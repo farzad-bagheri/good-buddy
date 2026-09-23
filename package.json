@@ -1,0 +1,110 @@
+{
+  "name": "good-buddy",
+  "displayName": "Good Buddy",
+  "description": "A local-LLM (Ollama) powered coding assistant: inline completions and code explanations.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "type": "module",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other",
+    "Machine Learning"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.cjs",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "goodBuddy",
+          "title": "Good Buddy",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "goodBuddy": [
+        {
+          "type": "webview",
+          "id": "goodBuddy.chatView",
+          "name": "Chat",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "goodBuddy.explainCode",
+        "title": "Good Buddy: Explain Selected Code"
+      },
+      {
+        "command": "goodBuddy.toggleInlineCompletions",
+        "title": "Good Buddy: Toggle Inline Completions"
+      },
+      {
+        "command": "goodBuddy.showOutput",
+        "title": "Good Buddy: Show Output Log"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "goodBuddy.explainCode",
+          "when": "editorHasSelection",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Good Buddy",
+      "properties": {
+        "goodBuddy.endpoint": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Base URL of the local Ollama server."
+        },
+        "goodBuddy.completionModel": {
+          "type": "string",
+          "default": "moophlo/Qwen3-Coder-30B-A3B-Instruct-GGUF:latest",
+          "description": "Model used for inline code completions."
+        },
+        "goodBuddy.chatModel": {
+          "type": "string",
+          "default": "qwen3:8b",
+          "description": "Model used for chat-style tasks like explaining code."
+        },
+        "goodBuddy.inlineCompletionsEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable inline (ghost text) completions from the local model."
+        },
+        "goodBuddy.maxContextLines": {
+          "type": "number",
+          "default": 100,
+          "description": "Max number of lines of surrounding code to send as context for completions."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "vite build",
+    "check": "tsc --noEmit -p ./",
+    "watch": "vite build --watch",
+    "clean": "rm -rf out"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.4.0",
+    "vite": "^8.3.0"
+  },
+  "packageManager": "pnpm@11.21.0",
+  "dependencies": {
+    "marked": "^18.0.14"
+  }
+}
