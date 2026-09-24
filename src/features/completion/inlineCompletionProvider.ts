@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { getGoodBuddyConfig, inlineCompletionsEnabled } from "@/config";
-import { OllamaClient } from "@/ollama";
+import { OllamaClient } from "@/provider/ollama";
 
 // Uses Ollama's FIM-style prompt: give prefix/suffix and let the model fill the middle.
 export class GoodBuddyInlineCompletionProvider

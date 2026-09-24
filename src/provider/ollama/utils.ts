@@ -25,6 +25,13 @@ export function parseJsonResponse<T>(response: string, endpoint: string): T {
   }
 }
 
+/**
+ * Processes a single line of a streaming JSON response, extracting text and invoking a callback for each chunk.
+ * @param line A line of the streaming response to process.
+ * @param extractText A function that extracts text from the parsed JSON object.
+ * @param onChunk A callback function invoked with each extracted text chunk.
+ * @returns The extracted text from the current line.
+ */
 export function processStreamLine(
   line: string,
   extractText: (json: unknown) => string,
@@ -36,7 +43,6 @@ export function processStreamLine(
       onChunk(text);
     }
     return text;
-
   } catch (error) {
     throw new Error(
       `Invalid streaming response from: ${describeParseError(line, error)}`,

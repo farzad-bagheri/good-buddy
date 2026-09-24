@@ -62,6 +62,11 @@
     "configuration": {
       "title": "Good Buddy",
       "properties": {
+        "goodBuddy.provider": {
+          "type": "string",
+          "default": "ollama",
+          "description": "The provider for the Good Buddy assistant. Currently, only 'ollama' is supported."
+        },
         "goodBuddy.endpoint": {
           "type": "string",
           "default": "http://localhost:11434",

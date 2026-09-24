@@ -1,0 +1,1 @@
+export { GoodBuddyInlineCompletionProvider } from "./inlineCompletionProvider";

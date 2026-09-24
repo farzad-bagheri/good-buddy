@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
 import { getGoodBuddyConfig } from "../../config";
-import { ChatMessage, OllamaClient } from "../../ollama";
-import { ToolCall, WorkspaceTools } from "./workspaceTools";
+import { ChatMessage, OllamaClient } from "../../provider/ollama";
+import { ToolCall } from "./types";
+import { WorkspaceTools } from "./workspaceTools";
+import { Request } from "@/gateway";
 
 const MODEL_STATE_KEY = "goodBuddy.selectedChatModel";
 const MAX_ATTACHMENTS = 5;
@@ -13,20 +15,32 @@ interface ChatAttachment {
 }
 
 export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
+ private request :Request;
   public static readonly viewType = "goodBuddy.chatView";
 
   private view?: vscode.WebviewView;
   private history: ChatMessage[] = [];
   private activeController?: AbortController;
   private readonly workspaceTools = new WorkspaceTools();
-  private readonly pendingWrites = new Map<string, { path: string; before: string; after: string; resolve: (result: string) => void }>();
+  private readonly pendingWrites = new Map<
+    string,
+    {
+      path: string;
+      before: string;
+      after: string;
+      resolve: (result: string) => void;
+    }
+  >();
   private nextWriteId = 1;
   private attachments: ChatAttachment[] = [];
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly output: vscode.OutputChannel,
-  ) {}
+  ) {
+        const { endpoint } = getGoodBuddyConfig();
+    this.request = new Request(endpoint);
+  }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.view = webviewView;
@@ -61,7 +75,10 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
           this.activeController?.abort();
           break;
         case "reviewWrite":
-          await this.reviewWrite(String(message.id ?? ""), Boolean(message.approved));
+          await this.reviewWrite(
+            String(message.id ?? ""),
+            Boolean(message.approved),
+          );
           break;
       }
     });
@@ -74,7 +91,7 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
 
   private async sendModelList(): Promise<void> {
     const { endpoint, chatModel } = getGoodBuddyConfig();
-    const client = new OllamaClient(endpoint);
+    const client = new OllamaClient(this.request);
     try {
       const models = await client.listModels();
       this.view?.webview.postMessage({
@@ -109,10 +126,13 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
 
     const { endpoint } = getGoodBuddyConfig();
     const model = this.getSelectedModel();
-    const client = new OllamaClient(endpoint);
+    const client = new OllamaClient(this.request);
 
     const attachmentBlock = this.attachments
-      .map((attachment) => `\n\nAttached file: ${attachment.name}\n\`\`\`\n${attachment.content}\n\`\`\``)
+      .map(
+        (attachment) =>
+          `\n\nAttached file: ${attachment.name}\n\`\`\`\n${attachment.content}\n\`\`\``,
+      )
       .join("");
     const userContent = `${text}${attachmentBlock}`.trim();
     const attachmentLabel = this.attachments.length
@@ -121,7 +141,10 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
     this.attachments = [];
     this.postAttachments();
     this.history.push({ role: "user", content: userContent });
-    this.view.webview.postMessage({ type: "userMessage", text: `${text}${attachmentLabel}`.trim() });
+    this.view.webview.postMessage({
+      type: "userMessage",
+      text: `${text}${attachmentLabel}`.trim(),
+    });
 
     const controller = new AbortController();
     this.activeController = controller;
@@ -130,14 +153,17 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
     try {
       assistantText = await this.runAgent(client, model, controller.signal);
       this.view.webview.postMessage({ type: "assistantStart" });
-      this.view.webview.postMessage({ type: "assistantChunk", text: assistantText });
+      this.view.webview.postMessage({
+        type: "assistantChunk",
+        text: assistantText,
+      });
       this.history.push({ role: "assistant", content: assistantText });
       this.view.webview.postMessage({ type: "assistantDone" });
     } catch (err) {
       if (!controller.signal.aborted) {
         this.view.webview.postMessage({
           type: "assistantError",
-        text: formatError(err),
+          text: formatError(err),
         });
       } else {
         // Cancelled mid-stream; keep whatever was generated so far.
@@ -151,22 +177,39 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async runAgent(client: OllamaClient, model: string, signal: AbortSignal): Promise<string> {
-    const messages: ChatMessage[] = [agentInstructions(await this.workspaceTools.projectContext()), ...this.history];
+  private async runAgent(
+    client: OllamaClient,
+    model: string,
+    signal: AbortSignal,
+  ): Promise<string> {
+    const messages: ChatMessage[] = [
+      agentInstructions(await this.workspaceTools.projectContext()),
+      ...this.history,
+    ];
     for (let step = 0; step < 6; step++) {
       const response = await client.chat({ model, messages }, signal);
       this.output.appendLine(`[agent response] ${response.slice(0, 2_000)}`);
       const toolCall = parseToolCall(response);
       if (!toolCall) {
-        if (step === 0 && needsWorkspaceTool(this.history.at(-1)?.content ?? "")) {
+        if (
+          step === 0 &&
+          needsWorkspaceTool(this.history.at(-1)?.content ?? "")
+        ) {
           messages.push({ role: "assistant", content: response });
-          messages.push({ role: "user", content: "Do not describe the next step. Submit the required tool JSON now, with no prose." });
+          messages.push({
+            role: "user",
+            content:
+              "Do not describe the next step. Submit the required tool JSON now, with no prose.",
+          });
           continue;
         }
         return response;
       }
 
-      this.view?.webview.postMessage({ type: "toolStatus", text: `Using ${toolCall.tool}…` });
+      this.view?.webview.postMessage({
+        type: "toolStatus",
+        text: `Using ${toolCall.tool}…`,
+      });
       let result: string;
       try {
         result = await this.executeTool(toolCall);
@@ -174,23 +217,41 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
         result = `Tool error: ${formatError(error)}`;
       }
       messages.push({ role: "assistant", content: response });
-      messages.push({ role: "user", content: `Tool result for ${toolCall.tool}:\n${result}\nNow answer the original request.` });
+      messages.push({
+        role: "user",
+        content: `Tool result for ${toolCall.tool}:\n${result}\nNow answer the original request.`,
+      });
     }
     return "I stopped after five tool calls. Please narrow the request and try again.";
   }
 
   private async executeTool(toolCall: ToolCall): Promise<string> {
-    if (toolCall.tool !== "write_file" && toolCall.tool !== "replace_in_file") return this.workspaceTools.run(toolCall);
+    if (toolCall.tool !== "write_file" && toolCall.tool !== "replace_in_file")
+      return this.workspaceTools.run(toolCall);
     const path = toolArgument(toolCall, "path");
-    const edit = toolCall.tool === "replace_in_file"
-      ? await this.workspaceTools.proposeReplacement(path, toolArgument(toolCall, "oldText"), toolArgument(toolCall, "newText"))
-      : (() => undefined)();
-    const before = edit?.before ?? await this.workspaceTools.currentContent(path);
+    const edit =
+      toolCall.tool === "replace_in_file"
+        ? await this.workspaceTools.proposeReplacement(
+            path,
+            toolArgument(toolCall, "oldText"),
+            toolArgument(toolCall, "newText"),
+          )
+        : (() => undefined)();
+    const before =
+      edit?.before ?? (await this.workspaceTools.currentContent(path));
     const content = edit?.after ?? toolArgument(toolCall, "content");
-    const proposal = edit?.proposal ?? await this.workspaceTools.proposeWrite(path, content);
+    const proposal =
+      edit?.proposal ?? (await this.workspaceTools.proposeWrite(path, content));
     const id = String(this.nextWriteId++);
-    this.view?.webview.postMessage({ type: "writeProposal", id, path: proposal.path, diff: proposal.diff });
-    return new Promise((resolve) => this.pendingWrites.set(id, { path, before, after: content, resolve }));
+    this.view?.webview.postMessage({
+      type: "writeProposal",
+      id,
+      path: proposal.path,
+      diff: proposal.diff,
+    });
+    return new Promise((resolve) =>
+      this.pendingWrites.set(id, { path, before, after: content, resolve }),
+    );
   }
 
   private async reviewWrite(id: string, approved: boolean): Promise<void> {
@@ -199,14 +260,21 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
     this.pendingWrites.delete(id);
     if (!approved) return pending.resolve("Write denied by the user.");
     try {
-      pending.resolve(await this.workspaceTools.applyWrite(pending.path, pending.before, pending.after));
+      pending.resolve(
+        await this.workspaceTools.applyWrite(
+          pending.path,
+          pending.before,
+          pending.after,
+        ),
+      );
     } catch (error) {
       pending.resolve(`Tool error: ${formatError(error)}`);
     }
   }
 
   private rejectPendingWrites(): void {
-    for (const pending of this.pendingWrites.values()) pending.resolve("Write denied because the chat was reset.");
+    for (const pending of this.pendingWrites.values())
+      pending.resolve("Write denied because the chat was reset.");
     this.pendingWrites.clear();
   }
 
@@ -222,16 +290,24 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
     for (const uri of selected.slice(0, room)) {
       const bytes = await vscode.workspace.fs.readFile(uri);
       if (bytes.length > MAX_ATTACHMENT_BYTES || bytes.includes(0)) {
-        vscode.window.showWarningMessage(`Good Buddy skipped ${uri.path.split("/").pop()}: attachments must be text files under 80 KB.`);
+        vscode.window.showWarningMessage(
+          `Good Buddy skipped ${uri.path.split("/").pop()}: attachments must be text files under 80 KB.`,
+        );
         continue;
       }
-      this.attachments.push({ name: uri.path.split("/").pop() ?? "file", content: Buffer.from(bytes).toString("utf8") });
+      this.attachments.push({
+        name: uri.path.split("/").pop() ?? "file",
+        content: Buffer.from(bytes).toString("utf8"),
+      });
     }
     this.postAttachments();
   }
 
   private postAttachments(): void {
-    this.view?.webview.postMessage({ type: "attachments", names: this.attachments.map((attachment) => attachment.name) });
+    this.view?.webview.postMessage({
+      type: "attachments",
+      names: this.attachments.map((attachment) => attachment.name),
+    });
   }
 
   private renderHtml(webview: vscode.Webview): string {
@@ -431,7 +507,13 @@ function parseToolCall(response: string): ToolCall | undefined {
       if (
         candidate &&
         typeof candidate === "object" &&
-        ["list_project", "read_file", "write_file", "replace_in_file", "run_command"].includes(candidate.tool ?? "") &&
+        [
+          "list_project",
+          "read_file",
+          "write_file",
+          "replace_in_file",
+          "run_command",
+        ].includes(candidate.tool ?? "") &&
         candidate.arguments &&
         typeof candidate.arguments === "object" &&
         !Array.isArray(candidate.arguments)
@@ -447,7 +529,9 @@ function parseToolCall(response: string): ToolCall | undefined {
 
 function jsonCandidates(response: string): string[] {
   const candidates = [response.trim()];
-  const tagged = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/i.exec(response)?.[1];
+  const tagged = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/i.exec(
+    response,
+  )?.[1];
   if (tagged) candidates.push(tagged);
   const fenced = /```(?:json)?\s*([\s\S]*?)\s*```/i.exec(response)?.[1];
   if (fenced) candidates.push(fenced);
@@ -485,7 +569,9 @@ function toolArgument(toolCall: ToolCall, name: string): string {
 }
 
 function needsWorkspaceTool(userRequest: string): boolean {
-  return /\b(project|workspace|file|folder|directory|codebase|repo|read|inspect|check|test|run|edit|change|modify|add|remove|fix|implement|write)\b/i.test(userRequest);
+  return /\b(project|workspace|file|folder|directory|codebase|repo|read|inspect|check|test|run|edit|change|modify|add|remove|fix|implement|write)\b/i.test(
+    userRequest,
+  );
 }
 
 function getNonce(): string {

@@ -1,6 +1,10 @@
 import * as vscode from "vscode";
 
 export interface GoodBuddyConfig {
+  provider: "ollama";
+  /**
+   * The endpoint URL of the LLM server, combining the protocol, host, and port.
+   */
   endpoint: string;
   chatModel: string;
   completionModel: string;
@@ -13,6 +17,7 @@ export interface GoodBuddyConfig {
 export function getGoodBuddyConfig(): GoodBuddyConfig {
   const configuration = vscode.workspace.getConfiguration("goodBuddy");
   return {
+    provider: configuration.get<"ollama">("provider", "ollama"),
     endpoint: configuration.get<string>("endpoint", "http://localhost:11434"),
     chatModel: configuration.get<string>("chatModel", "<invalid>"),
     completionModel: configuration.get<string>("completionModel", "<invalid>"),
@@ -29,7 +34,7 @@ export function inlineCompletionsEnabled(): boolean {
 export async function toggleInlineCompletions(): Promise<void> {
   const cfg = vscode.workspace.getConfiguration("goodBuddy");
   const current = cfg.get<boolean>("inlineCompletionsEnabled", true);
-  
+
   await cfg.update(
     "inlineCompletionsEnabled",
     !current,

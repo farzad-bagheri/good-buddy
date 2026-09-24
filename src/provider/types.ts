@@ -1,6 +1,3 @@
-/**
- * Ollama types and interfaces for the local LLM client.
- */
 export interface GenerateOptions {
   model: string;
   prompt: string;
@@ -32,12 +29,4 @@ export interface ChatOptions {
   messages: ChatMessage[];
   stream?: boolean;
   think?: boolean;
-}
-
-export interface GenerateResponse {
-  response?: string;
-}
-
-export interface ChatResponse {
-  message?: { content?: string };
 }

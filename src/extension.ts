@@ -1,8 +1,9 @@
 import * as vscode from "vscode";
-import { GoodBuddyInlineCompletionProvider } from "@/features/completion/inlineCompletionProvider";
+import { GoodBuddyInlineCompletionProvider } from "@/features/completion";
 import { GoodBuddyChatViewProvider } from "@/features/chat/chatViewProvider";
-import { explainCode } from "@/features/explain/explainCode";
+import { ExplainCodeFeature } from "@/features/explain/explainCode";
 import { toggleInlineCompletions } from "./config";
+import { OllamaProvider } from "@/provider/ollama";
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("Good Buddy");
@@ -16,21 +17,23 @@ export function activate(context: vscode.ExtensionContext): void {
   statusBar.command = "workbench.view.extension.goodBuddy";
   statusBar.show();
 
-  const provider = new GoodBuddyInlineCompletionProvider(output, statusBar);
-  const chatViewProvider = new GoodBuddyChatViewProvider(context, output);
+  const provider = new OllamaProvider();
+  const explainCodeFeature = new ExplainCodeFeature(provider);
+  // const provider = new GoodBuddyInlineCompletionProvider(output, statusBar);
+  // const chatViewProvider = new GoodBuddyChatViewProvider(context, output);
 
   context.subscriptions.push(
     output,
     statusBar,
-    vscode.languages.registerInlineCompletionItemProvider(
-      { pattern: "**" },
-      provider,
-    ),
+    // vscode.languages.registerInlineCompletionItemProvider(
+    //   { pattern: "**" },
+    //   provider,
+    // ),
 
-    vscode.window.registerWebviewViewProvider(
-      GoodBuddyChatViewProvider.viewType,
-      chatViewProvider,
-    ),
+    // vscode.window.registerWebviewViewProvider(
+    //   GoodBuddyChatViewProvider.viewType,
+    //           chatViewProvider,
+    //         ),
 
     vscode.commands.registerCommand("goodBuddy.showOutput", () => {
       output.show(true);
@@ -44,7 +47,7 @@ export function activate(context: vscode.ExtensionContext): void {
         );
         return;
       }
-      await explainCode(editor);
+      await explainCodeFeature.explainCode(editor);
     }),
 
     vscode.commands.registerCommand(
