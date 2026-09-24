@@ -1,9 +1,9 @@
-import * as vscode from "vscode";
-import { getGoodBuddyConfig } from "../../config";
-import { ChatMessage, OllamaClient } from "../../provider/ollama";
-import { ToolCall } from "./types";
-import { WorkspaceTools } from "./workspaceTools";
+import { getGoodBuddyConfig } from "@/config";
+import { ToolCall } from "@/features/chat/types";
 import { Request } from "@/gateway";
+import { ChatMessage, GoodBuddyProvider } from "@/provider";
+import * as vscode from "vscode";
+import { WorkspaceTools } from "./workspaceTools";
 
 const MODEL_STATE_KEY = "goodBuddy.selectedChatModel";
 const MAX_ATTACHMENTS = 5;
@@ -14,8 +14,7 @@ interface ChatAttachment {
   content: string;
 }
 
-export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
- private request :Request;
+export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   public static readonly viewType = "goodBuddy.chatView";
 
   private view?: vscode.WebviewView;
@@ -37,9 +36,10 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly output: vscode.OutputChannel,
+    private readonly provider: GoodBuddyProvider  ,
   ) {
         const { endpoint } = getGoodBuddyConfig();
-    this.request = new Request(endpoint);
+
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -91,9 +91,8 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
 
   private async sendModelList(): Promise<void> {
     const { endpoint, chatModel } = getGoodBuddyConfig();
-    const client = new OllamaClient(this.request);
     try {
-      const models = await client.listModels();
+      const models = await this.provider.listModels();
       this.view?.webview.postMessage({
         type: "models",
         models,
@@ -126,7 +125,6 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
 
     const { endpoint } = getGoodBuddyConfig();
     const model = this.getSelectedModel();
-    const client = new OllamaClient(this.request);
 
     const attachmentBlock = this.attachments
       .map(
@@ -151,7 +149,7 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
 
     let assistantText = "";
     try {
-      assistantText = await this.runAgent(client, model, controller.signal);
+      assistantText = await this.runAgent(this.provider, model, controller.signal);
       this.view.webview.postMessage({ type: "assistantStart" });
       this.view.webview.postMessage({
         type: "assistantChunk",
@@ -178,7 +176,7 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async runAgent(
-    client: OllamaClient,
+    client: GoodBuddyProvider,
     model: string,
     signal: AbortSignal,
   ): Promise<string> {
@@ -479,26 +477,8 @@ export class GoodBuddyChatViewProvider implements vscode.WebviewViewProvider {
   }
 }
 
-function formatError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
 
-function agentInstructions(projectContext: string): ChatMessage {
-  return {
-    role: "system",
-    content: `You are Good Buddy, a concise coding assistant with workspace tools.
-Use a tool only when it helps answer the user's request. To request one, reply with ONLY this JSON object (no Markdown):
-{"tool":"list_project","arguments":{}}
-{"tool":"read_file","arguments":{"path":"relative/path"}}
-{"tool":"write_file","arguments":{"path":"relative/path","content":"complete file contents"}}
-{"tool":"replace_in_file","arguments":{"path":"relative/path","oldText":"exact existing text","newText":"replacement text"}}
-{"tool":"run_command","arguments":{"command":"npm test"}}
-Current project context:\n${projectContext}\n\nWhen the user asks about or changes this project, inspect relevant files before answering. Do not stop after saying what you will do: request the next tool in the same response. For small edits, prefer replace_in_file. The user must approve every write and command. Paths must be relative to the workspace. After a tool result, either request another tool or give the final answer.`,
-  };
-}
+
 
 function parseToolCall(response: string): ToolCall | undefined {
   for (const json of jsonCandidates(response)) {

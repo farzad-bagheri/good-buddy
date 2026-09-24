@@ -1,0 +1,1 @@
+export { GoodBuddyChatFeature } from "./GoodBuddyChatFeature";
