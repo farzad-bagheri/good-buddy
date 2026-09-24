@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { GoodBuddyInlineCompletionProvider } from "@/features/completion";
+import { GoodBuddyInlineCompletionFeature } from "@/features/completion";
 import { GoodBuddyChatViewProvider } from "@/features/chat/chatViewProvider";
 import { ExplainCodeFeature } from "@/features/explain";
 import { toggleInlineCompletions } from "./config";
@@ -17,18 +17,18 @@ export function activate(context: vscode.ExtensionContext): void {
   statusBar.command = "workbench.view.extension.goodBuddy";
   statusBar.show();
 
-  const provider = new OllamaProvider();
-  const explainCodeFeature = new ExplainCodeFeature(provider);
-  // const provider = new GoodBuddyInlineCompletionProvider(output, statusBar);
+  const ollamaProvider = new OllamaProvider();
+  const explainCodeFeature = new ExplainCodeFeature(ollamaProvider);
+  const inlineCompletionFeature = new GoodBuddyInlineCompletionFeature(output, statusBar, ollamaProvider);
   // const chatViewProvider = new GoodBuddyChatViewProvider(context, output);
 
   context.subscriptions.push(
     output,
     statusBar,
-    // vscode.languages.registerInlineCompletionItemProvider(
-    //   { pattern: "**" },
-    //   provider,
-    // ),
+    vscode.languages.registerInlineCompletionItemProvider(
+      { pattern: "**" },
+      inlineCompletionFeature,
+    ),
 
     // vscode.window.registerWebviewViewProvider(
     //   GoodBuddyChatViewProvider.viewType,

@@ -1,9 +1,11 @@
-import * as vscode from "vscode";
 import { getGoodBuddyConfig, inlineCompletionsEnabled } from "@/config";
-import { OllamaClient } from "@/provider/ollama";
+import { GoodBuddyProvider } from "@/provider";
+import * as vscode from "vscode";
 
-// Uses Ollama's FIM-style prompt: give prefix/suffix and let the model fill the middle.
-export class GoodBuddyInlineCompletionProvider
+const DEBOUNCE_MS = 250;
+const TIMEOUT_MS = 8000;
+
+export class GoodBuddyInlineCompletionFeature
   implements vscode.InlineCompletionItemProvider
 {
   private lastRequestId = 0;
@@ -11,7 +13,7 @@ export class GoodBuddyInlineCompletionProvider
   constructor(
     private readonly output: vscode.OutputChannel,
     private readonly statusBar: vscode.StatusBarItem,
-    private readonly debounceMs = 250,
+    private provider: GoodBuddyProvider,
   ) {}
 
   async provideInlineCompletionItems(
@@ -27,12 +29,12 @@ export class GoodBuddyInlineCompletionProvider
     const requestId = ++this.lastRequestId;
 
     // Wait for typing to pause before hitting the model; bail out early if superseded.
-    await new Promise((resolve) => setTimeout(resolve, this.debounceMs));
+    await new Promise((resolve) => setTimeout(resolve, DEBOUNCE_MS));
     if (requestId !== this.lastRequestId || token.isCancellationRequested) {
       return undefined;
     }
 
-    const { endpoint, completionModel, maxContextLines } = getGoodBuddyConfig();
+    const { completionModel, maxContextLines } = getGoodBuddyConfig();
 
     const startLine = Math.max(0, position.line - maxContextLines);
     const prefixRange = new vscode.Range(
@@ -55,14 +57,13 @@ export class GoodBuddyInlineCompletionProvider
       return undefined;
     }
 
-    const client = new OllamaClient(endpoint);
     const controller = new AbortController();
     token.onCancellationRequested(() => controller.abort());
     let timedOut = false;
     const timeout = setTimeout(() => {
       timedOut = true;
       controller.abort();
-    }, 8000);
+    }, TIMEOUT_MS);
 
     this.statusBar.text = "$(loading~spin) Good Buddy";
     this.statusBar.tooltip = `Querying ${completionModel}... (first request after idle can be slow while the model loads)`;
@@ -70,9 +71,9 @@ export class GoodBuddyInlineCompletionProvider
 
     try {
       // Instruct models don't reliably honor the generic "suffix" field, so build
-      // the FIM prompt ourselves using Qwen's special tokens and bypass the chat template.
+      // the FIM prompt ourselves using special tokens and bypass the chat template.
       const fimPrompt = `<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`;
-      const response = await client.generate(
+      const response = await this.provider.generate(
         {
           model: completionModel,
           prompt: fimPrompt,
@@ -99,7 +100,7 @@ export class GoodBuddyInlineCompletionProvider
         return undefined;
       }
 
-      const text = response.replace(/\r/g, "");
+      const text = response.replace(/\r/g, ""); // Normalize line endings to Unix style
       const elapsedMs = Date.now() - started;
       this.output.appendLine(
         `[${new Date().toISOString()}] model=${completionModel} elapsed=${elapsedMs}ms\n` +
