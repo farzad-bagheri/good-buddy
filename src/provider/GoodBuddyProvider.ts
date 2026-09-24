@@ -1,4 +1,3 @@
-import { Request } from "@/gateway";
 import { ChatOptions, GenerateOptions } from "./types";
 
 /**

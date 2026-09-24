@@ -19,7 +19,7 @@ Good Buddy is a VS Code extension that uses a local [Ollama](https://ollama.com/
 2. Start Ollama and ensure the configured models are available.
 3. Run `pnpm run watch`, then launch **Run Good Buddy Extension** from VS Code.
 
-Run `pnpm run check` before committing. Use `pnpm run build` to create a production bundle.
+Run `pnpm run check` and `pnpm run lint` before committing. Use `pnpm run build` to create a production bundle.
 
 ## License
 

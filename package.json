@@ -99,14 +99,19 @@
   "scripts": {
     "vscode:prepublish": "npm run build",
     "build": "vite build",
+    "lint": "eslint .",
     "check": "tsc --noEmit -p ./",
     "watch": "vite build --watch",
     "clean": "rm -rf out"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.90.0",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
     "typescript": "^5.4.0",
+    "typescript-eslint": "^8.70.1",
     "vite": "^8.3.0"
   },
   "packageManager": "pnpm@11.21.0",

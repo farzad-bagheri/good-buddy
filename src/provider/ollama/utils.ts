@@ -21,6 +21,7 @@ export function parseJsonResponse<T>(response: string, endpoint: string): T {
   } catch (error) {
     throw new Error(
       `Invalid JSON response from ${endpoint}: ${describeParseError(response, error)}`,
+      { cause: error },
     );
   }
 }
@@ -46,6 +47,7 @@ export function processStreamLine(
   } catch (error) {
     throw new Error(
       `Invalid streaming response from: ${describeParseError(line, error)}`,
+      { cause: error },
     );
   }
 }
