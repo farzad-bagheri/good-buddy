@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { GoodBuddyInlineCompletionProvider } from "@/features/completion";
 import { GoodBuddyChatViewProvider } from "@/features/chat/chatViewProvider";
-import { ExplainCodeFeature } from "@/features/explain/explainCode";
+import { ExplainCodeFeature } from "@/features/explain";
 import { toggleInlineCompletions } from "./config";
 import { OllamaProvider } from "@/provider/ollama";
 

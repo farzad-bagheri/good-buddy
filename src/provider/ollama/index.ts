@@ -1,1 +1,1 @@
-export * from "./ollama-provider";
+export * from "./OllamaProvider";

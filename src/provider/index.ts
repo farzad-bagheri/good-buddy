@@ -1,2 +1,2 @@
-export { GoodBuddyProvider } from "./provider";
+export { GoodBuddyProvider } from "./GoodBuddyProvider";
 export * from "./types";
