@@ -4,6 +4,7 @@
   "description": "A local-LLM (Ollama) powered coding assistant: inline completions and code explanations.",
   "version": "0.0.1",
   "publisher": "local",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "vscode": "^1.90.0"

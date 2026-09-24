@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+title: Good Buddy
+version: 0.0.1
+date-released: 2026-09-24
+license: MIT
+authors:
+  - name: Farzad Bagheri Dabanlou
+message: >-
+  Citation is appreciated but not required. Please cite Good Buddy when it is
+  useful to your research, software, or commercial work.

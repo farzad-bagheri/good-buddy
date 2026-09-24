@@ -9,16 +9,28 @@ Good Buddy is a VS Code extension that uses a local [Ollama](https://ollama.com/
 - `src/features/chat/` contains the chat webview and its lifecycle.
 - `src/features/completion/` contains inline-completion behavior.
 - `src/features/explain/` contains selected-code explanation behavior.
-- `src/ollama/` is the isolated HTTP client and API types.
+- `src/provider/` contains the provider abstraction and Ollama implementation.
+- `src/gateway/` contains the HTTP request helpers.
 - `out/` is generated JavaScript. Do not edit it directly.
 
 ## Develop
 
-1. Install dependencies with `npm install`.
+1. Install dependencies with `pnpm install`.
 2. Start Ollama and ensure the configured models are available.
-3. Run `npm run watch`, then launch **Run Good Buddy Extension** from VS Code.
+3. Run `pnpm run watch`, then launch **Run Good Buddy Extension** from VS Code.
 
-Run `npm run check` before committing. It type-checks and builds the extension.
+Run `pnpm run check` before committing. Use `pnpm run build` to create a production bundle.
+
+## License
+
+Good Buddy is available under the [MIT License](LICENSE). You may use it for
+personal or commercial purposes, modify it, and redistribute it, subject to
+the license terms.
+
+Attribution or citation is appreciated but not required. If Good Buddy is
+useful in your research, software, or commercial work, you can use the
+metadata in [CITATION.cff](CITATION.cff) or cite it as **Good Buddy** by the
+Good Buddy contributors.
 
 ## Troubleshooting chat
 
