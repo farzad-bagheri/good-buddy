@@ -2,33 +2,51 @@ import { exec } from "child_process";
 import * as path from "path";
 import { promisify } from "util";
 import * as vscode from "vscode";
-import { ToolCall, WriteProposal } from "./types";
+import { ToolCall, WriteProposal } from "../types";
+import { ToolDefinition } from "./types";
 
 const execute = promisify(exec);
 const MAX_OUTPUT_LENGTH = 12_000;
 
 export class WorkspaceTools {
-  async run(call: ToolCall): Promise<string> {
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root) {
-      throw new Error("Open a workspace folder before using project tools.");
-    }
-
-    switch (call.tool) {
-      case "list_project":
-        return this.listProject(root);
-      case "read_file":
-        return this.readFile(root, requiredString(call.arguments.path, "path"));
-      case "write_file":
-        throw new Error("Write requests must be reviewed before execution.");
-      case "replace_in_file":
-        throw new Error("Edit requests must be reviewed before execution.");
-      case "run_command":
-        return this.runCommand(
-          root,
-          requiredString(call.arguments.command, "command"),
-        );
-    }
+  createTools(
+    executeWrite: (call: ToolCall) => Promise<string>,
+  ): ToolDefinition[] {
+    return [
+      {
+        id: "list_project",
+        description: "List the workspace project tree.",
+        execute: async () => this.listProject(this.workspaceRoot()),
+      },
+      {
+        id: "read_file",
+        description: "Read a text file from the workspace.",
+        execute: async (call) =>
+          this.readFile(
+            this.workspaceRoot(),
+            requiredString(call.arguments.path, "path"),
+          ),
+      },
+      {
+        id: "write_file",
+        description: "Propose complete contents for a workspace file.",
+        execute: executeWrite,
+      },
+      {
+        id: "replace_in_file",
+        description: "Propose replacing one exact section in a workspace file.",
+        execute: executeWrite,
+      },
+      {
+        id: "run_command",
+        description: "Run a command in the workspace after user approval.",
+        execute: async (call) =>
+          this.runCommand(
+            this.workspaceRoot(),
+            requiredString(call.arguments.command, "command"),
+          ),
+      },
+    ];
   }
 
   private async listProject(root: string): Promise<string> {
