@@ -70,7 +70,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       switch (message.type) {
         case "ready":
           await this.sendModelList();
-          this.postHistory();
+          await this.postHistory();
           this.postAttachments();
           break;
         case "send":
@@ -88,7 +88,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           this.history = [];
           this.attachments.clear();
           this.postAttachments();
-          this.postHistory();
+          await this.postHistory();
           break;
         case "cancel":
           this.activeController?.abort();
@@ -127,10 +127,17 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     }
   }
 
-  private postHistory(): void {
+  private async postHistory(): Promise<void> {
+    const messages = await Promise.all(
+      this.history.map(async (message) =>
+        message.role === "assistant"
+          ? { ...message, html: await marked.parse(message.content) }
+          : message,
+      ),
+    );
     this.view?.webview.postMessage({
       type: "history",
-      messages: this.history,
+      messages,
     });
   }
 
@@ -168,7 +175,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       this.view.webview.postMessage({ type: "assistantStart" });
       this.view.webview.postMessage({
         type: "assistantChunk",
-        text: marked.parse(assistantText),
+        html: marked.parse(assistantText),
       });
       this.history.push({ role: "assistant", content: assistantText });
       this.view.webview.postMessage({ type: "assistantDone" });
@@ -220,6 +227,23 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   .msg.user .role { color: var(--vscode-textLink-foreground); }
   .msg.assistant .role { color: var(--vscode-charts-green); }
   .msg.error .role { color: var(--vscode-errorForeground); }
+  .markdown { white-space: normal; line-height: 1.55; }
+  .markdown p { margin: 0 0 12px; }
+  .markdown p:last-child { margin-bottom: 0; }
+  .markdown h1, .markdown h2, .markdown h3, .markdown h4 { line-height: 1.3; margin: 20px 0 8px; }
+  .markdown h1 { font-size: 1.35em; }
+  .markdown h2 { font-size: 1.2em; }
+  .markdown h3, .markdown h4 { font-size: 1.05em; }
+  .markdown ul, .markdown ol { margin: 8px 0 14px; padding-left: 24px; }
+  .markdown li { margin: 4px 0; }
+  .markdown code { font-family: var(--vscode-editor-font-family); font-size: 0.9em; color: var(--vscode-textPreformat-foreground); background: var(--vscode-textCodeBlock-background); padding: 0.15em 0.35em; border-radius: 3px; }
+  .markdown pre { margin: 14px 0; padding: 12px 14px; overflow-x: auto; border: 1px solid var(--vscode-editorWidget-border); border-radius: 5px; background: var(--vscode-textCodeBlock-background); color: var(--vscode-textPreformat-foreground); white-space: pre; }
+  .markdown pre code { padding: 0; background: transparent; color: inherit; }
+  .markdown blockquote { margin: 14px 0; padding: 6px 14px; border-left: 3px solid var(--vscode-textLink-foreground); color: var(--vscode-descriptionForeground); background: var(--vscode-textCodeBlock-background); }
+  .markdown a { color: var(--vscode-textLink-foreground); }
+  .markdown table { width: 100%; margin: 14px 0; border-collapse: collapse; }
+  .markdown th, .markdown td { padding: 6px 8px; border: 1px solid var(--vscode-editorWidget-border); text-align: left; }
+  .markdown th { background: var(--vscode-textCodeBlock-background); }
   .proposal { margin: 8px 0 12px; padding: 8px; border: 1px solid var(--vscode-editorWidget-border); border-radius: 4px; }
   .proposal pre { max-height: 260px; overflow: auto; white-space: pre; background: var(--vscode-textCodeBlock-background); padding: 6px; }
   .proposal-actions { display: flex; gap: 6px; }
@@ -259,13 +283,35 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     roleLabel.className = 'role';
     roleLabel.textContent = role === 'user' ? 'You' : role === 'assistant' ? 'Good Buddy' : 'Error';
     const body = document.createElement('div');
-    body.className = 'body';
+    body.className = role === 'assistant' ? 'body markdown' : 'body';
     body.textContent = text;
     div.appendChild(roleLabel);
     div.appendChild(body);
     messagesEl.appendChild(div);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     return body;
+  }
+
+  function addMarkdownMessage(role, html) {
+    const body = addMessage(role, '');
+    body.innerHTML = sanitizeHtml(html);
+    return body;
+  }
+
+  function sanitizeHtml(html) {
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    template.content.querySelectorAll('script, style, iframe, object, embed, form').forEach((node) => node.remove());
+    template.content.querySelectorAll('*').forEach((element) => {
+      for (const attribute of [...element.attributes]) {
+        const name = attribute.name.toLowerCase();
+        const value = attribute.value.trim();
+        if (name.startsWith('on') || ((name === 'href' || name === 'src') && /^javascript:/i.test(value))) {
+          element.removeAttribute(attribute.name);
+        }
+      }
+    });
+    return template.innerHTML;
   }
 
   function send() {
@@ -328,7 +374,8 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       case 'history': {
         messagesEl.innerHTML = '';
         for (const m of msg.messages) {
-          addMessage(m.role, m.content);
+          if (m.role === 'assistant' && m.html) addMarkdownMessage(m.role, m.html);
+          else addMessage(m.role, m.content);
         }
         break;
       }
@@ -340,7 +387,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
         break;
       case 'assistantChunk':
         if (assistantBodyEl) {
-          assistantBodyEl.textContent += msg.text;
+          assistantBodyEl.innerHTML = sanitizeHtml(msg.html);
           messagesEl.scrollTop = messagesEl.scrollHeight;
         }
         break;
