@@ -1,5 +1,6 @@
 import { ChatMessage } from "@/provider";
 import { ToolDefinition } from "./tools";
+import type { ToolCall } from "./types";
 
 export function formatError(error: unknown): string {
   if (error instanceof Error) {
@@ -26,9 +27,7 @@ Current project context:\n${projectContext}\n\nWhen the user asks about or chang
   };
 }
 
-export function parseToolCall(
-  response: string,
-): import("./types").ToolCall | undefined {
+export function parseToolCall(response: string): ToolCall | undefined {
   for (const json of jsonCandidates(response)) {
     try {
       const candidate = JSON.parse(json) as {
@@ -39,11 +38,15 @@ export function parseToolCall(
         candidate &&
         typeof candidate === "object" &&
         typeof candidate.tool === "string" &&
-        candidate.arguments &&
-        typeof candidate.arguments === "object" &&
-        !Array.isArray(candidate.arguments)
+        (candidate.arguments === undefined ||
+          (typeof candidate.arguments === "object" &&
+            candidate.arguments !== null &&
+            !Array.isArray(candidate.arguments)))
       ) {
-        return candidate as import("./types").ToolCall;
+        return {
+          tool: candidate.tool,
+          arguments: (candidate.arguments ?? {}) as Record<string, unknown>,
+        } as ToolCall;
       }
     } catch {
       // Models may wrap valid JSON in prose or a code fence.
@@ -52,6 +55,11 @@ export function parseToolCall(
   return undefined;
 }
 
+/**
+ * Extracts potential JSON tool calls from a response string.
+ * @param response The response string potentially containing JSON tool calls.
+ * @returns An array of JSON strings extracted from the response, including potential tool calls.
+ */
 function jsonCandidates(response: string): string[] {
   const candidates = [response.trim()];
   const tagged = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/i.exec(
@@ -83,10 +91,7 @@ function jsonCandidates(response: string): string[] {
   return candidates;
 }
 
-export function toolArgument(
-  toolCall: import("./types").ToolCall,
-  name: string,
-): string {
+export function toolArgument(toolCall: ToolCall, name: string): string {
   const value = toolCall.arguments[name];
   if (typeof value !== "string" || !value) {
     throw new Error(`Tool argument '${name}' must be a non-empty string.`);

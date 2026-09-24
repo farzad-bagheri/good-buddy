@@ -1,5 +1,6 @@
 import { getGoodBuddyConfig } from "@/config";
 import { ChatMessage, GoodBuddyProvider } from "@/provider";
+import { marked } from "marked";
 import * as vscode from "vscode";
 import { AttachmentStore } from "./AttachmentStore";
 import { ChatAgent } from "./ChatAgent";
@@ -28,6 +29,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     private readonly provider: GoodBuddyProvider,
   ) {
     this.writeApprovals = new WriteApprovalManager(this.workspaceTools, {
+      // Handle write proposals from the workspace tools.
       propose: (id, path, diff) =>
         this.view?.webview.postMessage({
           type: "writeProposal",
@@ -36,11 +38,13 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           diff,
         }),
     });
+    // Initialize the tool registry and chat agent.
     this.tools = new ToolRegistry(
       this.workspaceTools.createTools((tool) =>
         this.writeApprovals.execute(tool),
       ),
     );
+    // Initialize the chat agent with the provider, output channel, workspace tools, tool registry, and event handlers.
     this.agent = new ChatAgent(
       provider,
       output,
@@ -61,6 +65,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = this.renderHtml(webviewView.webview);
 
+    // Handle incoming messages from the webview.
     webviewView.webview.onDidReceiveMessage(async (message) => {
       switch (message.type) {
         case "ready":
@@ -133,6 +138,8 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     if ((!text.trim() && this.attachments.all.length === 0) || !this.view) {
       return;
     }
+
+    // Abort any ongoing request before starting a new one.
     this.activeController?.abort();
 
     const model = this.getSelectedModel();
@@ -161,7 +168,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       this.view.webview.postMessage({ type: "assistantStart" });
       this.view.webview.postMessage({
         type: "assistantChunk",
-        text: assistantText,
+        text: marked.parse(assistantText),
       });
       this.history.push({ role: "assistant", content: assistantText });
       this.view.webview.postMessage({ type: "assistantDone" });

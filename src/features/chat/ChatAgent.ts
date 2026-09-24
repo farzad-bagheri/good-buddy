@@ -53,6 +53,6 @@ export class ChatAgent {
       });
     }
 
-    return "I stopped after five tool calls. Please narrow the request and try again.";
+    return `I stopped after ${MAX_STEPS} tool calls. Please narrow the request and try again.`;
   }
 }
