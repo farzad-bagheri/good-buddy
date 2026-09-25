@@ -1,5 +1,4 @@
-#  Good Buddy
-![Good Buddy](media/icon.svg)
+# Good Buddy
 
 Good Buddy is a VS Code extension that uses a local [Ollama](https://ollama.com/) server for inline code completions, a chat view, and selected-code explanations.
 

@@ -12,8 +12,17 @@ export default defineConfig({
     },
     rollupOptions: {
       external: ["vscode"],
+      output: {
+        codeSplitting: false,
+      },
     },
     outDir: "out",
+  },
+  ssr: {
+    // Vite externalizes node_modules deps for SSR builds by default; bundle
+    // them all (except "vscode", excluded above) since we package without
+    // dependencies.
+    noExternal: true,
   },
   resolve: {
     alias: {

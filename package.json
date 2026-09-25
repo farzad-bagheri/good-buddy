@@ -1,11 +1,15 @@
 {
   "name": "good-buddy",
   "displayName": "Good Buddy",
-  "description": "A local-LLM (Ollama) powered coding assistant: inline completions and code explanations.",
+  "description": "A local-LLM powered coding assistant: inline completions and code explanations.",
   "version": "0.0.1",
   "publisher": "local",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/farzad-bagheri/good-buddy"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -99,6 +103,8 @@
   "scripts": {
     "prepare": "husky",
     "vscode:prepublish": "npm run build",
+    "package": "vsce package --no-dependencies",
+    "compile": "vite build",
     "build": "vite build",
     "lint": "eslint .",
     "check": "tsc --noEmit -p ./",
@@ -114,6 +120,7 @@
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.90.0",
     "@vitest/coverage-v8": "^5.0.1",
+    "@vscode/vsce": "^4.0.0",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
     "husky": "^9.1.7",
@@ -122,8 +129,8 @@
     "vite": "^8.3.0",
     "vitest": "^5.0.1"
   },
-  "packageManager": "pnpm@11.21.0",
   "dependencies": {
     "marked": "^18.0.14"
-  }
+  },
+  "packageManager": "pnpm@11.21.0"
 }
