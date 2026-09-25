@@ -31,7 +31,7 @@ export class ExplainCodeFeature {
         enableScripts: true,
       },
     );
-    panel.webview.html = shellHtml;
+    panel.webview.html = shellHtml();
 
     const controller = new AbortController();
     panel.onDidDispose(() => controller.abort());

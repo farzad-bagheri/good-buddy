@@ -102,7 +102,8 @@
     "lint": "eslint .",
     "check": "tsc --noEmit -p ./",
     "watch": "vite build --watch",
-    "clean": "rm -rf out"
+    "clean": "rm -rf out",
+    "compile-shell": "node scripts/html/compile-shell.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
