@@ -93,6 +93,13 @@ function jsonCandidates(response: string): string[] {
   return candidates;
 }
 
+/**
+ * Retrieves the value of a specific argument from a tool call.
+ * @param toolCall The tool call containing the arguments.
+ * @param name The name of the argument to retrieve.
+ * @returns The value of the specified argument as a non-empty string.
+ * @throws An error if the argument is not a non-empty string.
+ */
 export function toolArgument(toolCall: ToolCall, name: string): string {
   const value = toolCall.arguments[name];
   if (typeof value !== "string" || !value) {

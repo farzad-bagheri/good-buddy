@@ -43,6 +43,8 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           diff,
         }),
     });
+
+    // Initialize the command approval manager.
     this.commandApprovals = new CommandApprovalManager(this.workspaceTools, {
       propose: (id, command) =>
         this.view?.webview.postMessage({
@@ -51,13 +53,14 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           command,
         }),
     });
+
     // Initialize the tool registry and chat agent.
-    this.tools = new ToolRegistry(
-      this.workspaceTools.createTools(
-        (tool) => this.writeApprovals.execute(tool),
-        this.commandApprovals.execute.bind(this.commandApprovals),
-      ),
+    const registeredTools = this.workspaceTools.createTools(
+      (tool) => this.writeApprovals.executeOrPropose(tool),
+      (call) => this.commandApprovals.executeOrPropose(call),
     );
+    this.tools = new ToolRegistry(registeredTools);
+
     // Initialize the chat agent with the provider, output channel, workspace tools, tool registry, and event handlers.
     this.agent = new ChatAgent(
       provider,
@@ -119,7 +122,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           );
           break;
         case "reviewCommand":
-          await this.commandApprovals.review(
+          await this.commandApprovals.executeOrReject(
             String(message.id ?? ""),
             Boolean(message.approved),
           );

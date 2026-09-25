@@ -44,6 +44,7 @@ export class ChatAgent {
       } catch (error) {
         result = `Tool error: ${formatError(error)}`;
       }
+      
       messages.push({ role: "assistant", content: response });
       messages.push({
         role: "user",

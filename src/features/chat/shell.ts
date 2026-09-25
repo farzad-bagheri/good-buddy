@@ -302,22 +302,6 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
       function addMessage(role, text) {
         const div = document.createElement("div");
         div.className = "msg " + role;
-        const roleLabel = document.createElement("div");
-        roleLabel.className = "role";
-        roleLabel.textContent = "";
-        switch (role) {
-          case "user":
-            roleLabel.textContent = "You";
-            break;
-          case "assistant":
-            roleLabel.textContent = "Good Buddy";
-            break;
-          case "tool":
-            roleLabel.textContent = "";
-            break;
-          default:
-            roleLabel.textContent = "Error";
-        }
         const body = document.createElement("div");
         body.className = "";
         switch (role) {
@@ -331,7 +315,6 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
             body.className = "body";
         }
         body.textContent = text;
-        div.appendChild(roleLabel);
         div.appendChild(body);
         messagesEl.appendChild(div);
         messagesEl.scrollTop = messagesEl.scrollHeight;

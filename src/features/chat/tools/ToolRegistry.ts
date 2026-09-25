@@ -20,6 +20,12 @@ export class ToolRegistry {
     return tool;
   }
 
+  /**
+   * Executes the specified tool call by retrieving the corresponding tool and invoking its execute function.
+   * @param call The tool call containing the tool ID and arguments.
+   * @returns The result of executing the tool as a string.
+   * @throws An error if the tool ID is unknown.
+   */
   async execute(call: ToolCall): Promise<string> {
     return this.get(call.tool).execute(call);
   }

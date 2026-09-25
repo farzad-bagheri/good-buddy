@@ -35,7 +35,9 @@ describe("approval managers", () => {
       arguments: { path: "notes.txt", content: "after" },
     };
 
-    await expect(manager.execute(toolCall)).resolves.toBe("Wrote notes.txt.");
+    await expect(manager.executeOrPropose(toolCall)).resolves.toBe(
+      "Wrote notes.txt.",
+    );
 
     expect(applyWrite).toHaveBeenCalledWith("notes.txt", "before", "after");
     expect(propose).not.toHaveBeenCalled();
@@ -55,7 +57,7 @@ describe("approval managers", () => {
       } as unknown as WorkspaceTools,
       { propose },
     );
-    const pending = manager.execute({
+    const pending = manager.executeOrPropose({
       tool: "write_file",
       autoApprove: false,
       arguments: { path: "notes.txt", content: "after" },
@@ -76,7 +78,7 @@ describe("approval managers", () => {
     );
 
     await expect(
-      manager.execute({
+      manager.executeOrPropose({
         tool: "run_command",
         autoApprove: true,
         arguments: { command: "pnpm test" },
@@ -94,7 +96,7 @@ describe("approval managers", () => {
       { runCommand } as unknown as WorkspaceTools,
       { propose },
     );
-    const pending = manager.execute({
+    const pending = manager.executeOrPropose({
       tool: "run_command",
       autoApprove: false,
       arguments: { command: "pnpm test" },
@@ -102,7 +104,7 @@ describe("approval managers", () => {
 
     expect(propose).toHaveBeenCalledOnce();
     expect(runCommand).not.toHaveBeenCalled();
-    await manager.review("1", true);
+    await manager.executeOrReject("1", true);
     await expect(pending).resolves.toBe("done");
   });
 });

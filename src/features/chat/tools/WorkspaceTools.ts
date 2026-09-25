@@ -24,6 +24,12 @@ const execute = promisify(exec);
  * reading and writing files, and running commands.
  */
 export class WorkspaceTools {
+  /**
+   * Creates a set of tools for interacting with the workspace.
+   * @param executeWrite A function to execute write operations in the workspace.
+   * @param executeCommand A function to execute commands in the workspace.
+   * @returns An array of tool definitions for interacting with the workspace.
+   */
   createTools(
     executeWrite: (call: ToolCall) => Promise<string>,
     executeCommand: (call: ToolCall) => Promise<string>,

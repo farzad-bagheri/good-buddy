@@ -8,6 +8,11 @@ interface PendingCommand {
 }
 
 export interface CommandApprovalEvents {
+  /**
+   * Called when a command requires user approval.
+   * @param id The unique identifier for the pending command.
+   * @param command The command that requires approval.
+   */
   propose(id: string, command: string): void;
 }
 
@@ -24,23 +29,36 @@ export class CommandApprovalManager {
     private readonly events: CommandApprovalEvents,
   ) {}
 
-  async execute(toolCall: ToolCall): Promise<string> {
+  /**
+   * Executes the given tool call, requesting user approval if necessary.
+   * @param toolCall The tool call containing the command to be executed.
+   * @returns A promise that resolves with the result of the command execution or a denial message.
+   */
+  async executeOrPropose(toolCall: ToolCall): Promise<string> {
     const command = toolArgument(toolCall, "command");
     if (toolCall.autoApprove) {
       return this.workspaceTools.runCommand(command);
     }
 
+    // Propose the command to the user for approval.
     const id = String(this.nextId++);
     this.events.propose(id, command);
+
+    // Return a promise that will be resolved once the user reviews the command.
     return new Promise((resolve) => this.pending.set(id, { command, resolve }));
   }
 
-  async review(id: string, approved: boolean): Promise<void> {
+  /**
+   * Reviews a pending command, executing it if approved or rejecting it otherwise.
+   * @param id The unique identifier for the pending command.
+   * @param approved Whether the command is approved by the user.
+   */
+  async executeOrReject(id: string, approved: boolean): Promise<void> {
     const pending = this.pending.get(id);
     if (!pending) return;
 
     this.pending.delete(id);
-    
+
     pending.resolve(
       approved
         ? await this.workspaceTools.runCommand(pending.command)
