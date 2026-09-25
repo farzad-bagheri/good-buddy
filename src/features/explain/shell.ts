@@ -191,6 +191,8 @@ export const shellHtml = (iconUri: string) => `<!doctype html>
         <span>Good Buddy</span>
       </div>
 
+      <hr />
+
       <main id="out" class="content"></main>
 
       <div id="error"></div>

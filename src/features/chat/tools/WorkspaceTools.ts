@@ -11,6 +11,7 @@ const MAX_OUTPUT_LENGTH = 12_000;
 export class WorkspaceTools {
   createTools(
     executeWrite: (call: ToolCall) => Promise<string>,
+    executeCommand: (call: ToolCall) => Promise<string>,
   ): ToolDefinition[] {
     return [
       {
@@ -40,11 +41,7 @@ export class WorkspaceTools {
       {
         id: "run_command",
         description: "Run a command in the workspace after user approval.",
-        execute: async (call) =>
-          this.runCommand(
-            this.workspaceRoot(),
-            requiredString(call.arguments.command, "command"),
-          ),
+        execute: executeCommand,
       },
     ];
   }
@@ -161,16 +158,10 @@ export class WorkspaceTools {
     return root;
   }
 
-  private async runCommand(root: string, command: string): Promise<string> {
-    const approved = await vscode.window.showWarningMessage(
-      `Good Buddy wants to run: ${command}`,
-      { modal: true, detail: `Working directory: ${root}` },
-      "Run command",
-    );
-    if (approved !== "Run command") return "Command denied by the user.";
+  async runCommand(command: string): Promise<string> {
     try {
       const { stdout, stderr } = await execute(command, {
-        cwd: root,
+        cwd: this.workspaceRoot(),
         timeout: 60_000,
         maxBuffer: MAX_OUTPUT_LENGTH,
         windowsHide: true,

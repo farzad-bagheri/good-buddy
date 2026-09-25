@@ -18,12 +18,15 @@
         display: flex;
         flex-direction: column;
         color: var(--vscode-foreground);
+        background: var(--vscode-sideBar-background);
       }
       header {
         display: flex;
-        gap: 6px;
-        padding: 6px;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
         border-bottom: 1px solid var(--vscode-panel-border);
+        background: var(--vscode-editor-background);
       }
       select,
       button {
@@ -32,7 +35,13 @@
         color: var(--vscode-dropdown-foreground);
         border: 1px solid var(--vscode-dropdown-border, transparent);
         border-radius: 4px;
-        padding: 2px 6px;
+        padding: 4px 8px;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--vscode-toolbar-hoverBackground);
       }
       select {
         flex: 1;
@@ -41,27 +50,56 @@
       #messages {
         flex: 1;
         overflow-y: auto;
-        padding: 8px;
+        padding: 16px 14px 24px;
       }
       .msg {
-        margin-bottom: 12px;
+        margin: 0 auto 22px;
+        max-width: 900px;
         white-space: pre-wrap;
-        line-height: 1.4;
+        line-height: 1.55;
       }
       .msg .role {
         font-weight: 600;
-        font-size: 0.85em;
-        opacity: 0.7;
-        margin-bottom: 2px;
+        font-size: 0.9em;
+        margin-bottom: 7px;
+        letter-spacing: 0.01em;
       }
       .msg.user .role {
-        color: var(--vscode-textLink-foreground);
+        color: var(--vscode-foreground);
       }
       .msg.assistant .role {
-        color: var(--vscode-charts-green);
+        color: var(--vscode-textLink-foreground);
       }
       .msg.error .role {
         color: var(--vscode-errorForeground);
+      }
+      .msg.user .body {
+        display: inline-block;
+        max-width: min(85%, 720px);
+        padding: 8px 11px;
+        border: 1px solid var(--vscode-editorWidget-border);
+        border-radius: 6px;
+        background: var(--vscode-editor-background);
+      }
+      .msg.assistant .body {
+        max-width: 100%;
+      }
+      .tool-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 900px;
+        margin: -6px auto 16px;
+        color: var(--vscode-descriptionForeground);
+        font-size: 0.9em;
+      }
+      .tool-status::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--vscode-charts-blue);
+        flex: 0 0 auto;
       }
       .markdown {
         white-space: normal;
@@ -158,16 +196,25 @@
         background: var(--vscode-textCodeBlock-background);
         padding: 6px;
       }
+      .command-proposal {
+        max-width: 900px;
+        margin: 8px auto 18px;
+      }
+      .command-proposal pre {
+        margin: 10px 0;
+      }
       .proposal-actions {
         display: flex;
         gap: 6px;
       }
       footer {
         display: flex;
+        align-items: flex-end;
         gap: 6px;
-        padding: 6px;
+        padding: 10px 12px;
         border-top: 1px solid var(--vscode-panel-border);
         flex-wrap: wrap;
+        background: var(--vscode-editor-background);
       }
       textarea {
         flex: 1;
@@ -176,8 +223,9 @@
         background: var(--vscode-input-background);
         color: var(--vscode-input-foreground);
         border: 1px solid var(--vscode-input-border, transparent);
-        border-radius: 4px;
-        padding: 4px;
+        border-radius: 6px;
+        padding: 7px 9px;
+        line-height: 1.4;
       }
       #attachments {
         width: 100%;
@@ -198,7 +246,7 @@
         rows="2"
         placeholder="Ask Good Buddy... (Enter to send, Shift+Enter for newline)"
       ></textarea>
-      <button id="attachBtn" title="Attach text files">Attach</button>
+      <button id="attachBtn" title="Attach text files">+</button>
       <button id="sendBtn">Send</button>
       <div id="attachments"></div>
     </footer>
@@ -219,20 +267,46 @@
         div.className = "msg " + role;
         const roleLabel = document.createElement("div");
         roleLabel.className = "role";
-        roleLabel.textContent =
-          role === "user"
-            ? "You"
-            : role === "assistant"
-              ? "Good Buddy"
-              : "Error";
+        roleLabel.textContent = "";
+        switch (role) {
+          case "user":
+            roleLabel.textContent = "You";
+            break;
+          case "assistant":
+            roleLabel.textContent = "Good Buddy";
+            break;
+          case "tool":
+            roleLabel.textContent = "";
+            break;
+          default:
+            roleLabel.textContent = "Error";
+        }
         const body = document.createElement("div");
-        body.className = role === "assistant" ? "body markdown" : "body";
+        body.className = "";
+        switch (role) {
+          case "assistant":
+            body.className = "body markdown";
+            break;
+          case "tool":
+            body.className = "tool markdown";
+            break;
+          default:
+            body.className = "body";
+        }
         body.textContent = text;
         div.appendChild(roleLabel);
         div.appendChild(body);
         messagesEl.appendChild(div);
         messagesEl.scrollTop = messagesEl.scrollHeight;
         return body;
+      }
+
+      function addToolStatus(text) {
+        const status = document.createElement("div");
+        status.className = "tool-status";
+        status.textContent = text;
+        messagesEl.appendChild(status);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
       }
 
       function addMarkdownMessage(role, html) {
@@ -289,6 +363,29 @@
           actions.appendChild(button);
         }
         card.append(title, patch, actions);
+        messagesEl.appendChild(card);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function addCommandProposal(id, command) {
+        const card = document.createElement("section");
+        card.className = "proposal command-proposal";
+        const title = document.createElement("strong");
+        title.textContent = "Run command";
+        const detail = document.createElement("pre");
+        detail.textContent = command;
+        const actions = document.createElement("div");
+        actions.className = "proposal-actions";
+        for (const approved of [true, false]) {
+          const button = document.createElement("button");
+          button.textContent = approved ? "Run" : "Reject";
+          button.addEventListener("click", () => {
+            vscode.postMessage({ type: "reviewCommand", id, approved });
+            actions.textContent = approved ? "Running command..." : "Rejected";
+          });
+          actions.appendChild(button);
+        }
+        card.append(title, detail, actions);
         messagesEl.appendChild(card);
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
@@ -353,10 +450,13 @@
             assistantBodyEl = null;
             break;
           case "toolStatus":
-            addMessage("assistant", msg.text);
+            addToolStatus(msg.text);
             break;
           case "writeProposal":
             addWriteProposal(msg.id, msg.path, msg.diff);
+            break;
+          case "commandProposal":
+            addCommandProposal(msg.id, msg.command);
             break;
           case "attachments":
             attachmentsEl.textContent = msg.names.length

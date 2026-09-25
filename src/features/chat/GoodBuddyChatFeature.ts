@@ -4,6 +4,7 @@ import { marked } from "marked";
 import * as vscode from "vscode";
 import { AttachmentStore } from "./AttachmentStore";
 import { ChatAgent } from "./ChatAgent";
+import { CommandApprovalManager } from "./CommandApprovalManager";
 import { WriteApprovalManager } from "./WriteApprovalManager";
 import { shellHtml } from "./shell";
 import { ToolRegistry } from "./tools";
@@ -21,6 +22,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   private readonly workspaceTools = new WorkspaceTools();
   private readonly attachments = new AttachmentStore();
   private readonly writeApprovals: WriteApprovalManager;
+  private readonly commandApprovals: CommandApprovalManager;
   private readonly tools: ToolRegistry;
   private readonly agent: ChatAgent;
 
@@ -39,10 +41,19 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           diff,
         }),
     });
+    this.commandApprovals = new CommandApprovalManager(this.workspaceTools, {
+      propose: (id, command) =>
+        this.view?.webview.postMessage({
+          type: "commandProposal",
+          id,
+          command,
+        }),
+    });
     // Initialize the tool registry and chat agent.
     this.tools = new ToolRegistry(
-      this.workspaceTools.createTools((tool) =>
-        this.writeApprovals.execute(tool),
+      this.workspaceTools.createTools(
+        (tool) => this.writeApprovals.execute(tool),
+        this.commandApprovals.execute.bind(this.commandApprovals),
       ),
     );
     // Initialize the chat agent with the provider, output channel, workspace tools, tool registry, and event handlers.
@@ -86,6 +97,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
         case "newChat":
           this.activeController?.abort();
           this.writeApprovals.rejectAll();
+          this.commandApprovals.rejectAll();
           this.history = [];
           this.attachments.clear();
           this.postAttachments();
@@ -96,6 +108,12 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           break;
         case "reviewWrite":
           await this.writeApprovals.review(
+            String(message.id ?? ""),
+            Boolean(message.approved),
+          );
+          break;
+        case "reviewCommand":
+          await this.commandApprovals.review(
             String(message.id ?? ""),
             Boolean(message.approved),
           );
