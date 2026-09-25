@@ -230,7 +230,42 @@
       #attachments {
         width: 100%;
         font-size: 0.85em;
-        opacity: 0.8;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .attachment-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        max-width: 100%;
+        padding: 2px 4px 2px 7px;
+        border: 1px solid var(--vscode-editorWidget-border);
+        border-radius: 4px;
+        background: var(--vscode-input-background);
+      }
+      .attachment-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .remove-attachment {
+        display: inline-grid;
+        width: 18px;
+        height: 18px;
+        place-items: center;
+        flex: 0 0 auto;
+        padding: 0;
+        border: 0;
+        border-radius: 3px;
+        background: transparent;
+        color: var(--vscode-descriptionForeground);
+        font-size: 16px;
+        line-height: 1;
+      }
+      .remove-attachment:hover {
+        background: var(--vscode-toolbar-hoverBackground);
+        color: var(--vscode-foreground);
       }
     </style>
   </head>
@@ -459,9 +494,31 @@
             addCommandProposal(msg.id, msg.command);
             break;
           case "attachments":
-            attachmentsEl.textContent = msg.names.length
-              ? "Attached: " + msg.names.join(", ")
-              : "";
+            {
+              const children = msg.names.map((name, index) => {
+                const item = document.createElement("div");
+                item.className = "attachment-item";
+                const label = document.createElement("span");
+                label.className = "attachment-name";
+                label.textContent = name;
+                label.title = name;
+                const remove = document.createElement("button");
+                remove.className = "remove-attachment";
+                remove.type = "button";
+                remove.title = "Remove " + name;
+                remove.setAttribute("aria-label", "Remove " + name);
+                remove.textContent = "×";
+                remove.addEventListener("click", () =>
+                  vscode.postMessage({ type: "removeAttachment", index }),
+                );
+                item.append(label, remove);
+                return item;
+              });
+              attachmentsEl.innerHTML = "";
+              for (const child of children) {
+                attachmentsEl.appendChild(child);
+              }
+            }
             break;
         }
       });

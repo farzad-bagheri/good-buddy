@@ -20,6 +20,12 @@ export class AttachmentStore {
     this.items = [];
   }
 
+  removeAt(index: number): void {
+    if (index >= 0 && index < this.items.length) {
+      this.items.splice(index, 1);
+    }
+  }
+
   /**
    * Prompts the user to pick files to attach to the chat.
    */

@@ -93,6 +93,10 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
         case "attachFiles":
           await this.pickAttachments();
           break;
+        case "removeAttachment":
+          this.attachments.removeAt(Number(message.index));
+          this.postAttachments();
+          break;
         case "selectModel":
           await this.context.globalState.update(MODEL_STATE_KEY, message.model);
           break;

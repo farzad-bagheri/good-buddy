@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { MAX_OUTPUT_LENGTH } from "./constants";
+import { MAX_OUTPUT_LENGTH } from "../constants";
 
 /**
  * Resolves a workspace-relative file path to an absolute URI, ensuring it stays within the workspace.
