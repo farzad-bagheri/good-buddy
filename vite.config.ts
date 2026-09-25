@@ -1,4 +1,5 @@
-import { defineConfig } from "vite";
+import { resolve } from "node:path";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   build: {
@@ -15,6 +16,19 @@ export default defineConfig({
     outDir: "out",
   },
   resolve: {
-    tsconfigPaths: true,
+    alias: {
+      "@": resolve(import.meta.dirname, "src"),
+    },
+  },
+  test: {
+    environment: "node",
+    globals: true,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "lcov"],
+      reportsDirectory: "coverage",
+      include: ["src/**/*.ts"],
+      exclude: ["src/**/*.test.ts", "src/**/*.d.ts", "src/extension.ts"],
+    },
   },
 });

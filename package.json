@@ -101,6 +101,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "check": "tsc --noEmit -p ./",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
     "watch": "vite build --watch",
     "clean": "rm -rf out",
     "compile-shell": "node scripts/html/compile-shell.js"
@@ -109,11 +112,13 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.90.0",
+    "@vitest/coverage-v8": "^5.0.1",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
     "typescript": "^5.4.0",
     "typescript-eslint": "^8.70.1",
-    "vite": "^8.3.0"
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
   },
   "packageManager": "pnpm@11.21.0",
   "dependencies": {

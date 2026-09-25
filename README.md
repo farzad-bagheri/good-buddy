@@ -21,6 +21,16 @@ Good Buddy is a VS Code extension that uses a local [Ollama](https://ollama.com/
 
 Run `pnpm run check` and `pnpm run lint` before committing. Use `pnpm run build` to create a production bundle.
 
+## Testing
+
+This project now includes a Vitest-based unit-test setup for fast validation and coverage reports.
+
+- Run unit tests with `pnpm test`
+- Re-run automatically while editing with `pnpm test:watch`
+- Generate a coverage report with `pnpm coverage`
+
+The test suite uses mocked fetch responses for Ollama HTTP calls so you can verify request/response handling without a live local model server.
+
 ## License
 
 Good Buddy is available under the [MIT License](LICENSE). You may use it for
