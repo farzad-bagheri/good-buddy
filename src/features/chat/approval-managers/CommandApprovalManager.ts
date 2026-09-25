@@ -1,6 +1,6 @@
 import { WorkspaceTools } from "../tools";
 import { ToolCall } from "../types";
-import { toolArgument } from "../utils";
+import { formatError, toolArgument } from "../utils";
 
 interface PendingCommand {
   command: string;
@@ -14,6 +14,9 @@ export interface CommandApprovalEvents {
    * @param command The command that requires approval.
    */
   propose(id: string, command: string): void;
+  start(id: string, command: string): void;
+  output(id: string, chunk: string): void;
+  complete(id: string, result: string): void;
 }
 
 /**
@@ -36,16 +39,17 @@ export class CommandApprovalManager {
    */
   async executeOrPropose(toolCall: ToolCall): Promise<string> {
     const command = toolArgument(toolCall, "command");
+    const id = String(this.nextId++);
     if (toolCall.autoApprove) {
-      return this.workspaceTools.runCommand(command);
+      this.events.start(id, command);
+      return this.runCommand(id, command);
     }
 
     // Propose the command to the user for approval.
-    const id = String(this.nextId++);
     this.events.propose(id, command);
 
     // Return a promise that will be resolved once the user reviews the command.
-    return new Promise((resolve) => this.pending.set(id, { command, resolve }));
+    return new Promise((resolve) => this.pending.set(id, { command, resolve })); // Store the pending command with its resolver (to be called upon user approval or rejection)
   }
 
   /**
@@ -61,9 +65,22 @@ export class CommandApprovalManager {
 
     pending.resolve(
       approved
-        ? await this.workspaceTools.runCommand(pending.command)
+        ? await this.runCommand(id, pending.command)
         : "Command denied by the user.",
     );
+  }
+
+  private async runCommand(id: string, command: string): Promise<string> {
+    let result: string;
+    try {
+      result = await this.workspaceTools.runCommand(command, (chunk) =>
+        this.events.output(id, chunk),
+      );
+    } catch (error) {
+      result = `Command failed: ${formatError(error)}`;
+    }
+    this.events.complete(id, result);
+    return result;
   }
 
   rejectAll(reason = "Command denied because the chat was reset."): void {

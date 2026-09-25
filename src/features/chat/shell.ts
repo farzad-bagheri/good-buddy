@@ -205,6 +205,13 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
       .command-proposal pre {
         margin: 10px 0;
       }
+      .command-output {
+        max-height: 260px;
+        overflow: auto;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+        font-family: var(--vscode-editor-font-family);
+      }
       .proposal-actions {
         display: flex;
         gap: 6px;
@@ -296,6 +303,7 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
       const newChatBtn = document.getElementById("newChatBtn");
       const attachBtn = document.getElementById("attachBtn");
       const attachmentsEl = document.getElementById("attachments");
+      const commandCards = new Map();
 
       let assistantBodyEl = null;
 
@@ -387,27 +395,55 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
 
-      function addCommandProposal(id, command) {
+      function addCommandProposal(id, command, autoApproved = false) {
         const card = document.createElement("section");
         card.className = "proposal command-proposal";
         const title = document.createElement("strong");
         title.textContent = "Run command";
         const detail = document.createElement("pre");
         detail.textContent = command;
+        const output = document.createElement("pre");
+        output.className = "command-output";
+        output.hidden = true;
         const actions = document.createElement("div");
         actions.className = "proposal-actions";
-        for (const approved of [true, false]) {
-          const button = document.createElement("button");
-          button.textContent = approved ? "Run" : "Reject";
-          button.addEventListener("click", () => {
-            vscode.postMessage({ type: "reviewCommand", id, approved });
-            actions.textContent = approved ? "Running command..." : "Rejected";
-          });
-          actions.appendChild(button);
+        if (autoApproved) {
+          actions.textContent = "Running command...";
+        } else {
+          for (const approved of [true, false]) {
+            const button = document.createElement("button");
+            button.textContent = approved ? "Run" : "Reject";
+            button.addEventListener("click", () => {
+              vscode.postMessage({ type: "reviewCommand", id, approved });
+              actions.textContent = approved ? "Running command..." : "Rejected";
+            });
+            actions.appendChild(button);
+          }
         }
-        card.append(title, detail, actions);
+        card.append(title, detail, output, actions);
         messagesEl.appendChild(card);
+        commandCards.set(id, { output, actions });
         messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function appendCommandOutput(id, text) {
+        const command = commandCards.get(id);
+        if (!command) return;
+        command.output.hidden = false;
+        command.output.textContent += text;
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function completeCommand(id, result) {
+        const command = commandCards.get(id);
+        if (!command) return;
+        if (!command.output.textContent) {
+          command.output.textContent = result;
+          command.output.hidden = false;
+        }
+        command.actions.textContent = result.startsWith("Command failed:")
+          ? "Command failed"
+          : "Completed";
       }
 
       sendBtn.addEventListener("click", send);
@@ -443,6 +479,7 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
           }
           case "history": {
             messagesEl.innerHTML = "";
+            commandCards.clear();
             for (const m of msg.messages) {
               if (m.role === "assistant" && m.html)
                 addMarkdownMessage(m.role, m.html);
@@ -477,6 +514,15 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
             break;
           case "commandProposal":
             addCommandProposal(msg.id, msg.command);
+            break;
+          case "commandStart":
+            addCommandProposal(msg.id, msg.command, true);
+            break;
+          case "commandOutput":
+            appendCommandOutput(msg.id, msg.text);
+            break;
+          case "commandComplete":
+            completeCommand(msg.id, msg.result);
             break;
           case "attachments":
             {

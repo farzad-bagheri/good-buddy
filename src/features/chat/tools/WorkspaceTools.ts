@@ -1,6 +1,5 @@
 import { exec } from "child_process";
 import * as path from "path";
-import { promisify } from "util";
 import * as vscode from "vscode";
 import type { ToolCall, ToolDefinition } from "../types";
 import { MAX_OUTPUT_LENGTH, TOOL_TIMEOUT } from "../constants";
@@ -16,8 +15,6 @@ export interface WriteProposal {
   path: string;
   diff: string;
 }
-
-const execute = promisify(exec);
 
 /**
  * Provides a set of tools for interacting with the workspace, including listing project files,
@@ -61,7 +58,8 @@ export class WorkspaceTools {
       },
       {
         id: "run_command",
-        description: "Run a command in the workspace after user approval.",
+        description:
+          "Run a command in the workspace after user approval, unless auto-approved.",
         execute: executeCommand,
       },
     ];
@@ -229,27 +227,62 @@ export class WorkspaceTools {
    * @param command The command to run in the workspace root.
    * @returns The combined stdout and stderr output of the command, truncated if necessary.
    */
-  async runCommand(command: string): Promise<string> {
-    try {
-      const { stdout, stderr } = await execute(command, {
-        cwd: this.workspaceRoot(),
-        timeout: TOOL_TIMEOUT,
-        maxBuffer: MAX_OUTPUT_LENGTH,
-        windowsHide: true,
-      });
+  async runCommand(
+    command: string,
+    onOutput?: (chunk: string) => void,
+  ): Promise<string> {
+    return new Promise((resolve) => {
+      let streamedLength = 0;
+      let outputTruncated = false;
+      const forwardOutput = (chunk: Buffer | string) => {
+        if (!onOutput || outputTruncated) return;
 
-      return (
-        truncate(`${stdout}${stderr}`) || "Command completed with no output."
-      );
-    } catch (error) {
-      const details = error as {
-        stdout?: string;
-        stderr?: string;
-        message: string;
+        const text = chunk.toString();
+        const remaining = MAX_OUTPUT_LENGTH - streamedLength;
+        const visible = text.slice(0, remaining);
+        if (visible) {
+          streamedLength += visible.length;
+          try {
+            onOutput(visible);
+          } catch {
+            // A closed webview should not interrupt command execution.
+          }
+        }
+        if (visible.length < text.length) {
+          outputTruncated = true;
+          onOutput("\n[Output truncated]");
+        }
       };
-      return truncate(
-        `Command failed: ${details.message}\n${details.stdout ?? ""}${details.stderr ?? ""}`,
+
+      const child = exec(
+        command,
+        {
+          cwd: this.workspaceRoot(),
+          timeout: TOOL_TIMEOUT,
+          maxBuffer: MAX_OUTPUT_LENGTH,
+          windowsHide: true,
+        },
+        (error, stdout, stderr) => {
+          if (error) {
+            const details = error as Error & {
+              stdout?: string;
+              stderr?: string;
+            };
+            resolve(
+              truncate(
+                `Command failed: ${details.message}\n${details.stdout ?? stdout}${details.stderr ?? stderr}`,
+              ),
+            );
+            return;
+          }
+
+          resolve(
+            truncate(`${stdout}${stderr}`) || "Command completed with no output.",
+          );
+        },
       );
-    }
+      child.stdout?.on("data", forwardOutput);
+      child.stderr?.on("data", forwardOutput);
+    });
   }
 }

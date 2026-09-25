@@ -52,6 +52,24 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           id,
           command,
         }),
+      start: (id, command) =>
+        this.view?.webview.postMessage({
+          type: "commandStart",
+          id,
+          command,
+        }),
+      output: (id, text) =>
+        this.view?.webview.postMessage({
+          type: "commandOutput",
+          id,
+          text,
+        }),
+      complete: (id, result) =>
+        this.view?.webview.postMessage({
+          type: "commandComplete",
+          id,
+          result,
+        }),
     });
 
     // Initialize the tool registry and chat agent.

@@ -70,11 +70,19 @@ describe("approval managers", () => {
   });
 
   it("executes auto-approved commands without proposing them", async () => {
-    const runCommand = vi.fn().mockResolvedValue("done");
+    const runCommand = vi.fn(
+      async (_command: string, onOutput?: (chunk: string) => void) => {
+        onOutput?.("command output");
+        return "done";
+      },
+    );
     const propose = vi.fn();
+    const start = vi.fn();
+    const output = vi.fn();
+    const complete = vi.fn();
     const manager = new CommandApprovalManager(
       { runCommand } as unknown as WorkspaceTools,
-      { propose },
+      { propose, start, output, complete },
     );
 
     await expect(
@@ -85,16 +93,26 @@ describe("approval managers", () => {
       }),
     ).resolves.toBe("done");
 
-    expect(runCommand).toHaveBeenCalledWith("pnpm test");
+    expect(runCommand).toHaveBeenCalledWith("pnpm test", expect.any(Function));
     expect(propose).not.toHaveBeenCalled();
+    expect(start).toHaveBeenCalledWith("1", "pnpm test");
+    expect(output).toHaveBeenCalledWith("1", "command output");
+    expect(complete).toHaveBeenCalledWith("1", "done");
   });
 
   it("still requires review for commands not marked auto-approved", async () => {
-    const runCommand = vi.fn().mockResolvedValue("done");
+    const runCommand = vi.fn(
+      async (_command: string, onOutput?: (chunk: string) => void) => {
+        onOutput?.("command output");
+        return "done";
+      },
+    );
     const propose = vi.fn();
+    const output = vi.fn();
+    const complete = vi.fn();
     const manager = new CommandApprovalManager(
       { runCommand } as unknown as WorkspaceTools,
-      { propose },
+      { propose, start: vi.fn(), output, complete },
     );
     const pending = manager.executeOrPropose({
       tool: "run_command",
@@ -106,5 +124,7 @@ describe("approval managers", () => {
     expect(runCommand).not.toHaveBeenCalled();
     await manager.executeOrReject("1", true);
     await expect(pending).resolves.toBe("done");
+    expect(output).toHaveBeenCalledWith("1", "command output");
+    expect(complete).toHaveBeenCalledWith("1", "done");
   });
 });
