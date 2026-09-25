@@ -13,7 +13,7 @@ export class GoodBuddyInlineCompletionFeature
   constructor(
     private readonly output: vscode.OutputChannel,
     private readonly statusBar: vscode.StatusBarItem,
-    private provider: GoodBuddyProvider,
+    private readonly provider: GoodBuddyProvider,
   ) {}
 
   async provideInlineCompletionItems(

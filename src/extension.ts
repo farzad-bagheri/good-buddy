@@ -18,7 +18,7 @@ export function activate(context: vscode.ExtensionContext): void {
   statusBar.show();
 
   const ollamaProvider = new OllamaProvider();
-  const explainCodeFeature = new ExplainCodeFeature(ollamaProvider);
+  const explainCodeFeature = new ExplainCodeFeature(context, ollamaProvider);
   const inlineCompletionFeature = new GoodBuddyInlineCompletionFeature(
     output,
     statusBar,

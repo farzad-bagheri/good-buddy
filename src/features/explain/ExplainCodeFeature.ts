@@ -5,7 +5,10 @@ import * as vscode from "vscode";
 import { shellHtml } from "./shell";
 
 export class ExplainCodeFeature {
-  constructor(private provider: GoodBuddyProvider) {}
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly provider: GoodBuddyProvider,
+  ) {}
 
   async explainCode(editor: vscode.TextEditor): Promise<void> {
     const { chatModel } = getGoodBuddyConfig();
@@ -31,7 +34,11 @@ export class ExplainCodeFeature {
         enableScripts: true,
       },
     );
-    panel.webview.html = shellHtml();
+    
+    const iconUri = panel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, "media", "icon.svg"),
+    );
+    panel.webview.html = shellHtml(iconUri.toString());
 
     const controller = new AbortController();
     panel.onDidDispose(() => controller.abort());

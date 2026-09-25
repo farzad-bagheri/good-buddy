@@ -8,7 +8,7 @@ const shells = [
   {
     inputFile: "explain-shell.html",
     outputFile: "../../src/features/explain/shell.ts",
-    inject: [],
+    inject: ["iconUri: string"],
   },
   {
     inputFile: "chat-shell.html",
