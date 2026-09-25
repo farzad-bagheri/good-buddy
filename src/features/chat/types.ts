@@ -7,6 +7,7 @@ export type ToolName =
 
 export interface ToolCall {
   tool: ToolName;
+  autoApprove: boolean;
   arguments: Record<string, unknown>;
 }
 

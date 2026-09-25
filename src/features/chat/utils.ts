@@ -1,6 +1,5 @@
 import { ChatMessage } from "@/provider";
-import { ToolDefinition } from "./tools";
-import type { ToolCall } from "./types";
+import type { ToolCall, ToolDefinition } from "./types";
 
 export function formatError(error: unknown): string {
   if (error instanceof Error) {
@@ -20,7 +19,8 @@ export function agentInstructions(
     role: "system",
     content: `You are Good Buddy, a concise coding assistant with workspace tools.
 Use a tool only when it helps answer the user's request. For a final user-facing answer, use concise Markdown with headings, lists, inline code, or fenced code blocks when useful. To request one, reply with ONLY this JSON object (no Markdown):
-{"tool":"tool_id","arguments":{}}
+{"tool":"tool_id","autoApprove":true|false,"arguments":{}}
+Decide whether to autoApprove the tool call based on the context.
 Available tools:
 ${toolInstructions}
 Current project context:\n${projectContext}\n\nWhen the user asks about or changes this project, inspect relevant files before answering. Do not stop after saying what you will do: request the next tool in the same response. For small edits, prefer replace_in_file. The user must approve every write and command. Paths must be relative to the workspace. After a tool result, either request another tool or give the final answer.`,
@@ -32,6 +32,7 @@ export function parseToolCall(response: string): ToolCall | undefined {
     try {
       const candidate = JSON.parse(json) as {
         tool?: unknown;
+        autoApprove?: unknown;
         arguments?: unknown;
       };
       if (
@@ -45,6 +46,7 @@ export function parseToolCall(response: string): ToolCall | undefined {
       ) {
         return {
           tool: candidate.tool,
+          autoApprove: Boolean(candidate.autoApprove),
           arguments: (candidate.arguments ?? {}) as Record<string, unknown>,
         } as ToolCall;
       }

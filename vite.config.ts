@@ -5,6 +5,7 @@ export default defineConfig({
   build: {
     target: "node22",
     ssr: true,
+    sourcemap: true,
     lib: {
       entry: "src/extension.ts",
       formats: ["cjs"],
