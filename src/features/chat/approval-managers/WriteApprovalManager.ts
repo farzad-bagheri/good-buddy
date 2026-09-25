@@ -44,6 +44,14 @@ export class WriteApprovalManager {
     const content = edit?.after ?? toolArgument(toolCall, "content");
     const proposal =
       edit?.proposal ?? (await this.workspaceTools.proposeWrite(path, content));
+    if (toolCall.autoApprove) {
+      try {
+        return await this.workspaceTools.applyWrite(path, before, content);
+      } catch (error) {
+        return `Tool error: ${formatError(error)}`;
+      }
+    }
+
     const id = String(this.nextId++);
 
     this.events.propose(id, proposal.path, proposal.diff);
@@ -62,7 +70,7 @@ export class WriteApprovalManager {
       pending.resolve("Write denied by the user.");
       return;
     }
-    
+
     try {
       pending.resolve(
         await this.workspaceTools.applyWrite(

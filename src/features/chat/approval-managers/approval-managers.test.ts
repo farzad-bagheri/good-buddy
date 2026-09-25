@@ -1,0 +1,108 @@
+import { describe, expect, it, vi } from "vitest";
+import { CommandApprovalManager } from "./CommandApprovalManager";
+import { WriteApprovalManager } from "./WriteApprovalManager";
+import type { WorkspaceTools } from "../tools";
+import type { ToolCall } from "../types";
+import { parseToolCall } from "../utils";
+
+describe("approval managers", () => {
+  it("only accepts a literal true autoApprove flag", () => {
+    expect(
+      parseToolCall('{"tool":"run_command","autoApprove":"false"}'),
+    ).toMatchObject({ autoApprove: false });
+    expect(
+      parseToolCall('{"tool":"run_command","autoApprove":true}'),
+    ).toMatchObject({ autoApprove: true });
+  });
+
+  it("executes auto-approved writes without proposing them", async () => {
+    const applyWrite = vi.fn().mockResolvedValue("Wrote notes.txt.");
+    const propose = vi.fn();
+    const manager = new WriteApprovalManager(
+      {
+        currentContent: vi.fn().mockResolvedValue("before"),
+        proposeWrite: vi.fn().mockResolvedValue({
+          path: "notes.txt",
+          diff: "diff",
+        }),
+        applyWrite,
+      } as unknown as WorkspaceTools,
+      { propose },
+    );
+    const toolCall: ToolCall = {
+      tool: "write_file",
+      autoApprove: true,
+      arguments: { path: "notes.txt", content: "after" },
+    };
+
+    await expect(manager.execute(toolCall)).resolves.toBe("Wrote notes.txt.");
+
+    expect(applyWrite).toHaveBeenCalledWith("notes.txt", "before", "after");
+    expect(propose).not.toHaveBeenCalled();
+  });
+
+  it("still requires review for writes not marked auto-approved", async () => {
+    const applyWrite = vi.fn().mockResolvedValue("Wrote notes.txt.");
+    const propose = vi.fn();
+    const manager = new WriteApprovalManager(
+      {
+        currentContent: vi.fn().mockResolvedValue("before"),
+        proposeWrite: vi.fn().mockResolvedValue({
+          path: "notes.txt",
+          diff: "diff",
+        }),
+        applyWrite,
+      } as unknown as WorkspaceTools,
+      { propose },
+    );
+    const pending = manager.execute({
+      tool: "write_file",
+      autoApprove: false,
+      arguments: { path: "notes.txt", content: "after" },
+    });
+
+    await vi.waitFor(() => expect(propose).toHaveBeenCalledOnce());
+    expect(applyWrite).not.toHaveBeenCalled();
+    await manager.review("1", true);
+    await expect(pending).resolves.toBe("Wrote notes.txt.");
+  });
+
+  it("executes auto-approved commands without proposing them", async () => {
+    const runCommand = vi.fn().mockResolvedValue("done");
+    const propose = vi.fn();
+    const manager = new CommandApprovalManager(
+      { runCommand } as unknown as WorkspaceTools,
+      { propose },
+    );
+
+    await expect(
+      manager.execute({
+        tool: "run_command",
+        autoApprove: true,
+        arguments: { command: "pnpm test" },
+      }),
+    ).resolves.toBe("done");
+
+    expect(runCommand).toHaveBeenCalledWith("pnpm test");
+    expect(propose).not.toHaveBeenCalled();
+  });
+
+  it("still requires review for commands not marked auto-approved", async () => {
+    const runCommand = vi.fn().mockResolvedValue("done");
+    const propose = vi.fn();
+    const manager = new CommandApprovalManager(
+      { runCommand } as unknown as WorkspaceTools,
+      { propose },
+    );
+    const pending = manager.execute({
+      tool: "run_command",
+      autoApprove: false,
+      arguments: { command: "pnpm test" },
+    });
+
+    expect(propose).toHaveBeenCalledOnce();
+    expect(runCommand).not.toHaveBeenCalled();
+    await manager.review("1", true);
+    await expect(pending).resolves.toBe("done");
+  });
+});

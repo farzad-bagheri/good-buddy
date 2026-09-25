@@ -24,8 +24,12 @@ export class CommandApprovalManager {
     private readonly events: CommandApprovalEvents,
   ) {}
 
-  execute(toolCall: ToolCall): Promise<string> {
+  async execute(toolCall: ToolCall): Promise<string> {
     const command = toolArgument(toolCall, "command");
+    if (toolCall.autoApprove) {
+      return this.workspaceTools.runCommand(command);
+    }
+
     const id = String(this.nextId++);
     this.events.propose(id, command);
     return new Promise((resolve) => this.pending.set(id, { command, resolve }));
