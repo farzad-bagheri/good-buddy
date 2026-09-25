@@ -2,10 +2,12 @@ import { getGoodBuddyConfig } from "@/config";
 import { ChatMessage, GoodBuddyProvider } from "@/provider";
 import { marked } from "marked";
 import * as vscode from "vscode";
-import { AttachmentStore } from "./AttachmentStore";
-import { ChatAgent } from "./ChatAgent";
-import { CommandApprovalManager } from "./CommandApprovalManager";
-import { WriteApprovalManager } from "./WriteApprovalManager";
+import { ChatAgent } from "./agent";
+import {
+  CommandApprovalManager,
+  WriteApprovalManager,
+} from "./approval-managers";
+import { AttachmentStore } from "./attachment";
 import { shellHtml } from "./shell";
 import { ToolRegistry } from "./tools";
 import { WorkspaceTools } from "./tools/WorkspaceTools";

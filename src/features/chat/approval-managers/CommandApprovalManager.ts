@@ -1,6 +1,6 @@
-import { ToolCall } from "./types";
-import { toolArgument } from "./utils";
-import { WorkspaceTools } from "./tools/WorkspaceTools";
+import { WorkspaceTools } from "../tools";
+import { ToolCall } from "../types";
+import { toolArgument } from "../utils";
 
 interface PendingCommand {
   command: string;
@@ -11,6 +11,10 @@ export interface CommandApprovalEvents {
   propose(id: string, command: string): void;
 }
 
+/**
+ * Manages the approval process for running commands in the workspace.
+ * Keeps track of pending commands and handles user approval or rejection.
+ */
 export class CommandApprovalManager {
   private readonly pending = new Map<string, PendingCommand>();
   private nextId = 1;
@@ -30,7 +34,9 @@ export class CommandApprovalManager {
   async review(id: string, approved: boolean): Promise<void> {
     const pending = this.pending.get(id);
     if (!pending) return;
+
     this.pending.delete(id);
+    
     pending.resolve(
       approved
         ? await this.workspaceTools.runCommand(pending.command)

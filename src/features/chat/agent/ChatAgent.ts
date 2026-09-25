@@ -1,14 +1,12 @@
 import { ChatMessage, GoodBuddyProvider } from "@/provider";
-import { ToolCall } from "./types";
-import { ToolRegistry } from "./tools";
-import { agentInstructions, formatError, parseToolCall } from "./utils";
-import { WorkspaceTools } from "./tools/WorkspaceTools";
+import { MAX_CHAT_STEPS } from "../constants";
+import { ToolRegistry, WorkspaceTools } from "../tools";
+import { ToolCall } from "../types";
+import { agentInstructions, formatError, parseToolCall } from "../utils";
 
 export interface ChatAgentEvents {
   onToolStatus(tool: ToolCall): void;
 }
-
-const MAX_STEPS = 6;
 
 export class ChatAgent {
   constructor(
@@ -32,9 +30,9 @@ export class ChatAgent {
       ...history,
     ];
 
-    for (let step = 0; step < MAX_STEPS; step++) {
+    for (let step = 0; step < MAX_CHAT_STEPS; step++) {
       const response = await this.provider.chat({ model, messages }, signal);
-      this.output.appendLine(`[agent response] ${response.slice(0, 2_000)}`);
+      this.output.appendLine(`[agent response] ${response.slice(0, 2_000)}`); // Log the first 2,000 characters of the agent's response
       const toolCall = parseToolCall(response);
 
       if (!toolCall) return response;
@@ -53,6 +51,6 @@ export class ChatAgent {
       });
     }
 
-    return `I stopped after ${MAX_STEPS} tool calls. Please narrow the request and try again.`;
+    return `I stopped after ${MAX_CHAT_STEPS} tool calls. Please narrow the request and try again.`;
   }
 }

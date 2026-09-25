@@ -1,13 +1,14 @@
 import * as vscode from "vscode";
+import { MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES } from "../constants";
 
 export interface ChatAttachment {
   name: string;
   content: string;
 }
 
-const MAX_ATTACHMENTS = 5;
-const MAX_ATTACHMENT_BYTES = 80_000;
-
+/**
+ * Stores and manages chat attachments for the Good Buddy chat application.
+ */
 export class AttachmentStore {
   private items: ChatAttachment[] = [];
 
@@ -19,6 +20,9 @@ export class AttachmentStore {
     this.items = [];
   }
 
+  /**
+   * Prompts the user to pick files to attach to the chat.
+   */
   async pick(): Promise<void> {
     const selected = await vscode.window.showOpenDialog({
       canSelectMany: true,
@@ -33,7 +37,7 @@ export class AttachmentStore {
       const bytes = await vscode.workspace.fs.readFile(uri);
       if (bytes.length > MAX_ATTACHMENT_BYTES || bytes.includes(0)) {
         vscode.window.showWarningMessage(
-          `Good Buddy skipped ${uri.path.split("/").pop()}: attachments must be text files under 80 KB.`,
+          `Good Buddy skipped ${uri.path.split("/").pop()}: attachments must be text files under ${MAX_ATTACHMENT_BYTES / 1024} KB.`,
         );
         continue;
       }
@@ -44,6 +48,9 @@ export class AttachmentStore {
     }
   }
 
+  /**
+   * Formats all attached files for inclusion in a chat prompt.
+   */
   formatForPrompt(): string {
     return this.items
       .map(
@@ -53,6 +60,9 @@ export class AttachmentStore {
       .join("");
   }
 
+  /**
+   * Returns the names of all attached files.
+   */
   names(): string[] {
     return this.items.map((attachment) => attachment.name);
   }

@@ -1,6 +1,8 @@
-import { ToolCall, ToolName } from "../types";
-import { ToolDefinition } from "./types";
+import type { ToolCall, ToolDefinition, ToolName } from "../types";
 
+/**
+ * Manages the registration and execution of chat tools within the Good Buddy chat application.
+ */
 export class ToolRegistry {
   private readonly toolsById: ReadonlyMap<ToolName, ToolDefinition>;
 

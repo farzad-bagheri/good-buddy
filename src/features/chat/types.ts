@@ -10,7 +10,9 @@ export interface ToolCall {
   arguments: Record<string, unknown>;
 }
 
-export interface WriteProposal {
-  path: string;
-  diff: string;
+export interface ToolDefinition {
+  id: ToolName;
+  description: string;
+  execute(call: ToolCall): Promise<string>;
 }
+

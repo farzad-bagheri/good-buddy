@@ -2,12 +2,27 @@ import { exec } from "child_process";
 import * as path from "path";
 import { promisify } from "util";
 import * as vscode from "vscode";
-import { ToolCall, WriteProposal } from "../types";
-import { ToolDefinition } from "./types";
+import type { ToolCall, ToolDefinition } from "../types";
+import { MAX_OUTPUT_LENGTH, TOOL_TIMEOUT } from "../constants";
+import {
+  createDiff,
+  readTextIfExists,
+  requiredString,
+  truncate,
+  workspaceFile,
+} from "./utils";
+
+export interface WriteProposal {
+  path: string;
+  diff: string;
+}
 
 const execute = promisify(exec);
-const MAX_OUTPUT_LENGTH = 12_000;
 
+/**
+ * Provides a set of tools for interacting with the workspace, including listing project files,
+ * reading and writing files, and running commands.
+ */
 export class WorkspaceTools {
   createTools(
     executeWrite: (call: ToolCall) => Promise<string>,
@@ -46,6 +61,11 @@ export class WorkspaceTools {
     ];
   }
 
+  /**
+   * Retrieves the project context, including the workspace root and a project tree up to depth 3.
+   * @param root The root directory of the workspace.
+   * @returns A string representing the project context, including the workspace root and a project tree up to depth 3.
+   */
   private async listProject(root: string): Promise<string> {
     const entries: string[] = [];
     const visit = async (
@@ -58,7 +78,7 @@ export class WorkspaceTools {
       for (const [name, type] of await vscode.workspace.fs.readDirectory(
         folder,
       )) {
-        if (["node_modules", ".git", "out"].includes(name)) continue;
+        if (["node_modules", ".git", "out", "dist"].includes(name)) continue;
 
         const childRelative = relative ? `${relative}/${name}` : name;
         entries.push(
@@ -80,6 +100,12 @@ export class WorkspaceTools {
     return entries.join("\n") || "The workspace is empty.";
   }
 
+  /**
+   * Reads the content of a file within the workspace, truncating it if necessary.
+   * @param root The root directory of the workspace.
+   * @param relativePath The relative path to the file within the workspace.
+   * @returns The content of the file as a string, or an empty string if the file does not exist.
+   */
   private async readFile(root: string, relativePath: string): Promise<string> {
     const uri = workspaceFile(root, relativePath);
     const content = Buffer.from(
@@ -88,6 +114,12 @@ export class WorkspaceTools {
     return truncate(content);
   }
 
+  /**
+   * Proposes a write operation for a specific file within the workspace.
+   * @param relativePath The relative path to the file within the workspace.
+   * @param content The new content to propose for the file.
+   * @returns A write proposal containing the path and the diff between the current and proposed content.
+   */
   async proposeWrite(
     relativePath: string,
     content: string,
@@ -100,6 +132,14 @@ export class WorkspaceTools {
       diff: createDiff(relativePath, current, content),
     };
   }
+
+  /**
+   * Proposes a replacement of a specific section of a file's content, ensuring that exactly one occurrence of the old text exists.
+   * @param relativePath The relative path to the file within the workspace.
+   * @param oldText The text to be replaced.
+   * @param newText The new text to replace the old text with.
+   * @returns An object containing the write proposal, the content before the replacement, and the content after the replacement.
+   */
 
   async proposeReplacement(
     relativePath: string,
@@ -124,11 +164,22 @@ export class WorkspaceTools {
     };
   }
 
+  /**
+   * Retrieves the project context, including the workspace root and a project tree up to depth 3.
+   * @returns A string representing the project context, including the workspace root and a project tree up to depth 3.
+   */
   async projectContext(): Promise<string> {
     const root = this.workspaceRoot();
     return `Workspace root: ${root}\nProject tree (depth 3):\n${await this.listProject(root)}`;
   }
 
+  /**
+   * Applies a write operation to the specified file if its current content matches the expected content.
+   * @param relativePath The relative path to the file within the workspace.
+   * @param expectedContent The content expected to be currently in the file.
+   * @param content The new content to write to the file.
+   * @returns A message indicating the result of the write operation.
+   */
   async applyWrite(
     relativePath: string,
     expectedContent: string,
@@ -147,10 +198,19 @@ export class WorkspaceTools {
     return `Wrote ${relativePath}.`;
   }
 
+  /**
+   * Retrieves the current content of the specified file within the workspace.
+   * @param relativePath The relative path to the file within the workspace.
+   * @returns The content of the file as a string, or an empty string if the file does not exist.
+   */
   async currentContent(relativePath: string): Promise<string> {
     return readTextIfExists(workspaceFile(this.workspaceRoot(), relativePath));
   }
 
+  /**
+   * Returns the root directory of the currently opened workspace.
+   * @returns The absolute path to the workspace root directory.
+   */
   private workspaceRoot(): string {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root)
@@ -158,14 +218,20 @@ export class WorkspaceTools {
     return root;
   }
 
+  /**
+   * Runs a shell command in the context of the workspace root directory.
+   * @param command The command to run in the workspace root.
+   * @returns The combined stdout and stderr output of the command, truncated if necessary.
+   */
   async runCommand(command: string): Promise<string> {
     try {
       const { stdout, stderr } = await execute(command, {
         cwd: this.workspaceRoot(),
-        timeout: 60_000,
+        timeout: TOOL_TIMEOUT,
         maxBuffer: MAX_OUTPUT_LENGTH,
         windowsHide: true,
       });
+
       return (
         truncate(`${stdout}${stderr}`) || "Command completed with no output."
       );
@@ -180,110 +246,4 @@ export class WorkspaceTools {
       );
     }
   }
-}
-
-function workspaceFile(root: string, relativePath: string): vscode.Uri {
-  const resolved = path.resolve(root, relativePath);
-  if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
-    throw new Error("Tool paths must stay inside the opened workspace.");
-  }
-  return vscode.Uri.file(resolved);
-}
-
-/**
- * Ensures that the given value is a non-empty string, throwing an error if it is not.
- * @param value The value to check.
- * @param name The name of the argument, used in the error message.
- * @returns The validated non-empty string.
- */
-function requiredString(value: unknown, name: string): string {
-  if (typeof value !== "string" || !value)
-    throw new Error(`Tool argument '${name}' must be a non-empty string.`);
-  return value;
-}
-
-/**
- * Truncates the given string to a maximum length defined by MAX_OUTPUT_LENGTH, appending a truncation notice if necessary.
- * @param value The string to truncate.
- * @returns The truncated string if it exceeds the maximum length, otherwise the original string.
- */
-function truncate(value: string): string {
-  return value.length > MAX_OUTPUT_LENGTH
-    ? `${value.slice(0, MAX_OUTPUT_LENGTH)}\n…[truncated]`
-    : value;
-}
-
-/**
- * Reads the content of a file if it exists, returning an empty string if the file is not found.
- * @param uri The URI of the file to read.
- * @returns The content of the file as a string, or an empty string if the file does not exist.
- */
-async function readTextIfExists(uri: vscode.Uri): Promise<string> {
-  try {
-    return Buffer.from(await vscode.workspace.fs.readFile(uri)).toString(
-      "utf8",
-    );
-  } catch (error) {
-    if (
-      error instanceof vscode.FileSystemError &&
-      error.code === "FileNotFound"
-    )
-      return "";
-    throw error;
-  }
-}
-
-/**
- * Creates a unified diff for the given file content before and after changes.
- * @param relativePath The relative path of the file being diffed.
- * @param before The content of the file before the change.
- * @param after The content of the file after the change.
- * @returns A unified diff string representing the changes between the before and after content.
- */
-function createDiff(
-  relativePath: string,
-  before: string,
-  after: string,
-): string {
-  const oldLines = before.split("\n");
-  const newLines = after.split("\n");
-
-  // Find the common prefix of the old and new lines.
-  let prefix = 0;
-  while (
-    prefix < oldLines.length &&
-    prefix < newLines.length &&
-    oldLines[prefix] === newLines[prefix]
-  )
-    prefix++;
-
-  // Find the common suffix of the old and new lines.
-  let suffix = 0;
-  while (
-    suffix < oldLines.length - prefix &&
-    suffix < newLines.length - prefix &&
-    oldLines[oldLines.length - 1 - suffix] ===
-      newLines[newLines.length - 1 - suffix]
-  )
-    suffix++;
-
-  const oldChanged = oldLines.slice(prefix, oldLines.length - suffix);
-  const newChanged = newLines.slice(prefix, newLines.length - suffix);
-
-  const contextBefore = oldLines
-    .slice(Math.max(0, prefix - 3), prefix)
-    .map((line) => ` ${line}`);
-
-  const contextAfter = oldLines
-    .slice(oldLines.length - suffix, oldLines.length - suffix + 3)
-    .map((line) => ` ${line}`);
-
-  return [
-    `--- a/${relativePath}`,
-    `+++ b/${relativePath}`,
-    ...contextBefore,
-    ...oldChanged.map((line) => `-${line}`),
-    ...newChanged.map((line) => `+${line}`),
-    ...contextAfter,
-  ].join("\n");
 }
