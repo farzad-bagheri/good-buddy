@@ -306,6 +306,7 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
       const commandCards = new Map();
 
       let assistantBodyEl = null;
+      let thinkingIndicator = null;
 
       function addMessage(role, text) {
         const div = document.createElement("div");
@@ -334,6 +335,20 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
         status.className = "tool-status";
         status.textContent = text;
         messagesEl.appendChild(status);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function setModelStatus(waiting) {
+        if (waiting && !thinkingIndicator) {
+          thinkingIndicator = document.createElement("div");
+          thinkingIndicator.className = "tool-status";
+          thinkingIndicator.textContent = "Thinking...";
+          thinkingIndicator.setAttribute("role", "status");
+          messagesEl.appendChild(thinkingIndicator);
+        } else if (!waiting && thinkingIndicator) {
+          thinkingIndicator.remove();
+          thinkingIndicator = null;
+        }
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
 
@@ -415,7 +430,9 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
             button.textContent = approved ? "Run" : "Reject";
             button.addEventListener("click", () => {
               vscode.postMessage({ type: "reviewCommand", id, approved });
-              actions.textContent = approved ? "Running command..." : "Rejected";
+              actions.textContent = approved
+                ? "Running command..."
+                : "Rejected";
             });
             actions.appendChild(button);
           }
@@ -480,6 +497,7 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
           case "history": {
             messagesEl.innerHTML = "";
             commandCards.clear();
+            thinkingIndicator = null;
             for (const m of msg.messages) {
               if (m.role === "assistant" && m.html)
                 addMarkdownMessage(m.role, m.html);
@@ -491,6 +509,7 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
             addMessage("user", msg.text);
             break;
           case "assistantStart":
+            setModelStatus(false);
             assistantBodyEl = addMessage("assistant", "");
             break;
           case "assistantChunk":
@@ -500,11 +519,16 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
             }
             break;
           case "assistantDone":
+            setModelStatus(false);
             assistantBodyEl = null;
             break;
           case "assistantError":
+            setModelStatus(false);
             addMessage("error", msg.text);
             assistantBodyEl = null;
+            break;
+          case "modelStatus":
+            setModelStatus(msg.waiting);
             break;
           case "toolStatus":
             addToolStatus(msg.text);

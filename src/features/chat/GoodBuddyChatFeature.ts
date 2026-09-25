@@ -91,6 +91,10 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
             type: "toolStatus",
             text: `Using ${tool.tool}…`,
           }),
+        onModelStatus: (waiting, signal) => {
+          if (this.activeController?.signal !== signal) return;
+          this.view?.webview.postMessage({ type: "modelStatus", waiting });
+        },
       },
     );
   }

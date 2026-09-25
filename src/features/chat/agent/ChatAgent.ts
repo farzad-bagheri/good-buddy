@@ -6,6 +6,7 @@ import { agentInstructions, formatError, parseToolCall } from "../utils";
 
 export interface ChatAgentEvents {
   onToolStatus(tool: ToolCall): void;
+  onModelStatus(waiting: boolean, signal: AbortSignal): void;
 }
 
 export class ChatAgent {
@@ -31,7 +32,13 @@ export class ChatAgent {
     ];
 
     for (let step = 0; step < MAX_CHAT_STEPS; step++) {
-      const response = await this.provider.chat({ model, messages }, signal);
+      this.events.onModelStatus(true, signal);
+      let response: string;
+      try {
+        response = await this.provider.chat({ model, messages }, signal);
+      } finally {
+        this.events.onModelStatus(false, signal);
+      }
       this.output.appendLine(`[agent response] ${response.slice(0, 2_000)}`); // Log the first 2,000 characters of the agent's response
       const toolCall = parseToolCall(response);
 
@@ -44,7 +51,7 @@ export class ChatAgent {
       } catch (error) {
         result = `Tool error: ${formatError(error)}`;
       }
-      
+
       messages.push({ role: "assistant", content: response });
       messages.push({
         role: "user",

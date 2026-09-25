@@ -277,7 +277,8 @@ export class WorkspaceTools {
           }
 
           resolve(
-            truncate(`${stdout}${stderr}`) || "Command completed with no output.",
+            truncate(`${stdout}${stderr}`) ||
+              "Command completed with no output.",
           );
         },
       );
