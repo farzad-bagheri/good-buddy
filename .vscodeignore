@@ -8,11 +8,13 @@ node_modules/
 
 src/
 scripts/
+webview/
 
 *.map
 
 eslint.config.mjs
 vite.config.ts
+vite.webview.config.ts
 tsconfig.json
 tsconfig.*.json
 

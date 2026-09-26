@@ -124,7 +124,19 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   /** Configures the chat webview and handles messages sent by its UI. */
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.view = webviewView;
-    webviewView.webview.options = { enableScripts: true };
+    const chatWebviewRoot = vscode.Uri.joinPath(
+      this.context.extensionUri,
+      "out",
+      "webview",
+      "chat",
+    );
+    webviewView.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [
+        chatWebviewRoot,
+        vscode.Uri.joinPath(this.context.extensionUri, "media"),
+      ],
+    };
     webviewView.webview.html = this.renderHtml(webviewView.webview);
 
     // Handle incoming messages from the webview.
@@ -492,6 +504,18 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   private renderHtml(webview: vscode.Webview): string {
     const nonce = getNonce(); // Generate a unique nonce for Content-Security-Policy
     const cspSource = webview.cspSource;
+    const chatWebviewRoot = vscode.Uri.joinPath(
+      this.context.extensionUri,
+      "out",
+      "webview",
+      "chat",
+    );
+    const scriptUri = webview
+      .asWebviewUri(vscode.Uri.joinPath(chatWebviewRoot, "assets", "chat.js"))
+      .toString();
+    const styleUri = webview
+      .asWebviewUri(vscode.Uri.joinPath(chatWebviewRoot, "assets", "style.css"))
+      .toString();
     const addIconUri = this.resources
       .getIcon("add")
       .asWebUri(webview)
@@ -500,7 +524,14 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       .getIcon("send")
       .asWebUri(webview)
       .toString();
-    return shellHtml(cspSource, nonce, addIconUri, sendIconUri);
+    return shellHtml(
+      cspSource,
+      nonce,
+      scriptUri,
+      styleUri,
+      addIconUri,
+      sendIconUri,
+    );
   }
 }
 

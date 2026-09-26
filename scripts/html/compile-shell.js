@@ -16,6 +16,8 @@ const shells = [
     inject: [
       "cspSource: string",
       "nonce: string",
+      "scriptUri: string",
+      "styleUri: string",
       "addIconUri: string",
       "sendIconUri: string",
     ],
