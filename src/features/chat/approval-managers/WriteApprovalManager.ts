@@ -15,6 +15,12 @@ interface PendingWrite {
 }
 
 export interface WriteApprovalEvents {
+  /**
+   * Event triggered when a write operation is proposed for user approval.
+   * @param id The unique ID of the proposed write operation.
+   * @param path The file path of the proposed write operation.
+   * @param diff The diff representing the changes in the proposed write operation.
+   */
   propose(id: string, path: string, diff: string): void;
 }
 

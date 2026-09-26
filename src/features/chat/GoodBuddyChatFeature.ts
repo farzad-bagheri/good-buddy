@@ -28,6 +28,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   private readonly tools: ToolRegistry;
   private readonly agent: ChatAgent;
 
+  /** Initializes chat tools, approval managers, and the chat agent. */
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly output: vscode.OutputChannel,
@@ -89,7 +90,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
         onToolStatus: (tool) =>
           this.view?.webview.postMessage({
             type: "toolStatus",
-            text: `Using ${tool.tool}…`,
+            tool,
           }),
         onModelStatus: (waiting, signal) => {
           if (this.activeController?.signal !== signal) return;
@@ -99,6 +100,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     );
   }
 
+  /** Configures the chat webview and handles messages sent by its UI. */
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.view = webviewView;
     webviewView.webview.options = { enableScripts: true };
@@ -153,11 +155,13 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     });
   }
 
+  /** Returns the saved chat model, falling back to the configured default. */
   private getSelectedModel(): string {
     const { chatModel } = getGoodBuddyConfig();
     return this.context.globalState.get<string>(MODEL_STATE_KEY, chatModel);
   }
 
+  /** Sends available models to the webview, falling back to the configured model on failure. */
   private async sendModelList(): Promise<void> {
     const { chatModel } = getGoodBuddyConfig();
     try {
@@ -177,6 +181,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     }
   }
 
+  /** Sends chat history to the webview, rendering assistant messages as HTML. */
   private async postHistory(): Promise<void> {
     const messages = await Promise.all(
       this.history.map(async (message) =>
@@ -191,6 +196,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     });
   }
 
+  /** Adds a user message and runs the agent, reporting its result to the webview. */
   private async handleSend(text: string): Promise<void> {
     if ((!text.trim() && this.attachments.all.length === 0) || !this.view) {
       return;
@@ -246,11 +252,13 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     }
   }
 
+  /** Opens the attachment picker and refreshes the webview's attachment list. */
   private async pickAttachments(): Promise<void> {
     await this.attachments.pick();
     this.postAttachments();
   }
 
+  /** Sends the current attachment names to the webview. */
   private postAttachments(): void {
     this.view?.webview.postMessage({
       type: "attachments",
@@ -258,6 +266,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     });
   }
 
+  /** Renders the webview shell with a generated Content Security Policy nonce. */
   private renderHtml(webview: vscode.Webview): string {
     const nonce = getNonce(); // Generate a unique nonce for Content-Security-Policy
     const cspSource = webview.cspSource;
@@ -265,6 +274,10 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   }
 }
 
+/**
+ * Generates a random nonce string.
+ * @returns A randomly generated nonce string used for Content-Security-Policy.
+ */
 function getNonce(): string {
   const possible =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";

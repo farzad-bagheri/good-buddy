@@ -218,24 +218,36 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
       }
       footer {
         display: flex;
-        align-items: flex-end;
+        flex-direction: column;
         gap: 6px;
         padding: 10px 12px;
         border-top: 1px solid var(--vscode-panel-border);
         flex-wrap: wrap;
         background: var(--vscode-editor-background);
+        #container {
+          background: var(--vscode-input-background);
+
+          border: 1px solid var(--vscode-input-border, transparent);
+          border-radius: 6px;
+          padding: 7px 9px;
+          textarea {
+            width: 100%;
+            background: transparent;
+            color: var(--vscode-input-foreground);
+            outline: none;
+            resize: none;
+            font-family: inherit;
+            border: none;
+            line-height: 1.4;
+          }
+          #controls {
+            display: flex;
+            justify-content: flex-end;
+            gap: 6px;
+          }
+        }
       }
-      textarea {
-        flex: 1;
-        resize: none;
-        font-family: inherit;
-        background: var(--vscode-input-background);
-        color: var(--vscode-input-foreground);
-        border: 1px solid var(--vscode-input-border, transparent);
-        border-radius: 6px;
-        padding: 7px 9px;
-        line-height: 1.4;
-      }
+
       #attachments {
         width: 100%;
         font-size: 0.85em;
@@ -285,14 +297,18 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
     </header>
     <div id="messages"></div>
     <footer>
-      <textarea
-        id="input"
-        rows="2"
-        placeholder="Ask Good Buddy... (Enter to send, Shift+Enter for newline)"
-      ></textarea>
-      <button id="attachBtn" title="Attach text files">+</button>
-      <button id="sendBtn">Send</button>
-      <div id="attachments"></div>
+      <div id="container">
+        <div id="attachments"></div>
+        <textarea
+          id="input"
+          rows="2"
+          placeholder="Ask Good Buddy... (Enter to send, Shift+Enter for newline)"
+        ></textarea>
+        <div id="controls">
+          <button id="attachBtn" title="Attach text files">+</button>
+          <button id="sendBtn">Send</button>
+        </div>
+      </div>
     </footer>
     <script nonce="${nonce}">
       const vscode = acquireVsCodeApi();
@@ -330,10 +346,14 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
         return body;
       }
 
-      function addToolStatus(text) {
+      function addToolStatus(tool) {
         const status = document.createElement("div");
         status.className = "tool-status";
-        status.textContent = text;
+        if (tool.autoApprove) {
+          status.textContent = "Used " + tool.arguments.join(", ") + "…";
+        } else {
+          status.textContent = "Proposed " + tool.tool + "…";
+        }
         messagesEl.appendChild(status);
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
@@ -531,7 +551,7 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
             setModelStatus(msg.waiting);
             break;
           case "toolStatus":
-            addToolStatus(msg.text);
+            addToolStatus(msg.tool);
             break;
           case "writeProposal":
             addWriteProposal(msg.id, msg.path, msg.diff);
