@@ -2,7 +2,17 @@ import { ChatMessage, GoodBuddyProvider } from "@/provider";
 import { MAX_CHAT_STEPS } from "../constants";
 import { ToolRegistry, WorkspaceTools } from "../tools";
 import { ToolCall } from "../types";
-import { agentInstructions, formatError, parseToolCall } from "../utils";
+import {
+  agentInstructions,
+  assistantResponseFormat,
+  formatError,
+  parseAssistantEnvelope,
+} from "../utils";
+
+export interface ChatAgentResult {
+  response: string;
+  title?: string;
+}
 
 export interface ChatAgentEvents {
   /** Event triggered when the status of a tool call changes. */
@@ -24,21 +34,32 @@ export class ChatAgent {
     history: ChatMessage[],
     model: string,
     signal: AbortSignal,
-  ): Promise<string> {
+  ): Promise<ChatAgentResult> {
+    const availableTools = this.tools.list();
+    const requestTitle = !history.some(({ role }) => role === "assistant");
     const messages: ChatMessage[] = [
       agentInstructions(
         await this.workspaceTools.projectContext(),
-        this.tools.list(),
+        availableTools,
+        requestTitle,
       ),
       ...history.map(({ role, content }) => ({ role, content })),
     ];
+    let title: string | undefined;
 
     for (let step = 0; step < MAX_CHAT_STEPS; step++) {
       // Notify the webview that the model is processing a request.
       this.events.onModelStatus(true, signal);
       let response: string;
       try {
-        response = await this.provider.chat({ model, messages }, signal);
+        response = await this.provider.chat(
+          {
+            model,
+            messages,
+            format: assistantResponseFormat(availableTools, requestTitle),
+          },
+          signal,
+        );
       } finally {
         this.events.onModelStatus(false, signal);
       }
@@ -46,9 +67,12 @@ export class ChatAgent {
       // Log the agent's response for debugging purposes.
       this.output.appendLine(`[agent response] ${response.slice(0, 2_000)}`); // Log the first 2,000 characters of the agent's response
 
-      // Attempt to parse a tool call from the agent's response.
-      const toolCall = parseToolCall(response);
-      if (!toolCall) return response;
+      const envelope = parseAssistantEnvelope(response, availableTools);
+      title ??= envelope.title;
+      if (envelope.type === "final") {
+        return { response: envelope.response, title };
+      }
+      const toolCall = envelope.tool;
 
       // Notify the webview that a tool call is about to be executed.
       this.events.onToolStatus(toolCall);
@@ -69,6 +93,9 @@ export class ChatAgent {
     }
 
     // If the loop completes without returning, it means the agent reached the maximum number of tool calls.
-    return `I stopped after ${MAX_CHAT_STEPS} tool calls. Please narrow the request and try again.`;
+    return {
+      response: `I stopped after ${MAX_CHAT_STEPS} tool calls. Please narrow the request and try again.`,
+      title,
+    };
   }
 }

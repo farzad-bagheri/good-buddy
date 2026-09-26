@@ -28,6 +28,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   private readonly chatStorage: ChatHistoryStore;
   private currentChatId?: string;
   private currentChatCreatedAt?: string;
+  private currentChatTitle?: string;
   private readonly deletedChatIds = new Set<string>();
   private readonly workspaceTools = new WorkspaceTools();
   private readonly attachments = new AttachmentStore();
@@ -156,6 +157,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           this.history = [];
           this.currentChatId = undefined;
           this.currentChatCreatedAt = undefined;
+          this.currentChatTitle = undefined;
           this.attachments.clear();
           this.postAttachments();
           await this.postHistory();
@@ -168,7 +170,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           await this.resumeChat(String(message.id ?? ""));
           break;
         case "deleteChat":
-          await this.deleteChat(String(message.id ?? ""));
+          await this.confirmDeleteChat(String(message.id ?? ""));
           break;
         case "cancel":
           this.activeController?.abort();
@@ -261,18 +263,22 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     createdAt: string,
     model: string,
     messages: ChatMessage[],
+    title?: string,
   ): Promise<void> {
     if (this.deletedChatIds.has(id) || messages.length === 0) return;
 
     const firstUserMessage = messages.find(({ role }) => role === "user");
     const rawTitle =
+      title ??
+      this.currentChatTitle ??
       firstUserMessage?.displayContent ??
       firstUserMessage?.content ??
       "New chat";
-    const title = rawTitle.split("\n", 1)[0].trim().slice(0, 80) || "New chat";
+    const chatTitle =
+      rawTitle.split("\n", 1)[0].trim().slice(0, 80) || "New chat";
     const chat: StoredChat = {
       id,
-      title,
+      title: chatTitle,
       createdAt,
       updatedAt: new Date().toISOString(),
       model,
@@ -297,6 +303,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     this.deletedChatIds.delete(chat.id);
     this.currentChatId = chat.id;
     this.currentChatCreatedAt = chat.createdAt;
+    this.currentChatTitle = chat.title;
     this.history = chat.messages;
     this.attachments.clear();
     await this.context.globalState.update(MODEL_STATE_KEY, chat.model);
@@ -306,20 +313,48 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     await this.postChatList();
   }
 
+  private async confirmDeleteChat(id: string): Promise<void> {
+    const chat = await this.chatStorage.get(id);
+    if (!chat) {
+      await this.postChatList();
+      return;
+    }
+
+    const choice = await vscode.window.showWarningMessage(
+      `Delete "${chat.title}"? This cannot be undone.`,
+      { modal: true },
+      "Delete",
+    );
+    if (choice !== "Delete") return;
+
+    await this.deleteChat(id);
+  }
+
   private async deleteChat(id: string): Promise<void> {
     this.deletedChatIds.add(id);
+    try {
+      await this.chatStorage.delete(id);
+    } catch (err) {
+      this.deletedChatIds.delete(id);
+      this.output.appendLine(`Good Buddy chat: failed to delete chat: ${err}`);
+      void vscode.window.showErrorMessage(
+        `Good Buddy could not delete the saved chat: ${err}`,
+      );
+      return;
+    }
+
     if (id === this.currentChatId) {
       this.activeController?.abort();
       this.writeApprovals.rejectAll();
       this.commandApprovals.rejectAll();
       this.currentChatId = undefined;
       this.currentChatCreatedAt = undefined;
+      this.currentChatTitle = undefined;
       this.history = [];
       this.postAttachments();
       await this.postHistory();
     }
 
-    await this.chatStorage.delete(id);
     await this.postChatList();
   }
 
@@ -377,25 +412,29 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
 
     let assistantText = "";
     try {
-      await this.persistChat(id, createdAt, model, conversation);
       if (controller.signal.aborted || this.currentChatId !== id) return;
 
       // Run the agent to generate the assistant's response.
-      assistantText = await this.agent.run(
+      const result = await this.agent.run(
         conversation.map((message) => ({ ...message })),
         model,
         controller.signal,
       );
+      assistantText = result.response;
+      const chatTitle = result.title ?? this.currentChatTitle;
+      if (this.currentChatId === id && result.title) {
+        this.currentChatTitle = result.title;
+      }
       if (controller.signal.aborted || this.currentChatId !== id) {
         if (assistantText) {
           conversation.push({ role: "assistant", content: assistantText });
-          await this.persistChat(id, createdAt, model, conversation);
+          await this.persistChat(id, createdAt, model, conversation, chatTitle);
         }
         return;
       }
 
       conversation.push({ role: "assistant", content: assistantText });
-      await this.persistChat(id, createdAt, model, conversation);
+      await this.persistChat(id, createdAt, model, conversation, chatTitle);
       // Notify the webview that the assistant has started generating its response.
       this.view.webview.postMessage({ type: "assistantStart" });
       // Send the initial chunk of the assistant's response to the webview.
@@ -413,14 +452,17 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
             type: "assistantError",
             text: formatError(err),
           });
+          await this.persistChat(id, createdAt, model, conversation);
         }
       } else {
         // If the request was aborted, but some assistant text was generated, push it to the history.
         if (assistantText) {
           conversation.push({ role: "assistant", content: assistantText });
-          await this.persistChat(id, createdAt, model, conversation);
         }
         if (this.currentChatId === id) {
+          if (this.activeController === controller) {
+            await this.persistChat(id, createdAt, model, conversation);
+          }
           this.view?.webview.postMessage({ type: "assistantDone" });
         }
       }

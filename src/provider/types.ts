@@ -30,4 +30,5 @@ export interface ChatOptions {
   messages: ChatMessage[];
   stream?: boolean;
   think?: boolean;
+  format?: "json" | Record<string, unknown>;
 }

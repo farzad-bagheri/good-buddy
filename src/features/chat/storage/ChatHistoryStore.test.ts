@@ -3,6 +3,7 @@ import { ChatHistoryStore, StoredChat } from "./ChatHistoryStore";
 
 const storageState = vi.hoisted(() => ({
   files: new Map<string, Uint8Array>(),
+  deleteError: undefined as Error | undefined,
 }));
 
 vi.mock("vscode", () => {
@@ -29,6 +30,7 @@ vi.mock("vscode", () => {
           storageState.files.set(file.path, contents);
         },
         delete: async (file: { path: string }) => {
+          if (storageState.deleteError) throw storageState.deleteError;
           storageState.files.delete(file.path);
         },
       },
@@ -37,7 +39,10 @@ vi.mock("vscode", () => {
 });
 
 describe("ChatHistoryStore", () => {
-  beforeEach(() => storageState.files.clear());
+  beforeEach(() => {
+    storageState.files.clear();
+    storageState.deleteError = undefined;
+  });
 
   it("persists full message content and lists chats newest first", async () => {
     const store = new ChatHistoryStore({ path: "/extension" } as never);
@@ -73,6 +78,18 @@ describe("ChatHistoryStore", () => {
 
     expect(await store.get(chat.id)).toBeUndefined();
     expect(await store.list()).toEqual([]);
+  });
+
+  it("surfaces filesystem errors when deleting a chat", async () => {
+    const store = new ChatHistoryStore({ path: "/extension" } as never);
+    const chat = createChat(
+      "7c89a311-9d47-4d44-90a4-dde41d47f5b0",
+      "2026-09-26T10:00:00.000Z",
+    );
+    await store.save(chat);
+    storageState.deleteError = new Error("Permission denied");
+
+    await expect(store.delete(chat.id)).rejects.toThrow("Permission denied");
   });
 });
 

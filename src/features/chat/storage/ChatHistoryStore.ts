@@ -25,7 +25,7 @@ export class ChatHistoryStore {
   async list(): Promise<ChatSummary[]> {
     await vscode.workspace.fs.createDirectory(this.directory);
     const entries = await vscode.workspace.fs.readDirectory(this.directory);
-    
+
     const chats = await Promise.all(
       entries
         .filter(([name]) => name.endsWith(".json"))
@@ -77,14 +77,7 @@ export class ChatHistoryStore {
 
   async delete(id: string): Promise<void> {
     if (!isChatId(id)) return;
-
-    try {
-      await vscode.workspace.fs.delete(
-        getChatFileUri(this.directory, id),
-      );
-    } catch {
-      // A missing chat is already deleted.
-    }
+    await vscode.workspace.fs.delete(getChatFileUri(this.directory, id));
   }
 }
 

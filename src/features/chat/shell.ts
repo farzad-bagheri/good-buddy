@@ -456,11 +456,9 @@ export const shellHtml = (cspSource: string, nonce: string, addIconUri: string, 
           remove.title = "Delete chat";
           remove.setAttribute("aria-label", "Delete " + chat.title);
           remove.textContent = "x";
-          remove.addEventListener("click", () => {
-            if (window.confirm("Delete this saved chat?")) {
-              vscode.postMessage({ type: "deleteChat", id: chat.id });
-            }
-          });
+          remove.addEventListener("click", () =>
+            vscode.postMessage({ type: "deleteChat", id: chat.id }),
+          );
           row.append(open, remove);
           chatHistoryEl.appendChild(row);
         }

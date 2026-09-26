@@ -40,4 +40,25 @@ describe("OllamaProvider", () => {
       expect.objectContaining({ method: "POST" }),
     );
   });
+
+  it("sends a structured response schema to Ollama", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ message: { content: "{}" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const format = {
+      type: "object",
+      properties: { type: { type: "string", enum: ["final", "tool_call"] } },
+    };
+
+    const provider = new OllamaProvider();
+    await provider.chat({
+      model: "qwen3:8b",
+      messages: [{ role: "user", content: "Say hello" }],
+      format,
+    });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).format).toEqual(format);
+  });
 });
