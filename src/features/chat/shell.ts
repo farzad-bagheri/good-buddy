@@ -1,12 +1,12 @@
 // Auto-generated from D:\Code\good-buddy\scripts\html\chat-shell.html
 
-export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
+export const shellHtml = (cspSource: string, nonce: string, addIconUri: string, sendIconUri: string) => `<!doctype html>
 <html>
   <head>
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';"
+      content="default-src 'none'; img-src ${cspSource}; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';"
     />
     <style>
       html,
@@ -245,6 +245,32 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
             justify-content: flex-end;
             gap: 6px;
           }
+          #controls button {
+            display: grid;
+            width: 32px;
+            height: 32px;
+            place-items: center;
+            padding: 6px;
+          }
+          .control-icon {
+            width: 16px;
+            height: 16px;
+            background-color: var(--vscode-icon-foreground, var(--vscode-foreground));
+            mask-position: center;
+            mask-repeat: no-repeat;
+            mask-size: contain;
+            -webkit-mask-position: center;
+            -webkit-mask-repeat: no-repeat;
+            -webkit-mask-size: contain;
+          }
+          #attachBtn .control-icon {
+            mask-image: url("${addIconUri}");
+            -webkit-mask-image: url("${addIconUri}");
+          }
+          #sendBtn .control-icon {
+            mask-image: url("${sendIconUri}");
+            -webkit-mask-image: url("${sendIconUri}");
+          }
         }
       }
 
@@ -305,8 +331,12 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
           placeholder="Ask Good Buddy... (Enter to send, Shift+Enter for newline)"
         ></textarea>
         <div id="controls">
-          <button id="attachBtn" title="Attach text files">+</button>
-          <button id="sendBtn">Send</button>
+          <button id="attachBtn" type="button" title="Attach text files" aria-label="Attach text files">
+            <span class="control-icon" aria-hidden="true"></span>
+          </button>
+          <button id="sendBtn" type="button" title="Send message" aria-label="Send message">
+            <span class="control-icon" aria-hidden="true"></span>
+          </button>
         </div>
       </div>
     </footer>
@@ -589,7 +619,18 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
             break;
           case "attachments":
             {
-              const children = msg.names.map((name, index) => {
+              const children = [];
+              if (msg.activeDocument) {
+                const item = document.createElement("div");
+                item.className = "attachment-item";
+                const label = document.createElement("span");
+                label.className = "attachment-name";
+                label.textContent = "Open: " + msg.activeDocument;
+                label.title = "Included with your next message";
+                item.appendChild(label);
+                children.push(item);
+              }
+              for (const [index, name] of msg.names.entries()) {
                 const item = document.createElement("div");
                 item.className = "attachment-item";
                 const label = document.createElement("span");
@@ -606,8 +647,8 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
                   vscode.postMessage({ type: "removeAttachment", index }),
                 );
                 item.append(label, remove);
-                return item;
-              });
+                children.push(item);
+              }
               attachmentsEl.innerHTML = "";
               for (const child of children) {
                 attachmentsEl.appendChild(child);

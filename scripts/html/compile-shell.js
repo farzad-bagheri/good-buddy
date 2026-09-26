@@ -13,7 +13,12 @@ const shells = [
   {
     inputFile: "chat-shell.html",
     outputFile: "../../src/features/chat/shell.ts",
-    inject: ["cspSource: string", "nonce: string"],
+    inject: [
+      "cspSource: string",
+      "nonce: string",
+      "addIconUri: string",
+      "sendIconUri: string",
+    ],
   },
 ];
 

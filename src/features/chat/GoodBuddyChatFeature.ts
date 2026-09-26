@@ -8,6 +8,7 @@ import {
   WriteApprovalManager,
 } from "./approval-managers";
 import { AttachmentStore } from "./attachment";
+import { MAX_ATTACHMENT_BYTES } from "./constants";
 import { shellHtml } from "./shell";
 import { ToolRegistry } from "./tools";
 import { WorkspaceTools } from "./tools/WorkspaceTools";
@@ -103,6 +104,10 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           this.view?.webview.postMessage({ type: "modelStatus", waiting });
         },
       },
+    );
+
+    this.context.subscriptions.push(
+      vscode.window.onDidChangeActiveTextEditor(() => this.postAttachments()),
     );
   }
 
@@ -215,11 +220,14 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     );
 
     const model = this.getSelectedModel();
-    const attachmentBlock = this.attachments.formatForPrompt();
+    const activeDocument = this.activeDocumentAttachment();
+    const attachmentBlock = this.attachments.formatForPrompt(activeDocument);
     const userContent = `${text}${attachmentBlock}`.trim();
     const attachmentLabel = this.attachments.all.length
-      ? `\n\nAttached: ${this.attachments.names().join(", ")}`
-      : "";
+      ? `\n\nAttached: ${this.attachments.names(activeDocument).join(", ")}`
+      : activeDocument
+        ? `\n\nOpen file: ${activeDocument.name}`
+        : "";
     this.attachments.clear();
     this.postAttachments();
     this.history.push({ role: "user", content: userContent });
@@ -269,17 +277,49 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
 
   /** Sends the current attachment names to the webview. */
   private postAttachments(): void {
+    const activeDocument = this.activeDocumentAttachment();
     this.view?.webview.postMessage({
       type: "attachments",
       names: this.attachments.names(),
+      activeDocument: activeDocument?.name,
     });
+  }
+
+  private activeDocumentAttachment():
+    | { name: string; content: string }
+    | undefined {
+    const document = vscode.window.activeTextEditor?.document;
+    if (!document) return undefined;
+
+    const content = document.getText();
+    if (
+      content.includes("\0") ||
+      Buffer.byteLength(content, "utf8") > MAX_ATTACHMENT_BYTES
+    ) {
+      return undefined;
+    }
+
+    return {
+      name: vscode.workspace.asRelativePath(document.uri),
+      content,
+    };
   }
 
   /** Renders the webview shell with a generated Content Security Policy nonce. */
   private renderHtml(webview: vscode.Webview): string {
     const nonce = getNonce(); // Generate a unique nonce for Content-Security-Policy
     const cspSource = webview.cspSource;
-    return shellHtml(cspSource, nonce);
+    const addIconUri = webview
+      .asWebviewUri(
+        vscode.Uri.joinPath(this.context.extensionUri, "media", "add.svg"),
+      )
+      .toString();
+    const sendIconUri = webview
+      .asWebviewUri(
+        vscode.Uri.joinPath(this.context.extensionUri, "media", "send.svg"),
+      )
+      .toString();
+    return shellHtml(cspSource, nonce, addIconUri, sendIconUri);
   }
 }
 

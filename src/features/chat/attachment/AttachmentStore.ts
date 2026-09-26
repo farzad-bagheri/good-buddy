@@ -57,8 +57,8 @@ export class AttachmentStore {
   /**
    * Formats all attached files for inclusion in a chat prompt.
    */
-  formatForPrompt(): string {
-    return this.items
+  formatForPrompt(defaultAttachment?: ChatAttachment): string {
+    return this.withDefault(defaultAttachment)
       .map(
         (attachment) =>
           `\n\nAttached file: ${attachment.name}\n\`\`\`\n${attachment.content}\n\`\`\``,
@@ -69,7 +69,21 @@ export class AttachmentStore {
   /**
    * Returns the names of all attached files.
    */
-  names(): string[] {
-    return this.items.map((attachment) => attachment.name);
+  names(defaultAttachment?: ChatAttachment): string[] {
+    return this.withDefault(defaultAttachment).map(
+      (attachment) => attachment.name,
+    );
+  }
+
+  private withDefault(defaultAttachment?: ChatAttachment): ChatAttachment[] {
+    if (!defaultAttachment) return [...this.items];
+    return [
+      defaultAttachment,
+      ...this.items.filter(
+        (attachment) =>
+          attachment.name !== defaultAttachment.name ||
+          attachment.content !== defaultAttachment.content,
+      ),
+    ];
   }
 }
