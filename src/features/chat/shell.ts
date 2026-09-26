@@ -255,7 +255,10 @@ export const shellHtml = (cspSource: string, nonce: string, addIconUri: string, 
           .control-icon {
             width: 16px;
             height: 16px;
-            background-color: var(--vscode-icon-foreground, var(--vscode-foreground));
+            background-color: var(
+              --vscode-icon-foreground,
+              var(--vscode-foreground)
+            );
             mask-position: center;
             mask-repeat: no-repeat;
             mask-size: contain;
@@ -273,7 +276,6 @@ export const shellHtml = (cspSource: string, nonce: string, addIconUri: string, 
           }
         }
       }
-
       #attachments {
         width: 100%;
         font-size: 0.85em;
@@ -286,7 +288,7 @@ export const shellHtml = (cspSource: string, nonce: string, addIconUri: string, 
         align-items: center;
         gap: 4px;
         max-width: 100%;
-        padding: 2px 4px 2px 7px;
+        padding: 4px;
         border: 1px solid var(--vscode-editorWidget-border);
         border-radius: 4px;
         background: var(--vscode-input-background);
@@ -331,10 +333,20 @@ export const shellHtml = (cspSource: string, nonce: string, addIconUri: string, 
           placeholder="Ask Good Buddy... (Enter to send, Shift+Enter for newline)"
         ></textarea>
         <div id="controls">
-          <button id="attachBtn" type="button" title="Attach text files" aria-label="Attach text files">
+          <button
+            id="attachBtn"
+            type="button"
+            title="Attach text files"
+            aria-label="Attach text files"
+          >
             <span class="control-icon" aria-hidden="true"></span>
           </button>
-          <button id="sendBtn" type="button" title="Send message" aria-label="Send message">
+          <button
+            id="sendBtn"
+            type="button"
+            title="Send message"
+            aria-label="Send message"
+          >
             <span class="control-icon" aria-hidden="true"></span>
           </button>
         </div>

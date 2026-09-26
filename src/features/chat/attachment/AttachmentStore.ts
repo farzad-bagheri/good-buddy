@@ -3,6 +3,7 @@ import { MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES } from "../constants";
 
 export interface ChatAttachment {
   name: string;
+  path: string;
   content: string;
 }
 
@@ -49,9 +50,29 @@ export class AttachmentStore {
       }
       this.items.push({
         name: uri.path.split("/").pop() ?? "file",
+        path: vscode.workspace.asRelativePath(uri),
         content: Buffer.from(bytes).toString("utf8"),
       });
     }
+  }
+
+  activeDocumentAttachment(): ChatAttachment | undefined {
+    const document = vscode.window.activeTextEditor?.document;
+    if (!document) return undefined;
+
+    const content = document.getText();
+    if (
+      content.includes("\0") || // Skip binary files
+      Buffer.byteLength(content, "utf8") > MAX_ATTACHMENT_BYTES
+    ) {
+      return undefined;
+    }
+
+    return {
+      name: document.uri.path.split("/").pop() || document.fileName,
+      path: vscode.workspace.asRelativePath(document.uri),
+      content,
+    };
   }
 
   /**
@@ -61,7 +82,7 @@ export class AttachmentStore {
     return this.withDefault(defaultAttachment)
       .map(
         (attachment) =>
-          `\n\nAttached file: ${attachment.name}\n\`\`\`\n${attachment.content}\n\`\`\``,
+          `\n\nAttached file: ${attachment.path}\n\`\`\`\n${attachment.content}\n\`\`\``,
       )
       .join("");
   }

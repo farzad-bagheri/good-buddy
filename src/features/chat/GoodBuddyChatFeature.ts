@@ -8,7 +8,6 @@ import {
   WriteApprovalManager,
 } from "./approval-managers";
 import { AttachmentStore } from "./attachment";
-import { MAX_ATTACHMENT_BYTES } from "./constants";
 import { shellHtml } from "./shell";
 import { ToolRegistry } from "./tools";
 import { WorkspaceTools } from "./tools/WorkspaceTools";
@@ -220,7 +219,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     );
 
     const model = this.getSelectedModel();
-    const activeDocument = this.activeDocumentAttachment();
+    const activeDocument = this.attachments.activeDocumentAttachment();
     const attachmentBlock = this.attachments.formatForPrompt(activeDocument);
     const userContent = `${text}${attachmentBlock}`.trim();
     const attachmentLabel = this.attachments.all.length
@@ -277,32 +276,12 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
 
   /** Sends the current attachment names to the webview. */
   private postAttachments(): void {
-    const activeDocument = this.activeDocumentAttachment();
+    const activeDocument = this.attachments.activeDocumentAttachment();
     this.view?.webview.postMessage({
       type: "attachments",
       names: this.attachments.names(),
       activeDocument: activeDocument?.name,
     });
-  }
-
-  private activeDocumentAttachment():
-    | { name: string; content: string }
-    | undefined {
-    const document = vscode.window.activeTextEditor?.document;
-    if (!document) return undefined;
-
-    const content = document.getText();
-    if (
-      content.includes("\0") ||
-      Buffer.byteLength(content, "utf8") > MAX_ATTACHMENT_BYTES
-    ) {
-      return undefined;
-    }
-
-    return {
-      name: vscode.workspace.asRelativePath(document.uri),
-      content,
-    };
   }
 
   /** Renders the webview shell with a generated Content Security Policy nonce. */
