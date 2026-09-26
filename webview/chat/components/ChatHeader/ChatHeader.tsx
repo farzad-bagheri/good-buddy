@@ -3,6 +3,7 @@ import "./ChatHeader.css";
 interface ChatHeaderProps {
   models: string[];
   selectedModel: string;
+  historyOpen: boolean;
   onModelChange: (model: string) => void;
   onToggleHistory: () => void;
   onNewChat: () => void;
@@ -11,11 +12,18 @@ interface ChatHeaderProps {
 export function ChatHeader({
   models,
   selectedModel,
+  historyOpen,
   onModelChange,
   onToggleHistory,
   onNewChat,
 }: ChatHeaderProps) {
-  return (
+  return historyOpen ? (
+    <header className="chat-header">
+      <button type="button" title="Back to chat view" onClick={onToggleHistory}>
+        👈 Back
+      </button>
+    </header>
+  ) : (
     <header className="chat-header">
       <select
         aria-label="Chat model"
@@ -29,12 +37,11 @@ export function ChatHeader({
         ))}
       </select>
       <button type="button" title="Saved chats" onClick={onToggleHistory}>
-        History
+        📜 History
       </button>
       <button type="button" title="New chat" onClick={onNewChat}>
-        New
+        🆕 New
       </button>
     </header>
   );
 }
-

@@ -1,5 +1,5 @@
-import type { AttachmentState } from "../types";
-import { vscode } from "../vscode";
+import type { AttachmentState } from "../../types";
+import { vscode } from "../../vscode";
 import "./Composer.css";
 
 interface ComposerProps {
@@ -22,22 +22,23 @@ export function Composer({
           <div className="attachment-item">
             <span
               className="attachment-name"
-              title="Included with your next message"
+              title={attachments.activeDocument.path}
             >
-              Open: {attachments.activeDocument}
+              {"👁️"} {attachments.activeDocument.name}
             </span>
           </div>
         )}
-        {attachments.names.map((name, index) => (
-          <div className="attachment-item" key={`${name}-${index}`}>
-            <span className="attachment-name" title={name}>
-              {name}
+        {attachments.attached.map((item, index) => (
+          <div className="attachment-item" key={`${item.name}-${index}`}>
+            <span className="attachment-name" title={item.path}>
+              {"📎"}
+              {item.name}
             </span>
             <button
               className="remove-attachment"
               type="button"
-              title={`Remove ${name}`}
-              aria-label={`Remove ${name}`}
+              title={`Remove ${item.name}`}
+              aria-label={`Remove ${item.name}`}
               onClick={() =>
                 vscode.postMessage({ type: "removeAttachment", index })
               }

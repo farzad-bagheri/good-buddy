@@ -41,7 +41,12 @@ export type NewTimelineItem =
   | Omit<Extract<TimelineItem, { kind: "writeProposal" }>, "id">
   | Omit<Extract<TimelineItem, { kind: "commandProposal" }>, "id">;
 
+export interface Attachment {
+  name: string;
+  path: string;
+}
+
 export interface AttachmentState {
-  names: string[];
-  activeDocument?: string;
+  attached: Attachment[];
+  activeDocument?: Attachment;
 }

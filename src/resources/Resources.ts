@@ -17,4 +17,19 @@ export class Resources {
       },
     };
   }
+
+  getWebViewAsset(name: string) {
+    const chatWebviewRoot = vscode.Uri.joinPath(
+      this.context.extensionUri,
+      "out",
+      "webview",
+      "chat",
+    );
+    return {
+      uri: vscode.Uri.joinPath(chatWebviewRoot, "assets", name),
+      asWebUri(webView: vscode.Webview) {
+        return webView.asWebviewUri(this.uri);
+      },
+    };
+  }
 }

@@ -1,9 +1,12 @@
 import * as vscode from "vscode";
 import { MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES } from "../constants";
 
-export interface ChatAttachment {
+export interface ChatAttachmentBase {
   name: string;
   path: string;
+}
+
+export interface ChatAttachment extends ChatAttachmentBase {
   content: string;
 }
 
@@ -15,6 +18,10 @@ export class AttachmentStore {
 
   get all(): readonly ChatAttachment[] {
     return this.items;
+  }
+
+  get allBase(): readonly ChatAttachmentBase[] {
+    return this.items.map(({ name, path }) => ({ name, path }));
   }
 
   clear(): void {

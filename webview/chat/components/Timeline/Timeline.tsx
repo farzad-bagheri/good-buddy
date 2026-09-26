@@ -1,6 +1,6 @@
-import { sanitizeHtml } from "../utils";
-import type { TimelineItem } from "../types";
-import { vscode } from "../vscode";
+import { sanitizeHtml } from "../../utils";
+import type { TimelineItem } from "../../types";
+import { vscode } from "../../vscode";
 import "./Timeline.css";
 
 export function Timeline({ items }: { items: TimelineItem[] }) {
@@ -19,12 +19,24 @@ function TimelineEntry({ item }: { item: TimelineItem }) {
       return (
         <article className={`message ${item.role}`}>
           {item.role === "assistant" ? (
-            <div
-              className="body markdown"
-              dangerouslySetInnerHTML={{
-                __html: sanitizeHtml(item.html ?? item.text),
-              }}
-            />
+            <div className="assistant">
+              <div
+                className="body markdown"
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeHtml(item.html ?? item.text),
+                }}
+              />
+              <button
+                type="button"
+                title="Copy message"
+                aria-label="Copy message"
+                onClick={() => {
+                  navigator.clipboard.writeText(item.text);
+                }}
+              >
+                📋
+              </button>
+            </div>
           ) : (
             <div className="body">{item.text}</div>
           )}

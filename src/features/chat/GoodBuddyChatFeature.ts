@@ -495,8 +495,8 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     const activeDocument = this.attachments.activeDocumentAttachment();
     this.view?.webview.postMessage({
       type: "attachments",
-      names: this.attachments.names(),
-      activeDocument: activeDocument?.name,
+      attached: this.attachments.allBase,
+      activeDocument: activeDocument,
     });
   }
 
@@ -504,17 +504,13 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   private renderHtml(webview: vscode.Webview): string {
     const nonce = getNonce(); // Generate a unique nonce for Content-Security-Policy
     const cspSource = webview.cspSource;
-    const chatWebviewRoot = vscode.Uri.joinPath(
-      this.context.extensionUri,
-      "out",
-      "webview",
-      "chat",
-    );
-    const scriptUri = webview
-      .asWebviewUri(vscode.Uri.joinPath(chatWebviewRoot, "assets", "chat.js"))
+    const scriptUri = this.resources
+      .getWebViewAsset("chat.js")
+      .asWebUri(webview)
       .toString();
-    const styleUri = webview
-      .asWebviewUri(vscode.Uri.joinPath(chatWebviewRoot, "assets", "style.css"))
+    const styleUri = this.resources
+      .getWebViewAsset("style.css")
+      .asWebUri(webview)
       .toString();
     const addIconUri = this.resources
       .getIcon("add")

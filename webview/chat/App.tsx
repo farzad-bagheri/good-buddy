@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChatHeader, } from "./components/ChatHeader";
+import { ChatHeader } from "./components/ChatHeader";
 import { ChatHistory } from "./components/ChatHistory";
 import { Composer } from "./components/Composer";
 import { Timeline } from "./components/Timeline";
@@ -22,7 +22,8 @@ export function App() {
    */
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [attachments, setAttachments] = useState<AttachmentState>({
-    names: [],
+    attached: [],
+    activeDocument: undefined,
   });
   /**
    * The current text input in the composer.
@@ -166,7 +167,7 @@ export function App() {
           break;
         case "attachments":
           setAttachments({
-            names: message.names,
+            attached: message.attached,
             activeDocument: message.activeDocument,
           });
           break;
@@ -222,6 +223,7 @@ export function App() {
       <ChatHeader
         models={models}
         selectedModel={selectedModel}
+        historyOpen={historyOpen}
         onModelChange={(model) => {
           setSelectedModel(model);
           vscode.postMessage({ type: "selectModel", model });
@@ -251,12 +253,14 @@ export function App() {
         <div ref={endOfMessages} />
       </section>
 
-      <Composer
-        attachments={attachments}
-        text={text}
-        onTextChange={setText}
-        onSend={send}
-      />
+      {historyOpen || (
+        <Composer
+          attachments={attachments}
+          text={text}
+          onTextChange={setText}
+          onSend={send}
+        />
+      )}
     </main>
   );
 }

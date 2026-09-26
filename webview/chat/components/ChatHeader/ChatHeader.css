@@ -1,6 +1,7 @@
 .chat-header {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   padding: 8px 12px;
   border-bottom: 1px solid var(--vscode-panel-border);
@@ -11,4 +12,3 @@
   flex: 1;
   min-width: 0;
 }
-

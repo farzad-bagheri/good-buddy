@@ -29,6 +29,17 @@
   color: var(--vscode-errorForeground);
 }
 
+.assistant {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.assistant .body {
+  flex: 1;
+}
+
 .markdown {
   white-space: normal;
   line-height: 1.55;

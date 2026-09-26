@@ -1,4 +1,4 @@
-import type { ChatSummary } from "../types";
+import type { ChatSummary } from "../../types";
 import "./ChatHistory.css";
 
 export function ChatHistory({
