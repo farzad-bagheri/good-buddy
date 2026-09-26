@@ -1,0 +1,14 @@
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editor-background);
+}
+
+.chat-header select {
+  flex: 1;
+  min-width: 0;
+}
+

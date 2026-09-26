@@ -1,0 +1,39 @@
+.chat-history {
+  max-height: 40%;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.chat-history-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.chat-history-open {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.chat-history-title,
+.chat-history-date {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-history-date,
+.chat-history-empty {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+}
+
+.chat-history-delete {
+  flex: 0 0 auto;
+}

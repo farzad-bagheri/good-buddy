@@ -1,78 +1,45 @@
 import { useEffect, useRef, useState } from "react";
-
-interface VsCodeApi {
-  postMessage(message: Record<string, unknown>): void;
-}
-
-interface ChatSummary {
-  id: string;
-  title: string;
-  updatedAt: string;
-}
-
-type TimelineItem =
-  | {
-      id: string;
-      kind: "message";
-      role: "user" | "assistant" | "error";
-      text: string;
-      html?: string;
-    }
-  | { id: string; kind: "toolStatus"; text: string }
-  | {
-      id: string;
-      kind: "writeProposal";
-      proposalId: string;
-      path: string;
-      diff: string;
-      status?: string;
-    }
-  | {
-      id: string;
-      kind: "commandProposal";
-      commandId: string;
-      command: string;
-      autoApproved: boolean;
-      output: string;
-      status?: string;
-    };
-
-type NewTimelineItem =
-  | Omit<Extract<TimelineItem, { kind: "message" }>, "id">
-  | Omit<Extract<TimelineItem, { kind: "toolStatus" }>, "id">
-  | Omit<Extract<TimelineItem, { kind: "writeProposal" }>, "id">
-  | Omit<Extract<TimelineItem, { kind: "commandProposal" }>, "id">;
-
-interface AttachmentState {
-  names: string[];
-  activeDocument?: string;
-}
-
-declare function acquireVsCodeApi(): VsCodeApi;
-
-const vscode = acquireVsCodeApi();
-let nextItemId = 0;
-
-function createItemId(): string {
-  nextItemId += 1;
-  return String(nextItemId);
-}
+import { ChatHeader, } from "./components/ChatHeader";
+import { ChatHistory } from "./components/ChatHistory";
+import { Composer } from "./components/Composer";
+import { Timeline } from "./components/Timeline";
+import type {
+  AttachmentState,
+  ChatSummary,
+  NewTimelineItem,
+  TimelineItem,
+} from "./types";
+import { createItemId } from "./utils";
+import { vscode } from "./vscode";
 
 export function App() {
   const [models, setModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [history, setHistory] = useState<ChatSummary[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  /**
+   * The list of timeline items representing the conversation and other events.
+   */
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [attachments, setAttachments] = useState<AttachmentState>({
     names: [],
   });
+  /**
+   * The current text input in the composer.
+   */
   const [text, setText] = useState("");
   const [thinking, setThinking] = useState(false);
+  /**
+   * The ID of the current assistant message being composed.
+   */
   const assistantId = useRef<string | undefined>(undefined);
+  /**
+   * A reference to the div element at the end of the message list.
+   */
   const endOfMessages = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Listen for messages from the VS Code extension.
     function onMessage(event: MessageEvent) {
       const message = event.data;
       switch (message.type) {
@@ -233,6 +200,7 @@ export function App() {
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
+  // Scroll to the end of the messages when items or thinking state changes.
   useEffect(() => {
     endOfMessages.current?.scrollIntoView({ block: "end" });
   }, [items, thinking]);
@@ -251,80 +219,30 @@ export function App() {
 
   return (
     <main className="chat-app">
-      <header>
-        <select
-          aria-label="Chat model"
-          value={selectedModel}
-          onChange={(event) => {
-            setSelectedModel(event.target.value);
-            vscode.postMessage({
-              type: "selectModel",
-              model: event.target.value,
-            });
-          }}
-        >
-          {models.map((model) => (
-            <option key={model} value={model}>
-              {model}
-            </option>
-          ))}
-        </select>
-        <button type="button" title="Saved chats" onClick={toggleHistory}>
-          History
-        </button>
-        <button
-          type="button"
-          title="New chat"
-          onClick={() => {
-            setHistoryOpen(false);
-            vscode.postMessage({ type: "newChat" });
-          }}
-        >
-          New
-        </button>
-      </header>
+      <ChatHeader
+        models={models}
+        selectedModel={selectedModel}
+        onModelChange={(model) => {
+          setSelectedModel(model);
+          vscode.postMessage({ type: "selectModel", model });
+        }}
+        onToggleHistory={toggleHistory}
+        onNewChat={() => {
+          setHistoryOpen(false);
+          vscode.postMessage({ type: "newChat" });
+        }}
+      />
 
       {historyOpen && (
-        <section className="chat-history" aria-label="Saved chats">
-          {history.length === 0 ? (
-            <p className="chat-history-empty">No saved chats</p>
-          ) : (
-            history.map((chat) => (
-              <div className="chat-history-item" key={chat.id}>
-                <button
-                  className="chat-history-open"
-                  type="button"
-                  title={chat.title}
-                  onClick={() =>
-                    vscode.postMessage({ type: "resumeChat", id: chat.id })
-                  }
-                >
-                  <span className="chat-history-title">{chat.title}</span>
-                  <span className="chat-history-date">
-                    {new Date(chat.updatedAt).toLocaleString()}
-                  </span>
-                </button>
-                <button
-                  className="chat-history-delete"
-                  type="button"
-                  title="Delete chat"
-                  aria-label={`Delete ${chat.title}`}
-                  onClick={() =>
-                    vscode.postMessage({ type: "deleteChat", id: chat.id })
-                  }
-                >
-                  x
-                </button>
-              </div>
-            ))
-          )}
-        </section>
+        <ChatHistory
+          history={history}
+          onResume={(id) => vscode.postMessage({ type: "resumeChat", id })}
+          onDelete={(id) => vscode.postMessage({ type: "deleteChat", id })}
+        />
       )}
 
       <section className="messages" aria-live="polite" hidden={historyOpen}>
-        {items.map((item) => (
-          <TimelineEntry item={item} key={item.id} />
-        ))}
+        <Timeline items={items} />
         {thinking && (
           <div className="tool-status" role="status">
             Thinking...
@@ -333,174 +251,12 @@ export function App() {
         <div ref={endOfMessages} />
       </section>
 
-      <footer>
-        <div className="attachments">
-          {attachments.activeDocument && (
-            <div className="attachment-item">
-              <span
-                className="attachment-name"
-                title="Included with your next message"
-              >
-                Open: {attachments.activeDocument}
-              </span>
-            </div>
-          )}
-          {attachments.names.map((name, index) => (
-            <div className="attachment-item" key={`${name}-${index}`}>
-              <span className="attachment-name" title={name}>
-                {name}
-              </span>
-              <button
-                className="remove-attachment"
-                type="button"
-                title={`Remove ${name}`}
-                aria-label={`Remove ${name}`}
-                onClick={() =>
-                  vscode.postMessage({ type: "removeAttachment", index })
-                }
-              >
-                x
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="composer">
-          <textarea
-            rows={2}
-            placeholder="Ask Good Buddy... (Enter to send, Shift+Enter for new line)"
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                send();
-              }
-            }}
-          />
-          <div className="controls">
-            <button
-              type="button"
-              title="Attach text files"
-              aria-label="Attach text files"
-              onClick={() => vscode.postMessage({ type: "attachFiles" })}
-            >
-              <span className="control-icon attach-icon" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              title="Send message"
-              aria-label="Send message"
-              onClick={send}
-            >
-              <span className="control-icon send-icon" aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-      </footer>
+      <Composer
+        attachments={attachments}
+        text={text}
+        onTextChange={setText}
+        onSend={send}
+      />
     </main>
   );
-}
-
-function TimelineEntry({ item }: { item: TimelineItem }) {
-  switch (item.kind) {
-    case "message":
-      return (
-        <article className={`message ${item.role}`}>
-          {item.role === "assistant" ? (
-            <div
-              className="body markdown"
-              dangerouslySetInnerHTML={{
-                __html: sanitizeHtml(item.html ?? item.text),
-              }}
-            />
-          ) : (
-            <div className="body">{item.text}</div>
-          )}
-        </article>
-      );
-    case "toolStatus":
-      return <div className="tool-status">{item.text}</div>;
-    case "writeProposal":
-      return (
-        <section className="proposal">
-          <strong>Proposed change: {item.path}</strong>
-          <pre>{item.diff}</pre>
-          {item.status ? (
-            <div>{item.status}</div>
-          ) : (
-            <div className="proposal-actions">
-              {[true, false].map((approved) => (
-                <button
-                  key={String(approved)}
-                  type="button"
-                  onClick={() => {
-                    vscode.postMessage({
-                      type: "reviewWrite",
-                      id: item.proposalId,
-                      approved,
-                    });
-                  }}
-                >
-                  {approved ? "Approve" : "Reject"}
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-      );
-    case "commandProposal":
-      return (
-        <section className="proposal command-proposal">
-          <strong>Run command</strong>
-          <pre>{item.command}</pre>
-          <pre className="command-output" hidden={!item.output}>
-            {item.output}
-          </pre>
-          {item.status ? (
-            <div>{item.status}</div>
-          ) : item.autoApproved ? (
-            <div>Running command...</div>
-          ) : (
-            <div className="proposal-actions">
-              {[true, false].map((approved) => (
-                <button
-                  key={String(approved)}
-                  type="button"
-                  onClick={() =>
-                    vscode.postMessage({
-                      type: "reviewCommand",
-                      id: item.commandId,
-                      approved,
-                    })
-                  }
-                >
-                  {approved ? "Run" : "Reject"}
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-      );
-  }
-}
-
-function sanitizeHtml(html: string): string {
-  const template = document.createElement("template");
-  template.innerHTML = html;
-  template.content
-    .querySelectorAll("script, style, iframe, object, embed, form")
-    .forEach((node) => node.remove());
-  template.content.querySelectorAll("*").forEach((element) => {
-    for (const attribute of [...element.attributes]) {
-      const name = attribute.name.toLowerCase();
-      const value = attribute.value.trim();
-      if (
-        name.startsWith("on") ||
-        ((name === "href" || name === "src") && /^javascript:/i.test(value))
-      ) {
-        element.removeAttribute(attribute.name);
-      }
-    }
-  });
-  return template.innerHTML;
 }
