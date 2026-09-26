@@ -47,6 +47,46 @@
         flex: 1;
         min-width: 0;
       }
+      #chatHistory {
+        max-height: 40%;
+        overflow-y: auto;
+        border-bottom: 1px solid var(--vscode-panel-border);
+        background: var(--vscode-sideBar-background);
+      }
+      #chatHistory[hidden] {
+        display: none;
+      }
+      .chat-history-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--vscode-panel-border);
+      }
+      .chat-history-open {
+        flex: 1;
+        min-width: 0;
+        padding: 2px 4px;
+        border: 0;
+        background: transparent;
+        text-align: left;
+      }
+      .chat-history-title,
+      .chat-history-date {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .chat-history-date,
+      .chat-history-empty {
+        color: var(--vscode-descriptionForeground);
+        font-size: 0.85em;
+      }
+      .chat-history-delete {
+        flex: 0 0 auto;
+        padding: 3px 7px;
+      }
       #messages {
         flex: 1;
         overflow-y: auto;
@@ -320,8 +360,10 @@
   <body>
     <header>
       <select id="modelSelect"></select>
+      <button id="historyBtn" type="button" title="Saved chats">History</button>
       <button id="newChatBtn" title="New chat">New</button>
     </header>
+    <div id="chatHistory" hidden></div>
     <div id="messages"></div>
     <footer>
       <div id="container">
@@ -355,16 +397,72 @@
       const vscode = acquireVsCodeApi();
       const messagesEl = document.getElementById("messages");
       const modelSelect = document.getElementById("modelSelect");
+      const historyBtn = document.getElementById("historyBtn");
       const input = document.getElementById("input");
       const sendBtn = document.getElementById("sendBtn");
       const newChatBtn = document.getElementById("newChatBtn");
       const attachBtn = document.getElementById("attachBtn");
       const attachmentsEl = document.getElementById("attachments");
+      const chatHistoryEl = document.getElementById("chatHistory");
       const commandCards = new Map();
       const writeCards = new Map();
 
       let assistantBodyEl = null;
       let thinkingIndicator = null;
+
+      function toggleChatHistory(show) {
+        chatHistoryEl.hidden = !show;
+        messagesEl.hidden = show;
+        historyBtn.setAttribute("aria-expanded", String(show));
+        if (show) vscode.postMessage({ type: "listChats" });
+      }
+
+      function renderChatList(chats) {
+        chatHistoryEl.replaceChildren();
+        if (!chats.length) {
+          const empty = document.createElement("p");
+          empty.className = "chat-history-empty";
+          empty.textContent = "No saved chats";
+          chatHistoryEl.appendChild(empty);
+          return;
+        }
+
+        for (const chat of chats) {
+          const row = document.createElement("div");
+          row.className = "chat-history-item";
+          const open = document.createElement("button");
+          open.className = "chat-history-open";
+          open.type = "button";
+          open.title = chat.title;
+          const title = document.createElement("span");
+          title.className = "chat-history-title";
+          title.textContent = chat.title;
+          const date = document.createElement("span");
+          date.className = "chat-history-date";
+          const updatedAt = new Date(chat.updatedAt);
+          date.textContent = Number.isNaN(updatedAt.valueOf())
+            ? ""
+            : updatedAt.toLocaleString();
+          open.append(title, date);
+          open.addEventListener("click", () =>
+            vscode.postMessage({ type: "resumeChat", id: chat.id }),
+          );
+
+          const remove = document.createElement("button");
+          remove.className = "chat-history-delete";
+          remove.type = "button";
+          remove.title = "Delete chat";
+          remove.setAttribute("aria-label", "Delete " + chat.title);
+          remove.textContent = "x";
+          remove.addEventListener("click", () => {
+            if (window.confirm("Delete this saved chat?")) {
+              vscode.postMessage({ type: "deleteChat", id: chat.id });
+            }
+          });
+          row.append(open, remove);
+          chatHistoryEl.appendChild(row);
+        }
+      }
 
       function addMessage(role, text) {
         const div = document.createElement("div");
@@ -546,9 +644,13 @@
           send();
         }
       });
-      newChatBtn.addEventListener("click", () =>
-        vscode.postMessage({ type: "newChat" }),
+      historyBtn.addEventListener("click", () =>
+        toggleChatHistory(chatHistoryEl.hidden),
       );
+      newChatBtn.addEventListener("click", () => {
+        toggleChatHistory(false);
+        vscode.postMessage({ type: "newChat" });
+      });
       attachBtn.addEventListener("click", () =>
         vscode.postMessage({ type: "attachFiles" }),
       );
@@ -571,6 +673,7 @@
             break;
           }
           case "history": {
+            toggleChatHistory(false);
             messagesEl.innerHTML = "";
             commandCards.clear();
             writeCards.clear();
@@ -582,6 +685,9 @@
             }
             break;
           }
+          case "chatList":
+            renderChatList(msg.chats);
+            break;
           case "userMessage":
             addMessage("user", msg.text);
             break;
