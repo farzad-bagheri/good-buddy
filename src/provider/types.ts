@@ -22,6 +22,7 @@ export interface GenerateOptions {
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
+  displayContent?: string;
 }
 
 export interface ChatOptions {

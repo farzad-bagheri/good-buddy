@@ -233,6 +233,7 @@ export const shellHtml = (cspSource: string, nonce: string, addIconUri: string, 
           textarea {
             width: 100%;
             background: transparent;
+            padding: 16px 0;
             color: var(--vscode-input-foreground);
             outline: none;
             resize: none;
@@ -654,7 +655,7 @@ export const shellHtml = (cspSource: string, nonce: string, addIconUri: string, 
                 remove.type = "button";
                 remove.title = "Remove " + name;
                 remove.setAttribute("aria-label", "Remove " + name);
-                remove.textContent = "×";
+                remove.textContent = "x";
                 remove.addEventListener("click", () =>
                   vscode.postMessage({ type: "removeAttachment", index }),
                 );

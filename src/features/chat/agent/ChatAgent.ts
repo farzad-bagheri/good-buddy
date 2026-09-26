@@ -30,7 +30,7 @@ export class ChatAgent {
         await this.workspaceTools.projectContext(),
         this.tools.list(),
       ),
-      ...history,
+      ...history.map(({ role, content }) => ({ role, content })),
     ];
 
     for (let step = 0; step < MAX_CHAT_STEPS; step++) {
@@ -45,7 +45,7 @@ export class ChatAgent {
 
       // Log the agent's response for debugging purposes.
       this.output.appendLine(`[agent response] ${response.slice(0, 2_000)}`); // Log the first 2,000 characters of the agent's response
-      
+
       // Attempt to parse a tool call from the agent's response.
       const toolCall = parseToolCall(response);
       if (!toolCall) return response;

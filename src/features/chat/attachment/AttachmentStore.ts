@@ -101,9 +101,7 @@ export class AttachmentStore {
     return [
       defaultAttachment,
       ...this.items.filter(
-        (attachment) =>
-          attachment.name !== defaultAttachment.name ||
-          attachment.content !== defaultAttachment.content,
+        (attachment) => attachment.path !== defaultAttachment.path,
       ),
     ];
   }

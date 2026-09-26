@@ -1,5 +1,6 @@
 import { getGoodBuddyConfig } from "@/config";
 import { ChatMessage, GoodBuddyProvider } from "@/provider";
+import { Resources } from "@/resources";
 import { marked } from "marked";
 import * as vscode from "vscode";
 import { ChatAgent } from "./agent";
@@ -21,6 +22,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private history: ChatMessage[] = [];
   private activeController?: AbortController;
+  private readonly resources: Resources;
   private readonly workspaceTools = new WorkspaceTools();
   private readonly attachments = new AttachmentStore();
   private readonly writeApprovals: WriteApprovalManager;
@@ -34,6 +36,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     private readonly output: vscode.OutputChannel,
     private readonly provider: GoodBuddyProvider,
   ) {
+    this.resources = new Resources(context);
     this.writeApprovals = new WriteApprovalManager(this.workspaceTools, {
       // Handle write proposals from the workspace tools.
       propose: (id, path, diff) =>
@@ -194,11 +197,14 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   /** Sends chat history to the webview, rendering assistant messages as HTML. */
   private async postHistory(): Promise<void> {
     const messages = await Promise.all(
-      this.history.map(async (message) =>
-        message.role === "assistant"
-          ? { ...message, html: await marked.parse(message.content) }
-          : message,
-      ),
+      this.history.map(async ({ role, content, displayContent }) => {
+        // Use displayContent if available, otherwise fall back to content.
+        const visibleMessage = { role, content: displayContent ?? content };
+        // Render the assistant's message as HTML if it is an assistant message.
+        return role === "assistant"
+          ? { ...visibleMessage, html: await marked.parse(content) }
+          : visibleMessage; 
+      }),
     );
     this.view?.webview.postMessage({
       type: "history",
@@ -208,6 +214,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
 
   /** Adds a user message and runs the agent, reporting its result to the webview. */
   private async handleSend(text: string): Promise<void> {
+    // Return early if the message is empty and there are no attachments, or if the webview is not available.
     if ((!text.trim() && this.attachments.all.length === 0) || !this.view) {
       return;
     }
@@ -227,37 +234,51 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       : activeDocument
         ? `\n\nOpen file: ${activeDocument.name}`
         : "";
+    const displayContent = `${text}${attachmentLabel}`.trim();
     this.attachments.clear();
     this.postAttachments();
-    this.history.push({ role: "user", content: userContent });
+    this.history.push({
+      role: "user",
+      content: userContent,
+      displayContent,
+    });
     this.view.webview.postMessage({
       type: "userMessage",
-      text: `${text}${attachmentLabel}`.trim(),
+      text: displayContent,
     });
 
+    // Prepare to run the agent and generate the assistant's response.
     const controller = new AbortController();
     this.activeController = controller;
+
     let assistantText = "";
     try {
+      // Run the agent to generate the assistant's response.
       assistantText = await this.agent.run(
         this.history,
         model,
         controller.signal,
       );
+      // Notify the webview that the assistant has started generating its response.
       this.view.webview.postMessage({ type: "assistantStart" });
+      // Send the initial chunk of the assistant's response to the webview.
       this.view.webview.postMessage({
         type: "assistantChunk",
         html: marked.parse(assistantText),
       });
+      // Push the assistant's response to the history.
       this.history.push({ role: "assistant", content: assistantText });
+      // Notify the webview that the assistant has finished generating its response.
       this.view.webview.postMessage({ type: "assistantDone" });
     } catch (err) {
+      // If an error occurs and the request was not aborted, notify the webview of the error.
       if (!controller.signal.aborted) {
         this.view.webview.postMessage({
           type: "assistantError",
           text: formatError(err),
         });
       } else {
+        // If the request was aborted, but some assistant text was generated, push it to the history.
         if (assistantText) {
           this.history.push({ role: "assistant", content: assistantText });
         }
@@ -288,15 +309,13 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   private renderHtml(webview: vscode.Webview): string {
     const nonce = getNonce(); // Generate a unique nonce for Content-Security-Policy
     const cspSource = webview.cspSource;
-    const addIconUri = webview
-      .asWebviewUri(
-        vscode.Uri.joinPath(this.context.extensionUri, "media", "add.svg"),
-      )
+    const addIconUri = this.resources
+      .getIcon("add")
+      .asWebUri(webview)
       .toString();
-    const sendIconUri = webview
-      .asWebviewUri(
-        vscode.Uri.joinPath(this.context.extensionUri, "media", "send.svg"),
-      )
+    const sendIconUri = this.resources
+      .getIcon("send")
+      .asWebUri(webview)
       .toString();
     return shellHtml(cspSource, nonce, addIconUri, sendIconUri);
   }
