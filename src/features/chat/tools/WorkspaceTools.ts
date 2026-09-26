@@ -112,9 +112,7 @@ export class WorkspaceTools {
    */
   private async readFile(root: string, relativePath: string): Promise<string> {
     const uri = workspaceFile(root, relativePath);
-    const content = Buffer.from(
-      await vscode.workspace.fs.readFile(uri),
-    ).toString("utf8");
+    const content = await this.readContent(uri);
     return truncate(content);
   }
 
@@ -130,7 +128,7 @@ export class WorkspaceTools {
   ): Promise<WriteProposal> {
     const root = this.workspaceRoot();
     const uri = workspaceFile(root, relativePath);
-    const current = await readTextIfExists(uri);
+    const current = await this.readContent(uri);
     return {
       path: relativePath,
       diff: createDiff(relativePath, current, content),
@@ -191,14 +189,42 @@ export class WorkspaceTools {
   ): Promise<string> {
     const root = this.workspaceRoot();
     const uri = workspaceFile(root, relativePath);
-    const current = await readTextIfExists(uri);
+    const document = this.openDocument(uri);
+    const current = document?.getText() ?? (await readTextIfExists(uri));
     if (current !== expectedContent) {
       return `Write cancelled: ${relativePath} changed after the proposal was created.`;
     }
-    await vscode.workspace.fs.createDirectory(
-      vscode.Uri.file(path.dirname(uri.fsPath)),
-    );
-    await vscode.workspace.fs.writeFile(uri, Buffer.from(content, "utf8"));
+
+    if (document) {
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(
+        uri,
+        new vscode.Range(
+          document.positionAt(0),
+          document.positionAt(current.length),
+        ),
+        content,
+      );
+      if (!(await vscode.workspace.applyEdit(edit))) {
+        throw new Error(`VS Code rejected the edit to ${relativePath}.`);
+      }
+      if (!(await document.save())) {
+        throw new Error(`Could not save ${relativePath}.`);
+      }
+    } else {
+      await vscode.workspace.fs.createDirectory(
+        vscode.Uri.file(path.dirname(uri.fsPath)),
+      );
+      await vscode.workspace.fs.writeFile(uri, Buffer.from(content, "utf8"));
+    }
+
+    const persisted = await readTextIfExists(uri);
+    if (document?.getText() !== content && document) {
+      throw new Error(`Editor verification failed for ${relativePath}.`);
+    }
+    if (persisted !== content) {
+      throw new Error(`Write verification failed for ${relativePath}.`);
+    }
     return `Wrote ${relativePath}.`;
   }
 
@@ -208,7 +234,17 @@ export class WorkspaceTools {
    * @returns The content of the file as a string, or an empty string if the file does not exist.
    */
   async currentContent(relativePath: string): Promise<string> {
-    return readTextIfExists(workspaceFile(this.workspaceRoot(), relativePath));
+    return this.readContent(workspaceFile(this.workspaceRoot(), relativePath));
+  }
+
+  private async readContent(uri: vscode.Uri): Promise<string> {
+    return this.openDocument(uri)?.getText() ?? (await readTextIfExists(uri));
+  }
+
+  private openDocument(uri: vscode.Uri): vscode.TextDocument | undefined {
+    return vscode.workspace.textDocuments.find(
+      (document) => document.uri.toString() === uri.toString(),
+    );
   }
 
   /**

@@ -22,6 +22,7 @@ export interface WriteApprovalEvents {
    * @param diff The diff representing the changes in the proposed write operation.
    */
   propose(id: string, path: string, diff: string): void;
+  complete(id: string, result: string): void;
 }
 
 /**
@@ -96,25 +97,32 @@ export class WriteApprovalManager {
     this.pending.delete(id);
 
     if (!approved) {
-      pending.resolve("Write denied by the user.");
+      const result = "Write denied by the user.";
+      pending.resolve(result);
+      this.events.complete(id, result);
       return;
     }
 
     try {
-      pending.resolve(
-        await this.workspaceTools.applyWrite(
-          pending.path,
-          pending.before,
-          pending.after,
-        ),
+      const result = await this.workspaceTools.applyWrite(
+        pending.path,
+        pending.before,
+        pending.after,
       );
+      pending.resolve(result);
+      this.events.complete(id, result);
     } catch (error) {
-      pending.resolve(`Tool error: ${formatError(error)}`);
+      const result = `Tool error: ${formatError(error)}`;
+      pending.resolve(result);
+      this.events.complete(id, result);
     }
   }
 
   rejectAll(reason = "Write denied because the chat was reset."): void {
-    for (const pending of this.pending.values()) pending.resolve(reason);
+    for (const [id, pending] of this.pending) {
+      pending.resolve(reason);
+      this.events.complete(id, reason);
+    }
     this.pending.clear();
   }
 }

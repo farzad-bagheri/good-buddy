@@ -27,7 +27,7 @@ describe("approval managers", () => {
         }),
         applyWrite,
       } as unknown as WorkspaceTools,
-      { propose },
+      { propose, complete: vi.fn() },
     );
     const toolCall: ToolCall = {
       tool: "write_file",
@@ -46,6 +46,7 @@ describe("approval managers", () => {
   it("still requires review for writes not marked auto-approved", async () => {
     const applyWrite = vi.fn().mockResolvedValue("Wrote notes.txt.");
     const propose = vi.fn();
+    const complete = vi.fn();
     const manager = new WriteApprovalManager(
       {
         currentContent: vi.fn().mockResolvedValue("before"),
@@ -55,7 +56,7 @@ describe("approval managers", () => {
         }),
         applyWrite,
       } as unknown as WorkspaceTools,
-      { propose },
+      { propose, complete },
     );
     const pending = manager.executeOrPropose({
       tool: "write_file",
@@ -67,6 +68,41 @@ describe("approval managers", () => {
     expect(applyWrite).not.toHaveBeenCalled();
     await manager.review("1", true);
     await expect(pending).resolves.toBe("Wrote notes.txt.");
+    expect(complete).toHaveBeenCalledWith("1", "Wrote notes.txt.");
+  });
+
+  it("reports pending writes cancelled when the active turn is abandoned", async () => {
+    const complete = vi.fn();
+    const propose = vi.fn();
+    const applyWrite = vi.fn();
+    const manager = new WriteApprovalManager(
+      {
+        currentContent: vi.fn().mockResolvedValue("before"),
+        proposeWrite: vi.fn().mockResolvedValue({
+          path: "notes.txt",
+          diff: "diff",
+        }),
+        applyWrite,
+      } as unknown as WorkspaceTools,
+      { propose, complete },
+    );
+    const pending = manager.executeOrPropose({
+      tool: "write_file",
+      autoApprove: false,
+      arguments: { path: "notes.txt", content: "after" },
+    });
+
+    await vi.waitFor(() => expect(propose).toHaveBeenCalledOnce());
+    manager.rejectAll("Write cancelled because a new chat request was sent.");
+
+    await expect(pending).resolves.toBe(
+      "Write cancelled because a new chat request was sent.",
+    );
+    expect(complete).toHaveBeenCalledWith(
+      "1",
+      "Write cancelled because a new chat request was sent.",
+    );
+    expect(applyWrite).not.toHaveBeenCalled();
   });
 
   it("executes auto-approved commands without proposing them", async () => {

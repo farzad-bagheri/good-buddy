@@ -320,6 +320,7 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
       const attachBtn = document.getElementById("attachBtn");
       const attachmentsEl = document.getElementById("attachments");
       const commandCards = new Map();
+      const writeCards = new Map();
 
       let assistantBodyEl = null;
       let thinkingIndicator = null;
@@ -350,7 +351,7 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
         const status = document.createElement("div");
         status.className = "tool-status";
         if (tool.autoApprove) {
-          status.textContent = "Used " + tool.arguments.join(", ") + "…";
+          status.textContent = "Used " + tool.tool + "…";
         } else {
           status.textContent = "Proposed " + tool.tool + "…";
         }
@@ -421,13 +422,27 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
           button.textContent = approved ? "Approve" : "Reject";
           button.addEventListener("click", () => {
             vscode.postMessage({ type: "reviewWrite", id, approved });
-            actions.textContent = approved ? "Approved" : "Rejected";
+            actions.textContent = approved ? "Applying..." : "Rejecting...";
           });
           actions.appendChild(button);
         }
         card.append(title, patch, actions);
         messagesEl.appendChild(card);
+        writeCards.set(id, actions);
         messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function completeWrite(id, result) {
+        const actions = writeCards.get(id);
+        if (!actions) return;
+        if (result === "Write denied by the user.") {
+          actions.textContent = "Rejected";
+        } else if (result.startsWith("Wrote ")) {
+          actions.textContent = "Applied";
+        } else {
+          actions.textContent = "Not applied: " + result;
+        }
+        writeCards.delete(id);
       }
 
       function addCommandProposal(id, command, autoApproved = false) {
@@ -517,6 +532,7 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
           case "history": {
             messagesEl.innerHTML = "";
             commandCards.clear();
+            writeCards.clear();
             thinkingIndicator = null;
             for (const m of msg.messages) {
               if (m.role === "assistant" && m.html)
@@ -555,6 +571,9 @@ export const shellHtml = (cspSource: string, nonce: string) => `<!doctype html>
             break;
           case "writeProposal":
             addWriteProposal(msg.id, msg.path, msg.diff);
+            break;
+          case "writeComplete":
+            completeWrite(msg.id, msg.result);
             break;
           case "commandProposal":
             addCommandProposal(msg.id, msg.command);

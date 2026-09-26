@@ -43,6 +43,12 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           path,
           diff,
         }),
+      complete: (id, result) =>
+        this.view?.webview.postMessage({
+          type: "writeComplete",
+          id,
+          result,
+        }),
     });
 
     // Initialize the command approval manager.
@@ -204,6 +210,9 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
 
     // Abort any ongoing request before starting a new one.
     this.activeController?.abort();
+    this.writeApprovals.rejectAll(
+      "Write cancelled because a new chat request was sent.",
+    );
 
     const model = this.getSelectedModel();
     const attachmentBlock = this.attachments.formatForPrompt();
