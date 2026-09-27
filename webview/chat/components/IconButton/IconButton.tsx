@@ -16,7 +16,7 @@ export function IconButton({
   onClick,
 }: IconButtonProps) {
   return (
-    <button type={type} title={title} aria-label={title} onClick={onClick}>
+    <button type={type} title={title} aria-label={title} onClick={onClick} className={styles["icon-button"]}>
       <div className={styles["icon-button-container"]}>
       {caption && <span className={styles["control-caption"]}>{caption}</span>}
       {iconClassName && (

@@ -1,0 +1,41 @@
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border-top: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editor-background);
+}
+
+.attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  font-size: 0.85em;
+}
+
+.composer {
+  padding: 8px 12px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 8px;
+  background: var(--vscode-input-background);
+}
+
+.composer textarea {
+  width: 100%;
+  padding: 16px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--vscode-input-foreground);
+  resize: none;
+  line-height: 1.4;
+}
+
+.controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

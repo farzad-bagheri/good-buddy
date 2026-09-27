@@ -22,6 +22,7 @@ export class ExplainCodeFeature {
     const code = editor.document.getText(
       selection.isEmpty ? undefined : selection,
     );
+
     if (!code.trim()) {
       vscode.window.showInformationMessage(
         "Good Buddy: select some code to explain.",
@@ -66,17 +67,17 @@ export class ExplainCodeFeature {
         },
         (chunk) => {
           fullExplanation += chunk;
-          panel.webview.postMessage({ type: "chunk", text: chunk });
+          panel.webview.postMessage({ type: "vsc:chunk", text: chunk });
         },
         controller.signal,
       );
 
       const html = marked.parse(fullExplanation);
-      panel.webview.postMessage({ type: "done", text: html });
+      panel.webview.postMessage({ type: "vsc:done", text: html });
     } catch (err) {
       if (!controller.signal.aborted) {
         panel.webview.postMessage({
-          type: "error",
+          type: "vsc:error",
           text: (err as Error).message,
         });
       }

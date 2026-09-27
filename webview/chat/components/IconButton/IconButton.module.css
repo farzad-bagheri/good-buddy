@@ -1,3 +1,7 @@
+.icon-button {
+ background:transparent;
+}
+
 .icon-button-container {
   display: flex;
   align-items: center;

@@ -14,12 +14,12 @@ export function ChatHistory({
   return (
     <section className={styles.history} aria-label="Saved chats">
       {history.length === 0 ? (
-        <p className={styles.empty}>No saved chats</p>
+        <p className={styles.empty}>No saved chats :(</p>
       ) : (
         history.map((chat) => (
           <div className={styles.item} key={chat.id}>
             <button
-              className={styles.open}
+              className={styles.resume}
               type="button"
               title={chat.title}
               onClick={() => onResume(chat.id)}

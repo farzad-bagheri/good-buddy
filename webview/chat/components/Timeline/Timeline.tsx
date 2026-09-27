@@ -1,7 +1,7 @@
 import { sanitizeHtml } from "../../utils";
 import type { TimelineItem } from "../../types";
 import { vscode } from "../../vscode";
-import "./Timeline.css";
+import "./Timeline.module.css";
 
 export function Timeline({ items }: { items: TimelineItem[] }) {
   return (

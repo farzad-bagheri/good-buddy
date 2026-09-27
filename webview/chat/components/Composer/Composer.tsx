@@ -1,6 +1,8 @@
 import type { AttachmentState } from "../../types";
 import { vscode } from "../../vscode";
-import "./Composer.css";
+import { IconButton } from "../IconButton";
+import { Attachment } from "./Attachment";
+import styles from "./Composer.module.css";
 
 interface ComposerProps {
   attachments: AttachmentState;
@@ -16,39 +18,27 @@ export function Composer({
   onSend,
 }: ComposerProps) {
   return (
-    <footer className="chat-footer">
-      <div className="attachments">
+    <footer className={styles.footer}>
+      <div className={styles.attachments}>
         {attachments.activeDocument && (
-          <div className="attachment-item">
-            <span
-              className="attachment-name"
-              title={attachments.activeDocument.path}
-            >
-              {"👁️"} {attachments.activeDocument.name}
-            </span>
-          </div>
+          <Attachment
+            name={attachments.activeDocument.name}
+            path={attachments.activeDocument.path}
+          />
         )}
         {attachments.attached.map((item, index) => (
-          <div className="attachment-item" key={`${item.name}-${index}`}>
-            <span className="attachment-name" title={item.path}>
-              {"📎"}
-              {item.name}
-            </span>
-            <button
-              className="remove-attachment"
-              type="button"
-              title={`Remove ${item.name}`}
-              aria-label={`Remove ${item.name}`}
-              onClick={() =>
-                vscode.postMessage({ type: "removeAttachment", index })
-              }
-            >
-              x
-            </button>
-          </div>
+          <Attachment
+            key={`${item.name}-${index}`}
+            name={item.name}
+            path={item.path}
+            onRemove={() =>
+              vscode.postMessage({ type: "removeAttachment", index })
+            }
+          />
         ))}
       </div>
-      <div className="composer">
+
+      <div className={styles.composer}>
         <textarea
           rows={2}
           placeholder="Ask Good Buddy... (Enter to send, Shift+Enter for new line)"
@@ -61,23 +51,18 @@ export function Composer({
             }
           }}
         />
-        <div className="controls">
-          <button
-            type="button"
+
+        <div className={styles.controls}>
+          <IconButton
+            iconClassName="add-icon"
             title="Attach text files"
-            aria-label="Attach text files"
             onClick={() => vscode.postMessage({ type: "attachFiles" })}
-          >
-            <span className="control-icon add-icon" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
+          />
+          <IconButton
+            iconClassName="send-icon"
             title="Send message"
-            aria-label="Send message"
             onClick={onSend}
-          >
-            <span className="control-icon send-icon" aria-hidden="true" />
-          </button>
+          />
         </div>
       </div>
     </footer>

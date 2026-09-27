@@ -1,16 +1,19 @@
 .history {
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   background: var(--vscode-input-background);
 }
 
 .item {
   display: flex;
   align-items: stretch;
-  border-radius: 4px;
+  gap: 8px;
+  padding: 8px;
   border-bottom: 1px solid var(--vscode-panel-border);
 }
 
-.open {
+.resume {
   flex: 1;
   min-width: 0;
   border: 0;
@@ -30,8 +33,4 @@
 .empty {
   color: var(--vscode-descriptionForeground);
   font-size: 0.85em;
-}
-
-.delete {
-  flex: 0 0 auto;
 }

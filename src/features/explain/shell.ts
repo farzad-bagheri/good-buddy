@@ -187,7 +187,7 @@ export const shellHtml = (iconUri: (name: string) => string) => `<!doctype html>
   <body>
     <div class="container">
       <div class="iconic">
-        <img src="${iconUri('icon')}" alt="Good Buddy Icon" class="logo" />
+        <img src="${iconUri('app')}" alt="Good Buddy Icon" class="logo" />
         <span>Good Buddy</span>
       </div>
 
@@ -208,7 +208,7 @@ export const shellHtml = (iconUri: (name: string) => string) => `<!doctype html>
         const msg = event.data;
 
         switch (msg.type) {
-          case "chunk":
+          case "vsc:chunk":
             if (out.textContent === "Waiting for explanation...") {
               out.textContent = "";
             }
@@ -216,7 +216,7 @@ export const shellHtml = (iconUri: (name: string) => string) => `<!doctype html>
             out.textContent += msg.text;
             break;
 
-          case "error":
+          case "vsc:error":
             error.innerHTML = "";
 
             const errorElement = document.createElement("div");
@@ -226,7 +226,7 @@ export const shellHtml = (iconUri: (name: string) => string) => `<!doctype html>
             error.appendChild(errorElement);
             break;
 
-          case "done":
+          case "vsc:done":
             out.innerHTML = msg.text;
             break;
         }

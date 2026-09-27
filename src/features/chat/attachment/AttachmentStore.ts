@@ -49,17 +49,21 @@ export class AttachmentStore {
     const room = MAX_ATTACHMENTS - this.items.length;
     for (const uri of selected.slice(0, room)) {
       const bytes = await vscode.workspace.fs.readFile(uri);
-      if (bytes.length > MAX_ATTACHMENT_BYTES || bytes.includes(0)) {
-        vscode.window.showWarningMessage(
-          `Good Buddy skipped ${uri.path.split("/").pop()}: attachments must be text files under ${MAX_ATTACHMENT_BYTES / 1024} KB.`,
-        );
-        continue;
-      }
-      this.items.push({
+
+      const attachment = {
         name: uri.path.split("/").pop() ?? "file",
         path: vscode.workspace.asRelativePath(uri),
         content: Buffer.from(bytes).toString("utf8"),
-      });
+      };
+
+      if (!this.isValidAttachment(attachment)) {
+        vscode.window.showWarningMessage(
+          `Good Buddy skipped ${uri.path.split("/").pop()}: invalid attachment.`,
+        );
+        continue;
+      }
+
+      this.items.push(attachment);
     }
   }
 
@@ -68,18 +72,18 @@ export class AttachmentStore {
     if (!document) return undefined;
 
     const content = document.getText();
-    if (
-      content.includes("\0") || // Skip binary files
-      Buffer.byteLength(content, "utf8") > MAX_ATTACHMENT_BYTES
-    ) {
-      return undefined;
-    }
 
-    return {
+    const candidateAttachment = {
       name: document.uri.path.split("/").pop() || document.fileName,
       path: vscode.workspace.asRelativePath(document.uri),
       content,
     };
+
+    if (!this.isValidAttachment(candidateAttachment)) {
+      return undefined;
+    }
+
+    return candidateAttachment;
   }
 
   /**
@@ -111,5 +115,14 @@ export class AttachmentStore {
         (attachment) => attachment.path !== defaultAttachment.path,
       ),
     ];
+  }
+
+  private isValidAttachment(attachment: ChatAttachment): boolean {
+    const nonBinary = !attachment.content.includes("\0");
+    const withinSizeLimit =
+      Buffer.byteLength(attachment.content, "utf8") <= MAX_ATTACHMENT_BYTES;
+    const notEmpty = attachment.content.length > 0;
+    const unique = !this.items.some((item) => item.path === attachment.path);
+    return nonBinary && withinSizeLimit && notEmpty && unique;
   }
 }
