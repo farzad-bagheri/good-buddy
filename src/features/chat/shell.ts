@@ -1,6 +1,6 @@
 // Auto-generated from D:\Code\good-buddy\scripts\html\chat-shell.html
 
-export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, styleUri: string, addIconUri: string, sendIconUri: string, deleteIconUri: string) => `<!doctype html>
+export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, styleUri: string, iconUri: (name: string) => string) => `<!doctype html>
 <html>
   <head>
     <meta charset="UTF-8" />
@@ -10,17 +10,40 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
     />
     <link rel="stylesheet" href="${styleUri}" />
     <style nonce="${nonce}">
-      .attach-icon {
-        mask-image: url("${addIconUri}");
-        -webkit-mask-image: url("${addIconUri}");
+      
+    .app-icon {
+        mask-image: url("${iconUri("app")}");
+        -webkit-mask-image: url("${iconUri("app")}");
       }
-      .send-icon {
-        mask-image: url("${sendIconUri}");
-        -webkit-mask-image: url("${sendIconUri}");
+
+    .send-icon {
+        mask-image: url("${iconUri("send")}");
+        -webkit-mask-image: url("${iconUri("send")}");
       }
-      .delete-icon {
-        mask-image: url("${deleteIconUri}");
-        -webkit-mask-image: url("${deleteIconUri}");
+
+    .back-icon {
+        mask-image: url("${iconUri("back")}");
+        -webkit-mask-image: url("${iconUri("back")}");
+      }
+
+    .delete-icon {
+        mask-image: url("${iconUri("delete")}");
+        -webkit-mask-image: url("${iconUri("delete")}");
+      }
+
+    .add-icon {
+        mask-image: url("${iconUri("add")}");
+        -webkit-mask-image: url("${iconUri("add")}");
+      }
+
+    .history-icon {
+        mask-image: url("${iconUri("history")}");
+        -webkit-mask-image: url("${iconUri("history")}");
+      }
+
+    .new-chat-icon {
+        mask-image: url("${iconUri("new-chat")}");
+        -webkit-mask-image: url("${iconUri("new-chat")}");
       }
     </style>
   </head>
@@ -28,4 +51,5 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
     <div id="root"></div>
     <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
   </body>
-</html>`;
+</html>
+`;

@@ -68,7 +68,7 @@ export function Composer({
             aria-label="Attach text files"
             onClick={() => vscode.postMessage({ type: "attachFiles" })}
           >
-            <span className="control-icon attach-icon" aria-hidden="true" />
+            <span className="control-icon add-icon" aria-hidden="true" />
           </button>
           <button
             type="button"

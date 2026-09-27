@@ -1,11 +1,9 @@
 import * as vscode from "vscode";
 
-export type IconName =  "icon" |"add" | "send" | "delete";
-
 export class Resources {
   constructor(private readonly context: vscode.ExtensionContext) {}
 
-  getIcon(icon: IconName) {
+  getIcon(icon: string) {
     return {
       uri: vscode.Uri.joinPath(
         this.context.extensionUri,

@@ -1,6 +1,6 @@
 import type { ChatSummary } from "../../types";
 import { IconButton } from "../IconButton/IconButton";
-import "./ChatHistory.css";
+import styles from "./ChatHistory.module.css";
 
 export function ChatHistory({
   history,
@@ -12,20 +12,20 @@ export function ChatHistory({
   onDelete: (id: string) => void;
 }) {
   return (
-    <section className="chat-history" aria-label="Saved chats">
+    <section className={styles.history} aria-label="Saved chats">
       {history.length === 0 ? (
-        <p className="chat-history-empty">No saved chats</p>
+        <p className={styles.empty}>No saved chats</p>
       ) : (
         history.map((chat) => (
-          <div className="chat-history-item" key={chat.id}>
+          <div className={styles.item} key={chat.id}>
             <button
-              className="chat-history-open"
+              className={styles.open}
               type="button"
               title={chat.title}
               onClick={() => onResume(chat.id)}
             >
-              <span className="chat-history-title">{chat.title}</span>
-              <span className="chat-history-date">
+              <span className={styles.title}>{chat.title}</span>
+              <span className={styles.date}>
                 {new Date(chat.updatedAt).toLocaleString()}
               </span>
             </button>
@@ -33,7 +33,6 @@ export function ChatHistory({
               iconClassName="delete-icon"
               type="button"
               title="Delete chat"
-              aria-label={`Delete ${chat.title}`}
               onClick={() => onDelete(chat.id)}
             />
           </div>

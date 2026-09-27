@@ -1,3 +1,5 @@
+import { IconButton } from "../../IconButton/IconButton";
+
 interface ChatToolbarProps {
   models: string[];
   selectedModel: string;
@@ -26,12 +28,16 @@ export function ChatToolbar({
           </option>
         ))}
       </select>
-      <button type="button" title="Saved chats" onClick={onToggleHistory}>
-        📜 History
-      </button>
-      <button type="button" title="New chat" onClick={onNewChat}>
-        🆕 New
-      </button>
+      <IconButton
+        title="New chat"
+        iconClassName="new-chat-icon"
+        onClick={onNewChat}
+      />
+      <IconButton
+        title="Saved chats"
+        iconClassName="history-icon"
+        onClick={onToggleHistory}
+      />
     </div>
   );
 }

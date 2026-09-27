@@ -3,12 +3,17 @@ import { GoodBuddyProvider } from "@/provider";
 import { marked } from "marked";
 import * as vscode from "vscode";
 import { shellHtml } from "./shell";
+import { Resources } from "@/resources/Resources";
 
 export class ExplainCodeFeature {
+    private readonly resources: Resources;
+    
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly provider: GoodBuddyProvider,
-  ) {}
+  ) {
+     this.resources = new Resources(context);
+  }
 
   async explainCode(editor: vscode.TextEditor): Promise<void> {
     const { chatModel } = getGoodBuddyConfig();
@@ -35,10 +40,9 @@ export class ExplainCodeFeature {
       },
     );
     
-    const iconUri = panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, "media", "icon.svg"),
-    );
-    panel.webview.html = shellHtml(iconUri.toString());
+  const iconUri = (name: string) =>
+      this.resources.getIcon(name).asWebUri(panel.webview).toString();
+    panel.webview.html = shellHtml(iconUri);
 
     const controller = new AbortController();
     panel.onDidDispose(() => controller.abort());

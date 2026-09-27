@@ -1,1 +1,1 @@
-export { Resources, type IconName } from "./Resources";
+export { Resources } from "./Resources";

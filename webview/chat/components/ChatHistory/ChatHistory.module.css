@@ -1,18 +1,16 @@
-.chat-history {
-  max-height: 40%;
+.history {
   overflow-y: auto;
-  border-bottom: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-input-background);
 }
 
-.chat-history-item {
+.item {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  align-items: stretch;
+  border-radius: 4px;
   border-bottom: 1px solid var(--vscode-panel-border);
 }
 
-.chat-history-open {
+.open {
   flex: 1;
   min-width: 0;
   border: 0;
@@ -20,20 +18,20 @@
   text-align: left;
 }
 
-.chat-history-title,
-.chat-history-date {
+.title,
+.date {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.chat-history-date,
-.chat-history-empty {
+.date,
+.empty {
   color: var(--vscode-descriptionForeground);
   font-size: 0.85em;
 }
 
-.chat-history-delete {
+.delete {
   flex: 0 0 auto;
 }

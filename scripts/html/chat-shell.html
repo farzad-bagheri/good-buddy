@@ -8,18 +8,7 @@
     />
     <link rel="stylesheet" href="${styleUri}" />
     <style nonce="${nonce}">
-      .attach-icon {
-        mask-image: url("${addIconUri}");
-        -webkit-mask-image: url("${addIconUri}");
-      }
-      .send-icon {
-        mask-image: url("${sendIconUri}");
-        -webkit-mask-image: url("${sendIconUri}");
-      }
-      .delete-icon {
-        mask-image: url("${deleteIconUri}");
-        -webkit-mask-image: url("${deleteIconUri}");
-      }
+      {{iconClasses}}
     </style>
   </head>
   <body>

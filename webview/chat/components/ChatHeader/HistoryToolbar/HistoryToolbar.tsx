@@ -8,7 +8,7 @@ export function HistoryToolbar({ onToggleHistory }: ChatToolbarProps) {
   return (
     <div className="toolbar">
       <IconButton
-        iconClassName="send-icon"
+        iconClassName="back-icon"
         caption="Back"
         title="Back to chat view"
         onClick={onToggleHistory}

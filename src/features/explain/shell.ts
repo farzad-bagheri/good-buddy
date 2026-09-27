@@ -1,6 +1,6 @@
 // Auto-generated from D:\Code\good-buddy\scripts\html\explain-shell.html
 
-export const shellHtml = (iconUri: string) => `<!doctype html>
+export const shellHtml = (iconUri: (name: string) => string) => `<!doctype html>
 <html>
   <head>
     <meta charset="UTF-8" />
@@ -187,7 +187,7 @@ export const shellHtml = (iconUri: string) => `<!doctype html>
   <body>
     <div class="container">
       <div class="iconic">
-        <img src="${iconUri}" alt="Good Buddy Icon" class="logo" />
+        <img src="${iconUri('icon')}" alt="Good Buddy Icon" class="logo" />
         <span>Good Buddy</span>
       </div>
 
