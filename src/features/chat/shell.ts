@@ -1,6 +1,6 @@
 // Auto-generated from D:\Code\good-buddy\scripts\html\chat-shell.html
 
-export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, styleUri: string, addIconUri: string, sendIconUri: string) => `<!doctype html>
+export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, styleUri: string, addIconUri: string, sendIconUri: string, deleteIconUri: string) => `<!doctype html>
 <html>
   <head>
     <meta charset="UTF-8" />
@@ -17,6 +17,10 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
       .send-icon {
         mask-image: url("${sendIconUri}");
         -webkit-mask-image: url("${sendIconUri}");
+      }
+      .delete-icon {
+        mask-image: url("${deleteIconUri}");
+        -webkit-mask-image: url("${deleteIconUri}");
       }
     </style>
   </head>

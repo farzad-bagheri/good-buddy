@@ -1,4 +1,5 @@
 import type { ChatSummary } from "../../types";
+import { IconButton } from "../IconButton/IconButton";
 import "./ChatHistory.css";
 
 export function ChatHistory({
@@ -28,15 +29,13 @@ export function ChatHistory({
                 {new Date(chat.updatedAt).toLocaleString()}
               </span>
             </button>
-            <button
-              className="chat-history-delete"
+            <IconButton
+              iconClassName="delete-icon"
               type="button"
               title="Delete chat"
               aria-label={`Delete ${chat.title}`}
               onClick={() => onDelete(chat.id)}
-            >
-              x
-            </button>
+            />
           </div>
         ))
       )}

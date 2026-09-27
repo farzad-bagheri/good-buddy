@@ -20,6 +20,7 @@ const shells = [
       "styleUri: string",
       "addIconUri: string",
       "sendIconUri: string",
+      "deleteIconUri: string",
     ],
   },
 ];

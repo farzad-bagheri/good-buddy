@@ -1,4 +1,6 @@
-import "./ChatHeader.css";
+import { ChatToolbar } from "./ChatToolbar";
+import { HistoryToolbar } from "./HistoryToolbar";
+import styles from "./ChatHeader.module.css";
 
 interface ChatHeaderProps {
   models: string[];
@@ -17,31 +19,19 @@ export function ChatHeader({
   onToggleHistory,
   onNewChat,
 }: ChatHeaderProps) {
-  return historyOpen ? (
-    <header className="chat-header">
-      <button type="button" title="Back to chat view" onClick={onToggleHistory}>
-        👈 Back
-      </button>
-    </header>
-  ) : (
-    <header className="chat-header">
-      <select
-        aria-label="Chat model"
-        value={selectedModel}
-        onChange={(event) => onModelChange(event.target.value)}
-      >
-        {models.map((model) => (
-          <option key={model} value={model}>
-            {model}
-          </option>
-        ))}
-      </select>
-      <button type="button" title="Saved chats" onClick={onToggleHistory}>
-        📜 History
-      </button>
-      <button type="button" title="New chat" onClick={onNewChat}>
-        🆕 New
-      </button>
+  return (
+    <header className={styles["chat-header"]}>
+      {historyOpen ? (
+        <HistoryToolbar onToggleHistory={onToggleHistory} />
+      ) : (
+        <ChatToolbar
+          models={models}
+          selectedModel={selectedModel}
+          onModelChange={onModelChange}
+          onToggleHistory={onToggleHistory}
+          onNewChat={onNewChat}
+        />
+      )}
     </header>
   );
 }

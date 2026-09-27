@@ -42,3 +42,11 @@ button:hover {
   display: flex;
   flex-direction: column;
 }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+}

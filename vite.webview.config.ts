@@ -13,7 +13,7 @@ export default defineConfig({
     cssCodeSplit: false,
     rollupOptions: {
       input: {
-        "chat-shell": resolve(workspaceRoot, "webview/chat/chat-shell.html"),
+        "index": resolve(workspaceRoot, "webview/chat/index.html"),
       },
       output: {
         entryFileNames: "assets/chat.js",

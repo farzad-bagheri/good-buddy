@@ -520,6 +520,10 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       .getIcon("send")
       .asWebUri(webview)
       .toString();
+    const deleteIconUri = this.resources
+      .getIcon("delete")
+      .asWebUri(webview)
+      .toString();
     return shellHtml(
       cspSource,
       nonce,
@@ -527,6 +531,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       styleUri,
       addIconUri,
       sendIconUri,
+      deleteIconUri,
     );
   }
 }

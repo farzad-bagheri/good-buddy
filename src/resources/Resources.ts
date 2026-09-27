@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-export type IconName = "add" | "send" | "icon";
+export type IconName =  "icon" |"add" | "send" | "delete";
 
 export class Resources {
   constructor(private readonly context: vscode.ExtensionContext) {}

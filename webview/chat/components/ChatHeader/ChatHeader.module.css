@@ -1,0 +1,4 @@
+.chat-header {
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editor-background);
+}

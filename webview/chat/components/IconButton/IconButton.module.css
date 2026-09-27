@@ -1,0 +1,19 @@
+.icon-button-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background-color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
