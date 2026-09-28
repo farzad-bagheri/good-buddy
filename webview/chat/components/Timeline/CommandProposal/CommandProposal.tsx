@@ -1,6 +1,6 @@
 import type { TimelineItem } from "../../../types";
 import { vscode } from "../../../vscode";
-// import styles from './CommandProposal.module.css';
+import styles from './CommandProposal.module.css';
 
 type CommandProposalItem = Extract<TimelineItem, { kind: "commandProposal" }>;
 

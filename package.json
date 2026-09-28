@@ -116,8 +116,6 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "watch:extension": "vite build --watch",
-    "watch:webview": "vite build --config vite.webview.config.ts --watch",
-    "dev:webview": "vite --config vite.webview.config.ts",
     "clean": "rm -rf out"
   },
   "devDependencies": {

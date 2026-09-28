@@ -76,8 +76,7 @@
   font-size: 0.9em;
 }
 
-.markdown pre,
-.proposal pre {
+.markdown pre {
   overflow: auto;
   padding: 10px 12px;
   border: 1px solid var(--vscode-editorWidget-border);
