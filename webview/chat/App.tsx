@@ -44,11 +44,11 @@ export function App() {
     function onMessage(event: MessageEvent) {
       const message = event.data;
       switch (message.type) {
-        case "models":
+        case "vsc:models":
           setModels(message.models);
           setSelectedModel(message.selected);
           break;
-        case "history":
+        case "vsc:history":
           setHistoryOpen(false);
           setThinking(false);
           assistantId.current = undefined;
@@ -64,13 +64,13 @@ export function App() {
             ),
           );
           break;
-        case "chatList":
+        case "vsc:chatList":
           setHistory(message.chats);
           break;
-        case "userMessage":
+        case "vsc:userMessage":
           appendItem({ kind: "message", role: "user", text: message.text });
           break;
-        case "assistantStart": {
+        case "vsc:assistantStart": {
           setThinking(false);
           const id = createItemId();
           assistantId.current = id;
@@ -80,7 +80,7 @@ export function App() {
           ]);
           break;
         }
-        case "assistantChunk":
+        case "vsc:assistantChunk":
           if (assistantId.current) {
             const id = assistantId.current;
             setItems((current) =>
@@ -92,25 +92,25 @@ export function App() {
             );
           }
           break;
-        case "assistantDone":
+        case "vsc:assistantDone":
           setThinking(false);
           assistantId.current = undefined;
           break;
-        case "assistantError":
+        case "vsc:assistantError":
           setThinking(false);
           assistantId.current = undefined;
           appendItem({ kind: "message", role: "error", text: message.text });
           break;
-        case "modelStatus":
+        case "vsc:modelStatus":
           setThinking(message.waiting);
           break;
-        case "toolStatus":
+        case "vsc:toolStatus":
           appendItem({
             kind: "toolStatus",
             text: `${message.tool.autoApprove ? "Used" : "Proposed"} ${message.tool.tool}...`,
           });
           break;
-        case "writeProposal":
+        case "vsc:writeProposal":
           appendItem({
             kind: "writeProposal",
             proposalId: message.id,
@@ -118,7 +118,7 @@ export function App() {
             diff: message.diff,
           });
           break;
-        case "writeComplete":
+        case "vsc:writeComplete":
           setItems((current) =>
             current.map((item) =>
               item.kind === "writeProposal" && item.proposalId === message.id
@@ -135,13 +135,13 @@ export function App() {
             ),
           );
           break;
-        case "commandProposal":
+        case "vsc:commandProposal":
           addCommand(message.id, message.command, false);
           break;
-        case "commandStart":
+        case "vsc:commandStart":
           addCommand(message.id, message.command, true);
           break;
-        case "commandOutput":
+        case "vsc:commandOutput":
           setItems((current) =>
             current.map((item) =>
               item.kind === "commandProposal" && item.commandId === message.id
@@ -150,7 +150,7 @@ export function App() {
             ),
           );
           break;
-        case "commandComplete":
+        case "vsc:commandComplete":
           setItems((current) =>
             current.map((item) =>
               item.kind === "commandProposal" && item.commandId === message.id
@@ -165,7 +165,7 @@ export function App() {
             ),
           );
           break;
-        case "attachments":
+        case "vsc:attachments":
           setAttachments({
             attached: message.attached,
             activeDocument: message.activeDocument,
@@ -197,7 +197,7 @@ export function App() {
     }
 
     window.addEventListener("message", onMessage);
-    vscode.postMessage({ type: "ready" });
+    vscode.postMessage({ type: "wv:ready" });
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
@@ -206,16 +206,10 @@ export function App() {
     endOfMessages.current?.scrollIntoView({ block: "end" });
   }, [items, thinking]);
 
-  function send() {
-    if (!text.trim()) return;
-    vscode.postMessage({ type: "send", text });
-    setText("");
-  }
-
   function toggleHistory() {
     const opening = !historyOpen;
     setHistoryOpen(opening);
-    if (opening) vscode.postMessage({ type: "listChats" });
+    if (opening) vscode.postMessage({ type: "wv:listChats" });
   }
 
   return (
@@ -226,20 +220,20 @@ export function App() {
         historyOpen={historyOpen}
         onModelChange={(model) => {
           setSelectedModel(model);
-          vscode.postMessage({ type: "selectModel", model });
+          vscode.postMessage({ type: "wv:selectModel", model });
         }}
         onToggleHistory={toggleHistory}
         onNewChat={() => {
           setHistoryOpen(false);
-          vscode.postMessage({ type: "newChat" });
+          vscode.postMessage({ type: "wv:newChat" });
         }}
       />
 
       {historyOpen && (
         <ChatHistory
           history={history}
-          onResume={(id) => vscode.postMessage({ type: "resumeChat", id })}
-          onDelete={(id) => vscode.postMessage({ type: "deleteChat", id })}
+          onResume={(id) => vscode.postMessage({ type: "wv:resumeChat", id })}
+          onDelete={(id) => vscode.postMessage({ type: "wv:deleteChat", id })}
         />
       )}
 
@@ -258,7 +252,6 @@ export function App() {
           attachments={attachments}
           text={text}
           onTextChange={setText}
-          onSend={send}
         />
       )}
     </main>

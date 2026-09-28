@@ -26,6 +26,11 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
         -webkit-mask-image: url("${iconUri("back")}");
       }
 
+    .copy-icon {
+        mask-image: url("${iconUri("copy")}");
+        -webkit-mask-image: url("${iconUri("copy")}");
+      }
+
     .delete-icon {
         mask-image: url("${iconUri("delete")}");
         -webkit-mask-image: url("${iconUri("delete")}");
@@ -34,6 +39,11 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
     .add-icon {
         mask-image: url("${iconUri("add")}");
         -webkit-mask-image: url("${iconUri("add")}");
+      }
+
+    .check-icon {
+        mask-image: url("${iconUri("check")}");
+        -webkit-mask-image: url("${iconUri("check")}");
       }
 
     .history-icon {

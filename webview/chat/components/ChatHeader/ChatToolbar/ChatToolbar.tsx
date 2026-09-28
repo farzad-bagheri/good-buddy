@@ -15,12 +15,16 @@ export function ChatToolbar({
   onToggleHistory,
   onNewChat,
 }: ChatToolbarProps) {
+  const handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    onModelChange(event.target.value);
+  };
+
   return (
     <div className="toolbar">
       <select
         aria-label="Chat model"
         value={selectedModel}
-        onChange={(event) => onModelChange(event.target.value)}
+        onChange={handleModelChange}
       >
         {models.map((model) => (
           <option key={model} value={model}>
@@ -30,12 +34,12 @@ export function ChatToolbar({
       </select>
       <IconButton
         title="New chat"
-        iconClassName="new-chat-icon"
+        iconName="new-chat-icon"
         onClick={onNewChat}
       />
       <IconButton
         title="Saved chats"
-        iconClassName="history-icon"
+        iconName="history-icon"
         onClick={onToggleHistory}
       />
     </div>

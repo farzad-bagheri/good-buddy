@@ -8,15 +8,19 @@ interface ComposerProps {
   attachments: AttachmentState;
   text: string;
   onTextChange: (text: string) => void;
-  onSend: () => void;
 }
 
-export function Composer({
-  attachments,
-  text,
-  onTextChange,
-  onSend,
-}: ComposerProps) {
+export function Composer({ attachments, text, onTextChange }: ComposerProps) {
+  const handleRemoveAttachment = (index: number) => () => {
+    vscode.postMessage({ type: "wv:removeAttachment", index });
+  };
+
+  const handleSend = () => {
+    if (!text.trim()) return;
+    vscode.postMessage({ type: "wv:send", text });
+    onTextChange("");
+  };
+
   return (
     <footer className={styles.footer}>
       <div className={styles.attachments}>
@@ -31,9 +35,7 @@ export function Composer({
             key={`${item.name}-${index}`}
             name={item.name}
             path={item.path}
-            onRemove={() =>
-              vscode.postMessage({ type: "removeAttachment", index })
-            }
+            onRemove={handleRemoveAttachment(index)}
           />
         ))}
       </div>
@@ -47,21 +49,21 @@ export function Composer({
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
-              onSend();
+              handleSend();
             }
           }}
         />
 
         <div className={styles.controls}>
           <IconButton
-            iconClassName="add-icon"
+            iconName="add-icon"
             title="Attach text files"
-            onClick={() => vscode.postMessage({ type: "attachFiles" })}
+            onClick={() => vscode.postMessage({ type: "wv:attachFiles" })}
           />
           <IconButton
-            iconClassName="send-icon"
+            iconName="send-icon"
             title="Send message"
-            onClick={onSend}
+            onClick={handleSend}
           />
         </div>
       </div>

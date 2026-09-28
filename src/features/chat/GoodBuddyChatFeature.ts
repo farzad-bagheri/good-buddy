@@ -49,14 +49,14 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       // Handle write proposals from the workspace tools.
       propose: (id, path, diff) =>
         this.view?.webview.postMessage({
-          type: "writeProposal",
+          type: "vsc:writeProposal",
           id,
           path,
           diff,
         }),
       complete: (id, result) =>
         this.view?.webview.postMessage({
-          type: "writeComplete",
+          type: "vsc:writeComplete",
           id,
           result,
         }),
@@ -66,25 +66,25 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     this.commandApprovals = new CommandApprovalManager(this.workspaceTools, {
       propose: (id, command) =>
         this.view?.webview.postMessage({
-          type: "commandProposal",
+          type: "vsc:commandProposal",
           id,
           command,
         }),
       start: (id, command) =>
         this.view?.webview.postMessage({
-          type: "commandStart",
+          type: "vsc:commandStart",
           id,
           command,
         }),
       output: (id, text) =>
         this.view?.webview.postMessage({
-          type: "commandOutput",
+          type: "vsc:commandOutput",
           id,
           text,
         }),
       complete: (id, result) =>
         this.view?.webview.postMessage({
-          type: "commandComplete",
+          type: "vsc:commandComplete",
           id,
           result,
         }),
@@ -106,12 +106,12 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       {
         onToolStatus: (tool) =>
           this.view?.webview.postMessage({
-            type: "toolStatus",
+            type: "vsc:toolStatus",
             tool,
           }),
         onModelStatus: (waiting, signal) => {
           if (this.activeController?.signal !== signal) return;
-          this.view?.webview.postMessage({ type: "modelStatus", waiting });
+          this.view?.webview.postMessage({ type: "vsc:modelStatus", waiting });
         },
       },
     );
@@ -142,26 +142,26 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     // Handle incoming messages from the webview.
     webviewView.webview.onDidReceiveMessage(async (message) => {
       switch (message.type) {
-        case "ready":
+        case "wv:ready":
           await this.sendModelList();
           await this.postHistory();
           this.postAttachments();
           await this.postChatList();
           break;
-        case "send":
+        case "wv:send":
           await this.handleSend(String(message.text ?? ""));
           break;
-        case "attachFiles":
+        case "wv:attachFiles":
           await this.pickAttachments();
           break;
-        case "removeAttachment":
+        case "wv:removeAttachment":
           this.attachments.removeAt(Number(message.index));
           this.postAttachments();
           break;
-        case "selectModel":
+        case "wv:selectModel":
           await this.context.globalState.update(MODEL_STATE_KEY, message.model);
           break;
-        case "newChat":
+        case "wv:newChat":
           this.activeController?.abort();
           this.writeApprovals.rejectAll();
           this.commandApprovals.rejectAll();
@@ -175,25 +175,25 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           await this.postHistory();
           await this.postChatList();
           break;
-        case "listChats":
+        case "wv:listChats":
           await this.postChatList();
           break;
-        case "resumeChat":
+        case "wv:resumeChat":
           await this.resumeChat(String(message.id ?? ""));
           break;
-        case "deleteChat":
+        case "wv:deleteChat":
           await this.confirmDeleteChat(String(message.id ?? ""));
           break;
-        case "cancel":
+        case "wv:cancel":
           this.activeController?.abort();
           break;
-        case "reviewWrite":
+        case "wv:reviewWrite":
           await this.writeApprovals.review(
             String(message.id ?? ""),
             Boolean(message.approved),
           );
           break;
-        case "reviewCommand":
+        case "wv:reviewCommand":
           await this.commandApprovals.executeOrReject(
             String(message.id ?? ""),
             Boolean(message.approved),
@@ -215,14 +215,14 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     try {
       const models = await this.provider.listModels();
       this.view?.webview.postMessage({
-        type: "models",
+        type: "vsc:models",
         models,
         selected: this.getSelectedModel(),
       });
     } catch (err) {
       this.output.appendLine(`Good Buddy chat: failed to list models: ${err}`);
       this.view?.webview.postMessage({
-        type: "models",
+        type: "vsc:models",
         models: [chatModel],
         selected: this.getSelectedModel(),
       });
@@ -242,7 +242,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       }),
     );
     this.view?.webview.postMessage({
-      type: "history",
+      type: "vsc:history",
       messages,
     });
   }
@@ -250,7 +250,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   private async postChatList(): Promise<void> {
     try {
       this.view?.webview.postMessage({
-        type: "chatList",
+        type: "vsc:chatList",
         chats: await this.chatStorage.list(),
       });
     } catch (err) {
@@ -414,7 +414,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       displayContent,
     });
     this.view.webview.postMessage({
-      type: "userMessage",
+      type: "vsc:userMessage",
       text: displayContent,
     });
 
@@ -448,20 +448,20 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       conversation.push({ role: "assistant", content: assistantText });
       await this.persistChat(id, createdAt, model, conversation, chatTitle);
       // Notify the webview that the assistant has started generating its response.
-      this.view.webview.postMessage({ type: "assistantStart" });
+      this.view.webview.postMessage({ type: "vsc:assistantStart" });
       // Send the initial chunk of the assistant's response to the webview.
       this.view.webview.postMessage({
-        type: "assistantChunk",
+        type: "vsc:assistantChunk",
         html: marked.parse(assistantText),
       });
       // Notify the webview that the assistant has finished generating its response.
-      this.view.webview.postMessage({ type: "assistantDone" });
+      this.view.webview.postMessage({ type: "vsc:assistantDone" });
     } catch (err) {
       // If an error occurs and the request was not aborted, notify the webview of the error.
       if (!controller.signal.aborted) {
         if (this.currentChatId === id) {
           this.view?.webview.postMessage({
-            type: "assistantError",
+            type: "vsc:assistantError",
             text: formatError(err),
           });
           await this.persistChat(id, createdAt, model, conversation);
@@ -475,7 +475,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
           if (this.activeController === controller) {
             await this.persistChat(id, createdAt, model, conversation);
           }
-          this.view?.webview.postMessage({ type: "assistantDone" });
+          this.view?.webview.postMessage({ type: "vsc:assistantDone" });
         }
       }
     } finally {
@@ -494,7 +494,7 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
   private postAttachments(): void {
     const activeDocument = this.attachments.activeDocumentAttachment();
     this.view?.webview.postMessage({
-      type: "attachments",
+      type: "vsc:attachments",
       attached: this.attachments.allBase,
       activeDocument: activeDocument,
     });

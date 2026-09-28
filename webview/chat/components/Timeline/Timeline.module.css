@@ -9,25 +9,6 @@
   display: none;
 }
 
-.message {
-  max-width: 900px;
-  margin: 0 auto 22px;
-  white-space: pre-wrap;
-  line-height: 1.55;
-}
-
-.message.user .body {
-  display: inline-block;
-  max-width: min(85%, 720px);
-  padding: 8px 11px;
-  border: 1px solid var(--vscode-editorWidget-border);
-  border-radius: 6px;
-  background: var(--vscode-editor-background);
-}
-
-.message.error {
-  color: var(--vscode-errorForeground);
-}
 
 .assistant {
   display: flex;
@@ -40,104 +21,6 @@
   flex: 1;
 }
 
-.markdown {
-  white-space: normal;
-  line-height: 1.55;
-}
-
-.markdown p {
-  margin: 0 0 12px;
-}
-
-.markdown p:last-child {
-  margin-bottom: 0;
-}
-
-.markdown h1,
-.markdown h2,
-.markdown h3,
-.markdown h4 {
-  margin: 20px 0 8px;
-  line-height: 1.3;
-}
-
-.markdown h1 {
-  font-size: 1.35em;
-}
-
-.markdown h2 {
-  font-size: 1.2em;
-}
-
-.markdown h3,
-.markdown h4 {
-  font-size: 1.05em;
-}
-
-.markdown ul,
-.markdown ol {
-  margin: 8px 0 14px;
-  padding-left: 24px;
-}
-
-.markdown li {
-  margin: 4px 0;
-}
-
-.markdown code {
-  padding: 0.15em 0.35em;
-  border-radius: 3px;
-  color: var(--vscode-textPreformat-foreground);
-  background: var(--vscode-textCodeBlock-background);
-  font-family: var(--vscode-editor-font-family);
-  font-size: 0.9em;
-}
-
-.markdown pre,
-.proposal pre {
-  overflow: auto;
-  padding: 10px 12px;
-  border: 1px solid var(--vscode-editorWidget-border);
-  border-radius: 4px;
-  color: var(--vscode-textPreformat-foreground);
-  background: var(--vscode-textCodeBlock-background);
-  white-space: pre;
-}
-
-.markdown pre code {
-  padding: 0;
-  background: transparent;
-  color: inherit;
-}
-
-.markdown blockquote {
-  margin: 14px 0;
-  padding: 6px 14px;
-  border-left: 3px solid var(--vscode-textLink-foreground);
-  color: var(--vscode-descriptionForeground);
-  background: var(--vscode-textCodeBlock-background);
-}
-
-.markdown a {
-  color: var(--vscode-textLink-foreground);
-}
-
-.markdown table {
-  width: 100%;
-  margin: 14px 0;
-  border-collapse: collapse;
-}
-
-.markdown th,
-.markdown td {
-  padding: 6px 8px;
-  border: 1px solid var(--vscode-editorWidget-border);
-  text-align: left;
-}
-
-.markdown th {
-  background: var(--vscode-textCodeBlock-background);
-}
 
 .tool-status {
   display: flex;

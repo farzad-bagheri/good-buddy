@@ -11,6 +11,14 @@ export function ChatHistory({
   onResume: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
+  const handleResume = (id: string) => () => {
+    onResume(id);
+  };
+
+  const handleDelete = (id: string) => () => {
+    onDelete(id);
+  };
+  
   return (
     <section className={styles.history} aria-label="Saved chats">
       {history.length === 0 ? (
@@ -22,7 +30,7 @@ export function ChatHistory({
               className={styles.resume}
               type="button"
               title={chat.title}
-              onClick={() => onResume(chat.id)}
+              onClick={handleResume(chat.id)}
             >
               <span className={styles.title}>{chat.title}</span>
               <span className={styles.date}>
@@ -30,10 +38,10 @@ export function ChatHistory({
               </span>
             </button>
             <IconButton
-              iconClassName="delete-icon"
+              iconName="delete-icon"
               type="button"
               title="Delete chat"
-              onClick={() => onDelete(chat.id)}
+              onClick={handleDelete(chat.id)}
             />
           </div>
         ))

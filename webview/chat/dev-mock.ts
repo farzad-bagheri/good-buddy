@@ -19,28 +19,31 @@ const mockHistory: ChatSummary[] = [
   },
 ];
 
-// Listen for messages from webview (simulating VS Code extension host)
+// Listen for messages from webview (**simulating VS Code extension host**)
 window.addEventListener("mock-vscode-message", (event) => {
   const message = (event as CustomEvent<Record<string, unknown>>).detail;
   switch (message.type) {
-    case "ready":
+    case "wv:ready":
       post({
-        type: "models",
+        type: "vsc:models",
         models: ["llama3", "qwen2.5-coder"],
         selected: "llama3",
       });
-      post({ type: "history", messages: [] });
+      post({ type: "vsc:history", messages: [] });
       break;
-    case "listChats": // message from webview requesting the chat list
-      post({ type: "chatList", chats: mockHistory }); // post to webview
+    case "wv:listChats":
+      post({ type: "vsc:chatList", chats: mockHistory });
       break;
-    case "send":
-      post({ type: "userMessage", text: message.text });
-      post({ type: "modelStatus", waiting: true });
-      post({ type: "assistantStart" });
+    case "wv:send":
+      post({ type: "vsc:userMessage", text: message.text });
+      post({ type: "vsc:modelStatus", waiting: true });
+      post({ type: "vsc:assistantStart" });
       setTimeout(() => {
-        post({ type: "assistantChunk", html: `<p>Echo: ${message.text}</p>` });
-        post({ type: "assistantDone" });
+        post({
+          type: "vsc:assistantChunk",
+          html: `<p>Echo: ${message.text}</p>`,
+        });
+        post({ type: "vsc:assistantDone" });
       }, 400);
       break;
   }
