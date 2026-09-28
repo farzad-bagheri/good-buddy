@@ -1,9 +1,10 @@
+import { ProviderModel } from "../../types";
+import styles from "./ChatHeader.module.css";
 import { ChatToolbar } from "./ChatToolbar";
 import { HistoryToolbar } from "./HistoryToolbar";
-import styles from "./ChatHeader.module.css";
 
 interface ChatHeaderProps {
-  models: string[];
+  models: ProviderModel[];
   selectedModel: string;
   historyOpen: boolean;
   onModelChange: (model: string) => void;

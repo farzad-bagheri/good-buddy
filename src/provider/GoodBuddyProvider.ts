@@ -1,4 +1,4 @@
-import { ChatOptions, GenerateOptions } from "./types";
+import { ChatOptions, GenerateOptions, ProviderModel } from "./types";
 
 /**
  * Abstract base class for Good Buddy providers, defining the interface for text generation, chat, and model listing.
@@ -40,5 +40,5 @@ export abstract class GoodBuddyProvider {
    * Lists the available models from the provider server.
    * @returns An array of model names.
    */
-  abstract listModels(): Promise<string[]>;
+  abstract listModels(): Promise<ProviderModel[]>;
 }

@@ -1,7 +1,9 @@
+import { ProviderModel } from "../../../types";
 import { IconButton } from "../../IconButton/IconButton";
+import styles from "./ChatToolbar.module.css";
 
 interface ChatToolbarProps {
-  models: string[];
+  models: ProviderModel[];
   selectedModel: string;
   onModelChange: (model: string) => void;
   onToggleHistory: () => void;
@@ -20,15 +22,15 @@ export function ChatToolbar({
   };
 
   return (
-    <div className="toolbar">
+    <div className={styles.toolbar}>
       <select
         aria-label="Chat model"
         value={selectedModel}
         onChange={handleModelChange}
       >
         {models.map((model) => (
-          <option key={model} value={model}>
-            {model}
+          <option key={model.model} value={model.model}>
+            {model.caption}
           </option>
         ))}
       </select>

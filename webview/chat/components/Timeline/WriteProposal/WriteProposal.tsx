@@ -1,17 +1,18 @@
-import type { TimelineItem } from "../../types";
-import { vscode } from "../../vscode";
+import type { TimelineItem } from "../../../types";
+import { vscode } from "../../../vscode";
+import styles from "../Proposal.module.css";
 
 type WriteProposalItem = Extract<TimelineItem, { kind: "writeProposal" }>;
 
 export function WriteProposal({ item }: { item: WriteProposalItem }) {
   return (
-    <section className="proposal">
+    <section className={styles.proposal}>
       <strong>Proposed change: {item.path}</strong>
       <pre>{item.diff}</pre>
       {item.status ? (
         <div>{item.status}</div>
       ) : (
-        <div className="proposal-actions">
+        <div className={styles.actions}>
           {[true, false].map((approved) => (
             <button
               key={String(approved)}

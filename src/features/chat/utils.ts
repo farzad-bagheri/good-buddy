@@ -1,4 +1,4 @@
-import { ChatMessage } from "@/provider";
+import { ChatMessage, ProviderModel } from "@/provider";
 import type { ToolCall, ToolDefinition } from "./types";
 
 export type AssistantEnvelope =
@@ -13,6 +13,7 @@ export function formatError(error: unknown): string {
 }
 
 export function agentInstructions(
+  model: ProviderModel,
   projectContext: string,
   tools: readonly ToolDefinition[],
   requestTitle: boolean,
@@ -25,7 +26,7 @@ export function agentInstructions(
     : '"title":null';
   return {
     role: "system",
-    content: `You are Good Buddy, a concise coding assistant with workspace tools.
+    content: `You are Good Buddy, a concise coding assistant with workspace tools. Your technical details are as follows: ${JSON.stringify(model)}.
 Every reply must be exactly one JSON object matching this contract, with no Markdown fences or surrounding prose:
 {"type":"final","response":"Markdown answer","tool":null,"autoApprove":false,"arguments":{},${titleExample}}
 {"type":"tool_call","response":"","tool":"tool_id","autoApprove":false,"arguments":{},${titleExample}}

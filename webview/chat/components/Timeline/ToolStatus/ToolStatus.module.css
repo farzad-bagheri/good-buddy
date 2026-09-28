@@ -3,14 +3,14 @@
   align-items: center;
   gap: 8px;
   max-width: 900px;
-  margin: -6px auto 16px;
+  margin: -8px auto 16px;
   color: var(--vscode-descriptionForeground);
   font-size: 0.9em;
 }
 
 .status::before {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   flex: 0 0 auto;
   border-radius: 50%;
   background: var(--vscode-charts-blue);

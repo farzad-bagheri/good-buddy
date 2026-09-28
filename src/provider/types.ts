@@ -1,3 +1,18 @@
+export interface ProviderModel {
+  caption: string;
+  name: string;
+  model: string;
+  details: {
+    format: string;
+    family: string;
+    parameter_size: string;
+    quantization_level: string;
+    context_length: number;
+    embedding_length: number;
+  };
+  capabilities: ("completion" | "tools" | "thinking")[];
+}
+
 export interface GenerateOptions {
   model: string;
   prompt: string;

@@ -1,0 +1,24 @@
+.proposal {
+  max-width: 900px;
+  margin: 8px auto 12px;
+  padding: 8px;
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 4px;
+}
+
+.proposal pre {
+  max-height: 260px;
+  overflow: auto;
+}
+
+.commandOutput {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-family: var(--vscode-editor-font-family);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

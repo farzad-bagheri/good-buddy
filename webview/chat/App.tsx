@@ -7,13 +7,14 @@ import type {
   AttachmentState,
   ChatSummary,
   NewTimelineItem,
+  ProviderModel,
   TimelineItem,
 } from "./types";
 import { createItemId } from "./utils";
 import { vscode } from "./vscode";
 
 export function App() {
-  const [models, setModels] = useState<string[]>([]);
+  const [models, setModels] = useState<ProviderModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [history, setHistory] = useState<ChatSummary[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -229,30 +230,29 @@ export function App() {
         }}
       />
 
-      {historyOpen && (
+      {historyOpen ? (
         <ChatHistory
           history={history}
           onResume={(id) => vscode.postMessage({ type: "wv:resumeChat", id })}
           onDelete={(id) => vscode.postMessage({ type: "wv:deleteChat", id })}
         />
-      )}
-
-      <section className="messages" aria-live="polite" hidden={historyOpen}>
-        <Timeline items={items} />
-        {thinking && (
-          <div className="tool-status" role="status">
-            Thinking...
-          </div>
-        )}
-        <div ref={endOfMessages} />
-      </section>
-
-      {historyOpen || (
-        <Composer
-          attachments={attachments}
-          text={text}
-          onTextChange={setText}
-        />
+      ) : (
+        <>
+          <section className="messages" aria-live="polite" hidden={historyOpen}>
+            <Timeline items={items} />
+            {thinking && (
+              <div className="tool-status" role="status">
+                Thinking...
+              </div>
+            )}
+            <div ref={endOfMessages} />
+          </section>
+          <Composer
+            attachments={attachments}
+            text={text}
+            onTextChange={setText}
+          />
+        </>
       )}
     </main>
   );

@@ -1,15 +1,12 @@
 .message {
   max-width: 900px;
-  margin: 0 auto 24px;
   white-space: pre-wrap;
   padding: 8px 16px;
 }
 
 .message.assistant {
   display: inline-block;
-  border: 1px solid var(--vscode-editorWidget-border);
-  border-radius: 8px;
-  background: var(--vscode-editor-background);
+  margin: 0 auto 24px;
 }
 
 .message.user {
@@ -17,6 +14,7 @@
   border: 1px solid var(--vscode-editorWidget-border);
   border-radius: 8px;
   background: var(--vscode-editor-background);
+  margin: 0 auto 12px;
 }
 
 .message.error {
@@ -59,7 +57,7 @@
 
 .markdown ul,
 .markdown ol {
-  margin: 8px 0 14px;
+  margin: 8px 0 16px;
   padding-left: 24px;
 }
 
@@ -69,7 +67,7 @@
 
 .markdown code {
   padding: 0.15em 0.35em;
-  border-radius: 3px;
+  border-radius: 4px;
   color: var(--vscode-textPreformat-foreground);
   background: var(--vscode-textCodeBlock-background);
   font-family: var(--vscode-editor-font-family);
@@ -78,7 +76,7 @@
 
 .markdown pre {
   overflow: auto;
-  padding: 10px 12px;
+  padding: 12px;
   border: 1px solid var(--vscode-editorWidget-border);
   border-radius: 4px;
   color: var(--vscode-textPreformat-foreground);
@@ -93,8 +91,8 @@
 }
 
 .markdown blockquote {
-  margin: 14px 0;
-  padding: 6px 14px;
+  margin: 12px 0;
+  padding: 8px 12px;
   border-left: 3px solid var(--vscode-textLink-foreground);
   color: var(--vscode-descriptionForeground);
   background: var(--vscode-textCodeBlock-background);
@@ -106,13 +104,13 @@
 
 .markdown table {
   width: 100%;
-  margin: 14px 0;
+  margin: 12px 0;
   border-collapse: collapse;
 }
 
 .markdown th,
 .markdown td {
-  padding: 6px 8px;
+  padding: 8px;
   border: 1px solid var(--vscode-editorWidget-border);
   text-align: left;
 }

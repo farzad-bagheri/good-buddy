@@ -1,4 +1,4 @@
-import { ChatMessage, GoodBuddyProvider } from "@/provider";
+import { ChatMessage, GoodBuddyProvider, ProviderModel } from "@/provider";
 import { MAX_CHAT_STEPS } from "../constants";
 import { ToolRegistry, WorkspaceTools } from "../tools";
 import { ToolCall } from "../types";
@@ -32,13 +32,18 @@ export class ChatAgent {
 
   async run(
     history: ChatMessage[],
-    model: string,
+    providerModel: ProviderModel | null,
     signal: AbortSignal,
   ): Promise<ChatAgentResult> {
+    if (!providerModel) {
+      throw new Error("No model selected");
+    }
+
     const availableTools = this.tools.list();
     const requestTitle = !history.some(({ role }) => role === "assistant");
     const messages: ChatMessage[] = [
       agentInstructions(
+        providerModel,
         await this.workspaceTools.projectContext(),
         availableTools,
         requestTitle,
@@ -54,7 +59,7 @@ export class ChatAgent {
       try {
         response = await this.provider.chat(
           {
-            model,
+            model: providerModel.model,
             messages,
             format: assistantResponseFormat(availableTools, requestTitle),
           },

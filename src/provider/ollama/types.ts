@@ -1,3 +1,5 @@
+import { ProviderModel } from "../types";
+
 export interface GenerateResponse {
   response?: string;
 }
@@ -7,5 +9,5 @@ export interface ChatResponse {
 }
 
 export interface ListModelsResponse {
-  models?: { name: string }[];
+  models?: ProviderModel[];
 }

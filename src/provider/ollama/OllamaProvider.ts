@@ -2,6 +2,7 @@ import { getGoodBuddyConfig } from "@/config";
 import { Request } from "@/gateway";
 import {
   GoodBuddyProvider,
+  ProviderModel,
   type ChatOptions,
   type GenerateOptions,
 } from "@/provider";
@@ -90,7 +91,7 @@ export class OllamaProvider implements GoodBuddyProvider {
    * Lists the available models from the Ollama server.
    * @returns An array of model names.
    */
-  async listModels(): Promise<string[]> {
+  async listModels(): Promise<ProviderModel[]> {
     const response = await this.request.get("/api/tags");
     const responseText = await response.text();
     const json = parseJsonResponse<ListModelsResponse>(
@@ -98,7 +99,10 @@ export class OllamaProvider implements GoodBuddyProvider {
       "/api/tags",
     );
 
-    return (json.models ?? []).map((m: { name: string }) => m.name);
+    return (json.models ?? []).map((m) => ({
+      ...m,
+      caption: `${m.details.family} ${m.details.parameter_size}`,
+    }));
   }
 
   /**
