@@ -69,7 +69,7 @@ export function App() {
           setHistory(message.chats);
           break;
         case "vsc:userMessage":
-          appendItem({ kind: "message", role: "user", text: message.text });
+          appendItem({ kind: "message", role: "user", text: message.text, html: message.html });
           break;
         case "vsc:assistantStart": {
           setThinking(false);

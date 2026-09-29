@@ -12,6 +12,10 @@ export interface GoodBuddyConfig {
    * The maximum number of context lines to consider.
    */
   maxContextLines: number;
+  /**
+   * How long to wait for an inline completion before giving up, in milliseconds.
+   */
+  completionTimeoutMs: number;
 }
 
 export function getGoodBuddyConfig(): GoodBuddyConfig {
@@ -22,6 +26,10 @@ export function getGoodBuddyConfig(): GoodBuddyConfig {
     chatModel: configuration.get<string>("chatModel", "<invalid>"),
     completionModel: configuration.get<string>("completionModel", "<invalid>"),
     maxContextLines: configuration.get<number>("maxContextLines", 100),
+    completionTimeoutMs: configuration.get<number>(
+      "completionTimeoutMs",
+      30000,
+    ),
   };
 }
 

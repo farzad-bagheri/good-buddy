@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { GoodBuddyInlineCompletionFeature } from "@/features/completion";
+import { InlineCompletionFeature } from "@/features/completion";
 import { ChatFeature } from "@/features/chat";
 import { ExplainCodeFeature } from "@/features/explain";
 import { toggleInlineCompletions } from "./config";
@@ -19,7 +19,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const ollamaProvider = new OllamaProvider();
   const explainCodeFeature = new ExplainCodeFeature(context, ollamaProvider);
-  const inlineCompletionFeature = new GoodBuddyInlineCompletionFeature(
+  const inlineCompletionFeature = new InlineCompletionFeature(
     output,
     statusBar,
     ollamaProvider,

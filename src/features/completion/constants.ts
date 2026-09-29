@@ -1,0 +1,1 @@
+export const EXPLANATION_DEBOUNCE_MS = 250;

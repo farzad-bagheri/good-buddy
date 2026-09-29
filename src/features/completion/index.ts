@@ -1,1 +1,1 @@
-export { GoodBuddyInlineCompletionFeature } from "./GoodBuddyInlineCompletionFeature";
+export { InlineCompletionFeature } from "./InlineCompletionFeature";

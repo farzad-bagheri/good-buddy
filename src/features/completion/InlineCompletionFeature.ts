@@ -1,11 +1,10 @@
 import { getGoodBuddyConfig, inlineCompletionsEnabled } from "@/config";
 import { GoodBuddyProvider } from "@/provider";
 import * as vscode from "vscode";
+import { EXPLANATION_DEBOUNCE_MS } from "./constants";
+import { getContextRanges } from "./utils";
 
-const DEBOUNCE_MS = 250;
-const TIMEOUT_MS = 8000;
-
-export class GoodBuddyInlineCompletionFeature
+export class InlineCompletionFeature
   implements vscode.InlineCompletionItemProvider
 {
   private lastRequestId = 0;
@@ -29,33 +28,20 @@ export class GoodBuddyInlineCompletionFeature
     const requestId = ++this.lastRequestId;
 
     // Wait for typing to pause before hitting the model; bail out early if superseded.
-    await new Promise((resolve) => setTimeout(resolve, DEBOUNCE_MS));
+    await new Promise((resolve) =>
+      setTimeout(resolve, EXPLANATION_DEBOUNCE_MS),
+    );
     if (requestId !== this.lastRequestId || token.isCancellationRequested) {
       return undefined;
     }
 
-    const { completionModel, maxContextLines } = getGoodBuddyConfig();
-
-    const startLine = Math.max(0, position.line - maxContextLines);
-    const prefixRange = new vscode.Range(
-      startLine,
-      0,
-      position.line,
-      position.character,
-    );
-    const endLine = Math.min(
-      document.lineCount - 1,
-      position.line + maxContextLines,
-    );
-    const suffixEndPos = document.lineAt(endLine).range.end;
-    const suffixRange = new vscode.Range(position, suffixEndPos);
-
-    const prefix = document.getText(prefixRange);
-    const suffix = document.getText(suffixRange);
-
-    if (!prefix.trim() && !suffix.trim()) {
+    const { completionModel, maxContextLines, completionTimeoutMs } =
+      getGoodBuddyConfig();
+    const context = getContextRanges(document, position, maxContextLines);
+    if (!context) {
       return undefined;
     }
+    const { prefix, suffix } = context;
 
     const controller = new AbortController();
     token.onCancellationRequested(() => controller.abort());
@@ -63,7 +49,7 @@ export class GoodBuddyInlineCompletionFeature
     const timeout = setTimeout(() => {
       timedOut = true;
       controller.abort();
-    }, TIMEOUT_MS);
+    }, completionTimeoutMs);
 
     this.statusBar.text = "$(loading~spin) Good Buddy";
     this.statusBar.tooltip = `Querying ${completionModel}... (first request after idle can be slow while the model loads)`;
@@ -83,6 +69,7 @@ export class GoodBuddyInlineCompletionFeature
             temperature: 0.2,
             num_predict: 128,
             stop: [
+              // Stop sequences for the model to know when to end the completion
               "\n\n",
               "```",
               "<|fim_prefix|>",
@@ -133,7 +120,7 @@ export class GoodBuddyInlineCompletionFeature
       }
 
       const message = timedOut
-        ? "timed out after 8s (model may still be loading; try again shortly)"
+        ? `timed out after ${completionTimeoutMs}ms (model may still be loading; try again shortly, or raise goodBuddy.completionTimeoutMs)`
         : (err as Error).message;
       this.statusBar.text = "$(error) Good Buddy";
       this.statusBar.tooltip = `Good Buddy error: ${message}`;

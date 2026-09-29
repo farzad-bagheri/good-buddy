@@ -96,6 +96,11 @@
           "type": "number",
           "default": 100,
           "description": "Max number of lines of surrounding code to send as context for completions."
+        },
+        "goodBuddy.completionTimeoutMs": {
+          "type": "number",
+          "default": 30000,
+          "description": "How long to wait for an inline completion before giving up, in milliseconds. Increase for large models or slower hardware."
         }
       }
     }

@@ -2,6 +2,46 @@
 
 Good Buddy is a VS Code extension that uses a local [Ollama](https://ollama.com/) server for inline code completions, a chat view, and selected-code explanations.
 
+## Installation
+
+Good Buddy does not call any cloud API — it talks to a local [Ollama](https://ollama.com/) server, so you need Ollama installed and running before the extension is useful.
+
+1. [Install Ollama](https://ollama.com/download) and make sure it's running (`ollama serve`, or the desktop app's background service).
+2. Pull at least one completion model and one chat model, for example:
+
+   ```sh
+   ollama pull qwen2.5-coder:7b
+   ollama pull qwen3:8b
+   ```
+
+3. Install/enable the Good Buddy extension in VS Code, then open **Settings** and configure it under **Good Buddy** (search `goodBuddy`):
+   - `goodBuddy.endpoint` — Ollama server URL. Defaults to `http://localhost:11434`, which is correct for a local install.
+   - `goodBuddy.completionModel` — **required**, must match a model tag you've pulled (see suggestions below). The default (`moophlo/Qwen3-Coder-30B-A3B-Instruct-GGUF:latest`) is a large 30B model that may time out on modest hardware.
+   - `goodBuddy.chatModel` — **required**, must match a model tag you've pulled (see suggestions below).
+   - `goodBuddy.inlineCompletionsEnabled` — toggle ghost-text completions on/off (also available via the **Good Buddy: Toggle Inline Completions** command).
+   - `goodBuddy.maxContextLines` — how many lines of surrounding code to send with each completion request.
+   - `goodBuddy.completionTimeoutMs` — how long to wait for a completion before giving up; raise this if you use a larger model or have slower hardware.
+
+   Good Buddy does **not** validate these model names — if a configured model isn't pulled locally, requests will fail and the error surfaces in the status bar tooltip and the **Good Buddy** output channel.
+
+### Suggested models
+
+Pick models sized for your hardware; smaller models respond faster and are a better fit for inline completions where latency matters.
+
+**Completion (`goodBuddy.completionModel`)** — should support fill-in-the-middle (FIM):
+
+- [`qwen2.5-coder:7b`](https://ollama.com/library/qwen2.5-coder) — good balance of speed and quality, recommended default.
+- [`qwen2.5-coder:1.5b`](https://ollama.com/library/qwen2.5-coder) — fastest option, best for low-resource machines.
+- [`codellama:7b-code`](https://ollama.com/library/codellama) — alternative code-focused model.
+
+**Chat / explanations (`goodBuddy.chatModel`)**:
+
+- [`qwen3:8b`](https://ollama.com/library/qwen3) — matches the extension's default, good general-purpose reasoning.
+- [`llama3.1:8b`](https://ollama.com/library/llama3.1) — widely used general-purpose alternative.
+- [`deepseek-r1:7b`](https://ollama.com/library/deepseek-r1) — stronger reasoning if you don't mind slower responses.
+
+Browse the full catalog at [ollama.com/library](https://ollama.com/library) for other sizes/quantizations that fit your hardware.
+
 ## Project layout
 
 - `src/extension.ts` registers VS Code commands and providers.

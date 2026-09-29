@@ -420,6 +420,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     this.view.webview.postMessage({
       type: "vsc:userMessage",
       text: displayContent,
+      html: marked.parse(displayContent),
     });
 
     // Prepare to run the agent and generate the assistant's response.
@@ -432,7 +433,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
 
       // Run the agent to generate the assistant's response.
       const result = await this.agent.run(
-        conversation.map((message) => ({ ...message })),
+        conversation,
         selectedModel,
         controller.signal,
       );
@@ -456,13 +457,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       }
 
       conversation.push({ role: "assistant", content: assistantText });
-      await this.persistChat(
-        id,
-        createdAt,
-        conversation,
-        modelName,
-        chatTitle,
-      );
+      await this.persistChat(id, createdAt, conversation, modelName, chatTitle);
       // Notify the webview that the assistant has started generating its response.
       this.view.webview.postMessage({ type: "vsc:assistantStart" });
       // Send the initial chunk of the assistant's response to the webview.
@@ -480,12 +475,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
             type: "vsc:assistantError",
             text: formatError(err),
           });
-          await this.persistChat(
-            id,
-            createdAt,
-            conversation,
-            modelName,
-          );
+          await this.persistChat(id, createdAt, conversation, modelName);
         }
       } else {
         // If the request was aborted, but some assistant text was generated, push it to the history.
@@ -494,12 +484,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         }
         if (this.currentChatId === id) {
           if (this.activeController === controller) {
-            await this.persistChat(
-              id,
-              createdAt,
-              conversation,
-              modelName,
-            );
+            await this.persistChat(id, createdAt, conversation, modelName);
           }
           this.view?.webview.postMessage({ type: "vsc:assistantDone" });
         }
