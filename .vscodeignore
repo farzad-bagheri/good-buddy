@@ -13,6 +13,8 @@ webview/
 *.map
 **/*.map
 
+docs/
+
 eslint.config.mjs
 vite.config.ts
 vite.webview.config.ts

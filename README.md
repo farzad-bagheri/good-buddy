@@ -2,6 +2,25 @@
 
 Good Buddy is a VS Code extension that uses a local [Ollama](https://ollama.com/) server for inline code completions, a chat view, and selected-code explanations.
 
+![hero](./docs/images/hero.png)
+
+## Features
+
+- 💻 Inline code completions using a local Ollama server.
+- 🗨️ Chat view for interactive discussions and explanations.
+- 🧩 Selected-code explanations to understand complex code snippets.
+
+## Usage
+
+Once installed and configured, you can:
+- Trigger inline completions by typing in the editor.
+- Open the chat view via the **Good Buddy: Open Chat** command.
+- Request explanations for selected code using the **Good Buddy: Explain Selection** command.
+
+## Contributing
+
+Contributions are welcome! Please open issues or submit pull requests on the [GitHub repository](https://github.com/farzad-bagheri/good-buddy).
+
 ## Installation
 
 Good Buddy does not call any cloud API — it talks to a local [Ollama](https://ollama.com/) server, so you need Ollama installed and running before the extension is useful.
