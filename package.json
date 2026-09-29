@@ -3,9 +3,10 @@
   "displayName": "Good Buddy",
   "description": "A local-LLM powered coding assistant: inline completions and code explanations.",
   "version": "0.0.1",
-  "publisher": "local",
+  "publisher": "dabanli",
   "license": "MIT",
   "type": "module",
+  "icon": "media/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/farzad-bagheri/good-buddy"
