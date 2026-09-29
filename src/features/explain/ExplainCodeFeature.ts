@@ -1,9 +1,9 @@
 import { getGoodBuddyConfig } from "@/config";
 import { GoodBuddyProvider } from "@/provider";
+import { Resources } from "@/resources";
 import { marked } from "marked";
 import * as vscode from "vscode";
 import { shellHtml } from "./shell";
-import { Resources } from "@/resources/Resources";
 
 export class ExplainCodeFeature {
     private readonly resources: Resources;
@@ -41,16 +41,13 @@ export class ExplainCodeFeature {
       },
     );
     
-  const iconUri = (name: string) =>
-      this.resources.getIcon(name).asWebUri(panel.webview).toString();
-    panel.webview.html = shellHtml(iconUri);
+    panel.webview.html = shellHtml();
 
     const controller = new AbortController();
     panel.onDidDispose(() => controller.abort());
 
     try {
-      let fullExplanation = "";
-      await this.provider.chatStream(
+     const explanation = await this.provider.chat(
         {
           model: chatModel,
           messages: [
@@ -65,14 +62,10 @@ export class ExplainCodeFeature {
             },
           ],
         },
-        (chunk) => {
-          fullExplanation += chunk;
-          panel.webview.postMessage({ type: "vsc:chunk", text: chunk });
-        },
         controller.signal,
       );
 
-      const html = marked.parse(fullExplanation);
+      const html = marked.parse(explanation);
       panel.webview.postMessage({ type: "vsc:done", text: html });
     } catch (err) {
       if (!controller.signal.aborted) {

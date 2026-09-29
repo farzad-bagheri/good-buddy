@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { GoodBuddyInlineCompletionFeature } from "@/features/completion";
-import { GoodBuddyChatFeature } from "@/features/chat";
+import { ChatFeature } from "@/features/chat";
 import { ExplainCodeFeature } from "@/features/explain";
 import { toggleInlineCompletions } from "./config";
 import { OllamaProvider } from "@/provider/ollama";
@@ -24,7 +24,7 @@ export function activate(context: vscode.ExtensionContext): void {
     statusBar,
     ollamaProvider,
   );
-  const chatFeature = new GoodBuddyChatFeature(context, output, ollamaProvider);
+  const chatFeature = new ChatFeature(context, output, ollamaProvider);
 
   context.subscriptions.push(
     output,
@@ -35,7 +35,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
 
     vscode.window.registerWebviewViewProvider(
-      GoodBuddyChatFeature.viewType,
+      ChatFeature.viewType,
       chatFeature,
     ),
 

@@ -18,7 +18,7 @@ export function Message({ item }: { item: MessageItem }) {
   return (
     <article className={`${styles.message} ${styles[item.role]}`}>
       <div
-        className={styles.markdown}
+        className="markdown-content"
         dangerouslySetInnerHTML={{
           __html: sanitizeHtml(item.html ?? item.text),
         }}

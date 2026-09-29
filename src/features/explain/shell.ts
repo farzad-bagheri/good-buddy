@@ -1,6 +1,6 @@
 // Auto-generated from D:\Code\good-buddy\scripts\html\explain-shell.html
 
-export const shellHtml = (iconUri: (name: string) => string) => `<!doctype html>
+export const shellHtml = () => `<!doctype html>
 <html>
   <head>
     <meta charset="UTF-8" />
@@ -36,8 +36,10 @@ export const shellHtml = (iconUri: (name: string) => string) => `<!doctype html>
         display: flex;
         align-items: center;
         gap: 8px;
+        padding: 16px 0;
         margin-bottom: 20px;
         color: var(--vscode-descriptionForeground);
+        border-bottom: 1px solid var(--vscode-editorWidget-border);
         font-size: 12px;
         text-transform: uppercase;
         letter-spacing: 0.06em;
@@ -51,101 +53,115 @@ export const shellHtml = (iconUri: (name: string) => string) => `<!doctype html>
         background: var(--vscode-textLink-foreground);
       }
 
-      /* LLM output */
-
-      .content {
+      .explanation-content {
         font-size: 14px;
       }
 
-      .content p {
-        margin: 0 0 16px;
-      }
+      .markdown-content {
+  white-space: normal;
+  line-height: 1.55;
+}
 
-      .content h1,
-      .content h2,
-      .content h3 {
-        margin-top: 28px;
-        margin-bottom: 12px;
-        line-height: 1.3;
-        font-weight: 600;
-        color: var(--vscode-foreground);
-      }
+.markdown-content p {
+  margin: 0 0 12px;
+}
 
-      .content h1 {
-        font-size: 20px;
-      }
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
 
-      .content h2 {
-        font-size: 17px;
-      }
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  margin: 20px 0 8px;
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
 
-      .content h3 {
-        font-size: 15px;
-      }
+.markdown-content h1 {
+  font-size: 1.35em;
+}
 
-      .content ul,
-      .content ol {
-        padding-left: 24px;
-        margin: 8px 0 18px;
-      }
+.markdown-content h2 {
+  font-size: 1.2em;
+}
 
-      .content li {
-        margin: 5px 0;
-      }
+.markdown-content h3,
+.markdown-content h4 {
+  font-size: 1.05em;
+}
 
-      /* Inline code */
+.markdown-content ul,
+.markdown-content ol {
+  margin: 8px 0 16px;
+  padding-left: 24px;
+}
 
-      code {
-        font-family: var(--vscode-editor-font-family);
-        font-size: 0.9em;
-        color: var(--vscode-textPreformat-foreground);
-        background: var(--vscode-textCodeBlock-background);
-        padding: 0.15em 0.35em;
-        border-radius: 3px;
-      }
+.markdown-content li {
+  margin: 4px 0;
+}
 
-      /* Code blocks */
+.markdown-content code {
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  color: var(--vscode-textPreformat-foreground);
+  background: var(--vscode-textCodeBlock-background);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
+}
 
-      pre {
-        margin: 16px 0;
-        padding: 14px 16px;
-        overflow-x: auto;
-        border: 1px solid var(--vscode-editorWidget-border);
-        border-radius: 5px;
-        background: var(--vscode-textCodeBlock-background);
-        color: var(--vscode-textPreformat-foreground);
-        font-family: var(--vscode-editor-font-family);
-        font-size: var(--vscode-editor-font-size);
-        line-height: 1.5;
-        white-space: pre;
-      }
+.markdown-content pre {
+  overflow: auto;
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 4px;
+  color: var(--vscode-textPreformat-foreground);
+  background: var(--vscode-textCodeBlock-background);
+  white-space: pre;
+}
 
-      pre code {
-        padding: 0;
-        background: transparent;
-        color: inherit;
-      }
+.markdown-content pre code {
+  padding: 0;
+  color: inherit;
+  background: transparent;
+}
 
-      /* Block quotes */
+.markdown-content blockquote {
+  margin: 12px 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--vscode-textLink-foreground);
+  color: var(--vscode-descriptionForeground);
+  background: var(--vscode-textCodeBlock-background);
+}
 
-      blockquote {
-        margin: 16px 0;
-        padding: 8px 16px;
-        border-left: 3px solid var(--vscode-textLink-foreground);
-        color: var(--vscode-descriptionForeground);
-        background: var(--vscode-textCodeBlock-background);
-      }
+.markdown-content a {
+  color: var(--vscode-textLink-foreground);
+}
 
-      /* Links */
+.markdown-content a:hover {
+  text-decoration: underline;
+}
 
-      a {
-        color: var(--vscode-textLink-foreground);
-        text-decoration: none;
-      }
+.markdown-content table {
+  width: 100%;
+  margin: 12px 0;
+  border-collapse: collapse;
+}
 
-      a:hover {
-        text-decoration: underline;
-      }
+.markdown-content th,
+.markdown-content td {
+  padding: 8px;
+  border: 1px solid var(--vscode-editorWidget-border);
+  text-align: left;
+}
+
+.markdown-content th {
+  background: var(--vscode-textCodeBlock-background);
+}
+
 
       /* Error */
 
@@ -157,43 +173,16 @@ export const shellHtml = (iconUri: (name: string) => string) => `<!doctype html>
         color: var(--vscode-errorForeground);
         background: var(--vscode-inputValidation-errorBackground);
       }
-
-      .iconic {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      /* Loading cursor */
-
-      .cursor {
-        display: inline-block;
-        width: 6px;
-        height: 15px;
-        margin-left: 2px;
-        vertical-align: -2px;
-        background: var(--vscode-foreground);
-        animation: blink 1s step-end infinite;
-      }
-
-      @keyframes blink {
-        50% {
-          opacity: 0;
-        }
-      }
     </style>
   </head>
 
   <body>
     <div class="container">
-      <div class="iconic">
-        <img src="${iconUri('app')}" alt="Good Buddy Icon" class="logo" />
+      <div class="header">
         <span>Good Buddy</span>
       </div>
 
-      <hr />
-
-      <main id="out" class="content"></main>
+      <main id="out" class="explanation-content markdown-content"></main>
 
       <div id="error"></div>
     </div>
@@ -206,16 +195,7 @@ export const shellHtml = (iconUri: (name: string) => string) => `<!doctype html>
 
       window.addEventListener("message", (event) => {
         const msg = event.data;
-
         switch (msg.type) {
-          case "vsc:chunk":
-            if (out.textContent === "Waiting for explanation...") {
-              out.textContent = "";
-            }
-
-            out.textContent += msg.text;
-            break;
-
           case "vsc:error":
             error.innerHTML = "";
 

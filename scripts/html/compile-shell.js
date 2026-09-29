@@ -25,12 +25,20 @@ const iconClasses = iconNames
   )
   .join("\n");
 
+const markdownStyles = readFileSync(
+  path.join(dir, "../../webview/shared/markdown.css"),
+  "utf8",
+)
+  .replaceAll("\\", "\\\\")
+  .replaceAll("`", "\\`")
+  .replaceAll("${", "\\${");
+
 const shells = [
   {
     inputFile: "explain-shell.html",
     outputFile: "../../src/features/explain/shell.ts",
-    arguments: ["iconUri: (name: string) => string"],
-    inject: [],
+    arguments: [],
+    inject: [{ markdownStyles: markdownStyles }],
   },
   {
     inputFile: "chat-shell.html",
@@ -55,7 +63,7 @@ for (const shell of shells) {
   // Inject dynamic content into the HTML template
   for (const injection of shell.inject) {
     for (const key in injection) {
-      content = content.replace(`{{${key}}}`, injection[key]);
+      content = content.replace(`{{${key}}}`, () => injection[key]);
     }
   }
 

@@ -18,7 +18,7 @@ import { formatError } from "./utils";
 
 const MODEL_STATE_KEY = "goodBuddy.selectedChatModel";
 
-export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
+export class ChatFeature implements vscode.WebviewViewProvider {
   public static readonly viewType = "goodBuddy.chatView";
 
   private view?: vscode.WebviewView;
