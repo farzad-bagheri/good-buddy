@@ -269,16 +269,16 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     await this.persistChat(
       this.currentChatId,
       this.currentChatCreatedAt,
-      this.getSelectedModel(),
       this.history,
+      this.getSelectedModel(),
     );
   }
 
   private async persistChat(
     id: string,
     createdAt: string,
-    model: string,
     messages: ChatMessage[],
+    model: string,
     title?: string,
   ): Promise<void> {
     if (this.deletedChatIds.has(id) || messages.length === 0) return;
@@ -397,8 +397,8 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
     this.writeApprovals.rejectAll(
       "Write cancelled because a new chat request was sent.",
     );
-
-    const selectedModel = await this.modelDetails(this.getSelectedModel());
+    const modelName = this.getSelectedModel();
+    const selectedModel = await this.modelDetails(modelName);
     const activeDocument = this.attachments.activeDocumentAttachment();
     const attachmentBlock = this.attachments.formatForPrompt(activeDocument);
     const userContent = `${text}${attachmentBlock}`.trim();
@@ -444,13 +444,25 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
       if (controller.signal.aborted || this.currentChatId !== id) {
         if (assistantText) {
           conversation.push({ role: "assistant", content: assistantText });
-          await this.persistChat(id, createdAt, selectedModel, conversation, chatTitle);
+          await this.persistChat(
+            id,
+            createdAt,
+            conversation,
+            modelName,
+            chatTitle,
+          );
         }
         return;
       }
 
       conversation.push({ role: "assistant", content: assistantText });
-      await this.persistChat(id, createdAt, selectedModel, conversation, chatTitle);
+      await this.persistChat(
+        id,
+        createdAt,
+        conversation,
+        modelName,
+        chatTitle,
+      );
       // Notify the webview that the assistant has started generating its response.
       this.view.webview.postMessage({ type: "vsc:assistantStart" });
       // Send the initial chunk of the assistant's response to the webview.
@@ -468,7 +480,12 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
             type: "vsc:assistantError",
             text: formatError(err),
           });
-          await this.persistChat(id, createdAt, selectedModel, conversation);
+          await this.persistChat(
+            id,
+            createdAt,
+            conversation,
+            modelName,
+          );
         }
       } else {
         // If the request was aborted, but some assistant text was generated, push it to the history.
@@ -477,7 +494,12 @@ export class GoodBuddyChatFeature implements vscode.WebviewViewProvider {
         }
         if (this.currentChatId === id) {
           if (this.activeController === controller) {
-            await this.persistChat(id, createdAt, selectedModel, conversation);
+            await this.persistChat(
+              id,
+              createdAt,
+              conversation,
+              modelName,
+            );
           }
           this.view?.webview.postMessage({ type: "vsc:assistantDone" });
         }

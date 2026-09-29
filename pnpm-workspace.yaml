@@ -1,2 +1,5 @@
+packages:
+  - webview/chat
+
 allowBuilds:
-  '@vscode/vsce-sign': false
+  "@vscode/vsce-sign": false

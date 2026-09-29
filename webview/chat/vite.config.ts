@@ -1,10 +1,11 @@
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
 
-const workspaceRoot = import.meta.dirname;
+const appRoot = import.meta.dirname;
+const workspaceRoot = resolve(appRoot, "../..");
 
 export default defineConfig({
-  root: resolve(workspaceRoot, "webview/chat"),
+  root: appRoot,
   base: "./",
   build: {
     target: "es2022",
@@ -13,7 +14,7 @@ export default defineConfig({
     cssCodeSplit: false,
     rollupOptions: {
       input: {
-        "index": resolve(workspaceRoot, "webview/chat/index.html"),
+        index: resolve(appRoot, "index.html"),
       },
       output: {
         entryFileNames: "assets/chat.js",
