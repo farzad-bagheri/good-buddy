@@ -10,6 +10,7 @@ const iconNames = [
   "back",
   "copy",
   "delete",
+  "remove",
   "add",
   "check",
   "history",

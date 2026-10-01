@@ -5,6 +5,14 @@ import styles from "../Proposal.module.css";
 type CommandProposalItem = Extract<TimelineItem, { kind: "commandProposal" }>;
 
 export function CommandProposal({ item }: { item: CommandProposalItem }) {
+  const handleReviewCommand = (approved: boolean) => {
+    vscode.postMessage({
+      type: "wv:reviewCommand",
+      id: item.commandId,
+      approved,
+    });
+  };
+
   return (
     <section className={styles.proposal}>
       <strong>Run command</strong>
@@ -22,13 +30,7 @@ export function CommandProposal({ item }: { item: CommandProposalItem }) {
             <button
               key={String(approved)}
               type="button"
-              onClick={() =>
-                vscode.postMessage({
-                  type: "wv:reviewCommand",
-                  id: item.commandId,
-                  approved,
-                })
-              }
+              onClick={() => handleReviewCommand(approved)}
             >
               {approved ? "Run" : "Reject"}
             </button>

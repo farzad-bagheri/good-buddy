@@ -28,6 +28,12 @@ export function ProviderNotice({
       ? "Install the configured models"
       : "Start Ollama to chat with Good Buddy";
 
+  const message = checking
+    ? "Connecting to your local model server..."
+    : hasMissingModels
+      ? "Ollama is running, but one or more configured models are missing."
+      : "Good Buddy uses a local Ollama server. Open the Ollama app or start the server below.";
+
   return (
     <section
       className={`${styles.notice} ${compact ? styles.compact : styles.centered}`}
@@ -36,15 +42,11 @@ export function ProviderNotice({
       {!compact && provider.artworkUri && (
         <img className={styles.artwork} src={provider.artworkUri} alt="" />
       )}
+
       <div className={styles.content}>
         <h2>{title}</h2>
-        <p className={styles.description}>
-          {checking
-            ? "Connecting to your local model server..."
-            : hasMissingModels
-              ? "Ollama is running, but one or more configured models are missing."
-              : "Good Buddy uses a local Ollama server. Open the Ollama app or start the server below."}
-        </p>
+        <p className={styles.description}>{message}</p>
+
         {!compact && !checking && (
           <ol className={styles.steps}>
             {unavailable && (
@@ -75,6 +77,7 @@ export function ProviderNotice({
             </li>
           </ol>
         )}
+
         <div className={styles.actions}>
           {!checking && (
             <button className={styles.checkButton} onClick={onCheck}>
@@ -85,6 +88,7 @@ export function ProviderNotice({
             Open Good Buddy Settings
           </button>
         </div>
+
         {!compact && (
           <p className={styles.endpoint}>
             Ollama endpoint: <code>{provider.endpoint}</code>

@@ -36,6 +36,11 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
         -webkit-mask-image: url("${iconUri("delete")}");
       }
 
+    .remove-icon {
+        mask-image: url("${iconUri("remove")}");
+        -webkit-mask-image: url("${iconUri("remove")}");
+      }
+
     .add-icon {
         mask-image: url("${iconUri("add")}");
         -webkit-mask-image: url("${iconUri("add")}");

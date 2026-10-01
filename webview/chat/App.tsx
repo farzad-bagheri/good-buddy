@@ -5,6 +5,15 @@ import { Composer } from "./components/Composer";
 import { ProviderNotice } from "./components/ProviderNotice";
 import { Suggestions } from "./components/Suggestions";
 import { Timeline } from "./components/Timeline";
+import {
+  appendCommandOutput,
+  appendCommandProposal,
+  appendTimelineItem,
+  completeCommandProposal,
+  mapHistoryToTimelineItems,
+  updateAssistantMessage,
+  updateWriteProposal,
+} from "./timelineUtils";
 import type {
   AttachmentState,
   ChatSummary,
@@ -74,25 +83,7 @@ export function App() {
           setHistoryOpen(false);
           setThinking(message.thinking === true);
           assistantId.current = undefined;
-          setItems(
-            message.messages.map(
-              (item: {
-                role: string;
-                content: string;
-                html?: string;
-                historyIndex?: number;
-                suggestions?: string[];
-              }) => ({
-                id: createItemId(),
-                kind: "message",
-                role: item.role,
-                text: item.content,
-                html: item.html,
-                historyIndex: item.historyIndex,
-                suggestions: item.suggestions,
-              }),
-            ),
-          );
+          setItems(mapHistoryToTimelineItems(message.messages));
           break;
         case "vsc:chatList":
           setHistory(message.chats);
@@ -110,27 +101,21 @@ export function App() {
           setThinking(false);
           const id = createItemId();
           assistantId.current = id;
-          setItems((current) => [
-            ...current,
-            {
-              id,
+          setItems((current) =>
+            appendTimelineItem(current, {
               kind: "message",
               role: "assistant",
               text: "",
               historyIndex: message.historyIndex,
-            },
-          ]);
+            }),
+          );
           break;
         }
         case "vsc:assistantChunk":
           if (assistantId.current) {
             const id = assistantId.current;
             setItems((current) =>
-              current.map((item) =>
-                item.id === id && item.kind === "message"
-                  ? { ...item, html: message.html }
-                  : item,
-              ),
+              updateAssistantMessage(current, id, { html: message.html }),
             );
           }
           break;
@@ -139,11 +124,9 @@ export function App() {
           if (assistantId.current) {
             const id = assistantId.current;
             setItems((current) =>
-              current.map((item) =>
-                item.id === id && item.kind === "message"
-                  ? { ...item, suggestions: message.suggestions }
-                  : item,
-              ),
+              updateAssistantMessage(current, id, {
+                suggestions: message.suggestions,
+              }),
             );
           }
           assistantId.current = undefined;
@@ -172,19 +155,7 @@ export function App() {
           break;
         case "vsc:writeComplete":
           setItems((current) =>
-            current.map((item) =>
-              item.kind === "writeProposal" && item.proposalId === message.id
-                ? {
-                    ...item,
-                    status:
-                      message.result === "Write denied by the user."
-                        ? "Rejected"
-                        : message.result.startsWith("Wrote ")
-                          ? "Applied"
-                          : `Not applied: ${message.result}`,
-                  }
-                : item,
-            ),
+            updateWriteProposal(current, message.id, message.result),
           );
           break;
         case "vsc:commandProposal":
@@ -195,26 +166,12 @@ export function App() {
           break;
         case "vsc:commandOutput":
           setItems((current) =>
-            current.map((item) =>
-              item.kind === "commandProposal" && item.commandId === message.id
-                ? { ...item, output: item.output + message.text }
-                : item,
-            ),
+            appendCommandOutput(current, message.id, message.text),
           );
           break;
         case "vsc:commandComplete":
           setItems((current) =>
-            current.map((item) =>
-              item.kind === "commandProposal" && item.commandId === message.id
-                ? {
-                    ...item,
-                    output: item.output || message.result,
-                    status: message.result.startsWith("Command failed:")
-                      ? "Command failed"
-                      : "Completed",
-                  }
-                : item,
-            ),
+            completeCommandProposal(current, message.id, message.result),
           );
           break;
         case "vsc:attachments":
@@ -227,25 +184,13 @@ export function App() {
     }
 
     function appendItem(item: NewTimelineItem) {
-      setItems((current) => [
-        ...current,
-        { ...item, id: createItemId() } as TimelineItem,
-      ]);
+      setItems((current) => appendTimelineItem(current, item));
     }
 
     function addCommand(id: string, command: string, autoApproved: boolean) {
-      setItems((current) => [
-        ...current,
-        {
-          id: createItemId(),
-          kind: "commandProposal",
-          commandId: id,
-          command,
-          autoApproved,
-          output: "",
-          status: autoApproved ? "Running command..." : undefined,
-        },
-      ]);
+      setItems((current) =>
+        appendCommandProposal(current, id, command, autoApproved),
+      );
     }
 
     window.addEventListener("message", onMessage);
@@ -258,24 +203,34 @@ export function App() {
     endOfMessages.current?.scrollIntoView({ block: "end" });
   }, [items, thinking]);
 
-  function toggleHistory() {
+  const toggleHistory = () => {
     const opening = !historyOpen;
     setHistoryOpen(opening);
     if (opening) vscode.postMessage({ type: "wv:listChats" });
-  }
+  };
 
-  function handleRetry(historyIndex: number) {
+  const handleRetry = (historyIndex: number) => {
     setThinking(true);
     vscode.postMessage({ type: "wv:retry", historyIndex });
-  }
+  };
+
+  const handleCheckProvider = () => {
+    setProvider((current) => ({
+      ...current,
+      status: "checking",
+    }));
+    vscode.postMessage({ type: "wv:checkProvider" });
+  };
 
   const latestMessage = [...items]
     .reverse()
     .find((item) => item.kind === "message");
+
   const suggestions =
     !thinking && latestMessage?.role === "assistant"
       ? latestMessage.suggestions
       : undefined;
+
   const hasConversation = items.some(
     (item) =>
       item.kind === "message" &&
@@ -312,13 +267,7 @@ export function App() {
               <ProviderNotice
                 provider={provider}
                 compact={hasConversation}
-                onCheck={() => {
-                  setProvider((current) => ({
-                    ...current,
-                    status: "checking",
-                  }));
-                  vscode.postMessage({ type: "wv:checkProvider" });
-                }}
+                onCheck={handleCheckProvider}
                 onOpenSettings={() =>
                   vscode.postMessage({ type: "wv:openSettings" })
                 }

@@ -1,3 +1,4 @@
+import { IconButton } from "../../IconButton";
 import styles from "./Attachment.module.css";
 
 export interface AttachmentProps {
@@ -13,13 +14,13 @@ export function Attachment({ name, path, onRemove }: AttachmentProps) {
       </span>
 
       {onRemove && (
-        <button
+        <IconButton
+          iconName="remove-icon"
+          title="Remove attachment"
           className={styles.remove}
           onClick={onRemove}
           aria-label="Remove attachment"
-        >
-          &times;
-        </button>
+        />
       )}
     </div>
   );

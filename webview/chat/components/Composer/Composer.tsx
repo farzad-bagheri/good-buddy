@@ -21,6 +21,13 @@ export function Composer({
     vscode.postMessage({ type: "wv:removeAttachment", index });
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      handleSend();
+    }
+  };
+
   const handleSend = () => {
     if (!text.trim()) return;
     onSend();
@@ -53,12 +60,7 @@ export function Composer({
           placeholder="Ask Good Buddy... (Enter to send, Shift+Enter for new line)"
           value={text}
           onChange={(event) => onTextChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              handleSend();
-            }
-          }}
+          onKeyDown={handleKeyDown}
         />
 
         <div className={styles.controls}>

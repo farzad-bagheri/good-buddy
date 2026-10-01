@@ -5,6 +5,14 @@ import styles from "../Proposal.module.css";
 type WriteProposalItem = Extract<TimelineItem, { kind: "writeProposal" }>;
 
 export function WriteProposal({ item }: { item: WriteProposalItem }) {
+  const handleReviewWrite = (approved: boolean) => {
+    vscode.postMessage({
+      type: "wv:reviewWrite",
+      id: item.proposalId,
+      approved,
+    });
+  };
+
   return (
     <section className={styles.proposal}>
       <strong>Proposed change: {item.path}</strong>
@@ -17,13 +25,7 @@ export function WriteProposal({ item }: { item: WriteProposalItem }) {
             <button
               key={String(approved)}
               type="button"
-              onClick={() =>
-                vscode.postMessage({
-                  type: "wv:reviewWrite",
-                  id: item.proposalId,
-                  approved,
-                })
-              }
+              onClick={() => handleReviewWrite(approved)}
             >
               {approved ? "Approve" : "Reject"}
             </button>
