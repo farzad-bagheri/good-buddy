@@ -8,18 +8,27 @@ import type {
   ChatSummary,
   NewTimelineItem,
   ProviderModel,
+  ProviderStatusInfo,
   TimelineItem,
 } from "./types";
 import { createItemId } from "./utils";
 import { vscode } from "./vscode";
 import { Suggestions } from "./components/Suggestions";
+import { ProviderNotice } from "./components/ProviderNotice/ProviderNotice";
 
 export function App() {
   const [models, setModels] = useState<ProviderModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [history, setHistory] = useState<ChatSummary[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [provider, setProvider] = useState<ProviderStatusInfo>({
+    status: "checking",
+    endpoint: "",
+    chatModel: "",
+    completionModel: "",
+    missingModels: [],
+    artworkUri: "",
+  });
   /**
    * The list of timeline items representing the conversation and other events.
    */
@@ -51,22 +60,39 @@ export function App() {
           setModels(message.models);
           setSelectedModel(message.selected);
           break;
+        case "vsc:providerStatus":
+          setProvider({
+            status: message.status,
+            endpoint: message.endpoint,
+            chatModel: message.chatModel,
+            completionModel: message.completionModel,
+            missingModels: message.missingModels,
+            artworkUri: message.artworkUri,
+          });
+          break;
         case "vsc:history":
           setHistoryOpen(false);
-          setThinking(false);
+          setThinking(message.thinking === true);
           assistantId.current = undefined;
           setItems(
             message.messages.map(
-              (item: { role: string; content: string; html?: string }) => ({
+              (item: {
+                role: string;
+                content: string;
+                html?: string;
+                historyIndex?: number;
+                suggestions?: string[];
+              }) => ({
                 id: createItemId(),
                 kind: "message",
                 role: item.role,
                 text: item.content,
                 html: item.html,
+                historyIndex: item.historyIndex,
+                suggestions: item.suggestions,
               }),
             ),
           );
-          setSuggestions(message.suggestions);
           break;
         case "vsc:chatList":
           setHistory(message.chats);
@@ -77,6 +103,7 @@ export function App() {
             role: "user",
             text: message.text,
             html: message.html,
+            historyIndex: message.historyIndex,
           });
           break;
         case "vsc:assistantStart": {
@@ -85,7 +112,13 @@ export function App() {
           assistantId.current = id;
           setItems((current) => [
             ...current,
-            { id, kind: "message", role: "assistant", text: "" },
+            {
+              id,
+              kind: "message",
+              role: "assistant",
+              text: "",
+              historyIndex: message.historyIndex,
+            },
           ]);
           break;
         }
@@ -103,8 +136,17 @@ export function App() {
           break;
         case "vsc:assistantDone":
           setThinking(false);
+          if (assistantId.current) {
+            const id = assistantId.current;
+            setItems((current) =>
+              current.map((item) =>
+                item.id === id && item.kind === "message"
+                  ? { ...item, suggestions: message.suggestions }
+                  : item,
+              ),
+            );
+          }
           assistantId.current = undefined;
-          setSuggestions(message.suggestions || []);
           break;
         case "vsc:assistantError":
           setThinking(false);
@@ -222,9 +264,23 @@ export function App() {
     if (opening) vscode.postMessage({ type: "wv:listChats" });
   }
 
-  function handleRetry() {
-    vscode.postMessage({ type: "wv:retry" });
+  function handleRetry(historyIndex: number) {
+    setThinking(true);
+    vscode.postMessage({ type: "wv:retry", historyIndex });
   }
+
+  const latestMessage = [...items]
+    .reverse()
+    .find((item) => item.kind === "message");
+  const suggestions =
+    !thinking && latestMessage?.role === "assistant"
+      ? latestMessage.suggestions
+      : undefined;
+  const hasConversation = items.some(
+    (item) =>
+      item.kind === "message" &&
+      (item.role === "user" || item.role === "assistant"),
+  );
 
   return (
     <main className="chat-app">
@@ -252,7 +308,27 @@ export function App() {
       ) : (
         <>
           <section className="messages" aria-live="polite" hidden={historyOpen}>
-            <Timeline items={items} onRetry={handleRetry} />
+            {provider.status !== "ready" && (
+              <ProviderNotice
+                provider={provider}
+                compact={hasConversation}
+                onCheck={() => {
+                  setProvider((current) => ({
+                    ...current,
+                    status: "checking",
+                  }));
+                  vscode.postMessage({ type: "wv:checkProvider" });
+                }}
+                onOpenSettings={() =>
+                  vscode.postMessage({ type: "wv:openSettings" })
+                }
+              />
+            )}
+            <Timeline
+              items={items}
+              onRetry={handleRetry}
+              retryDisabled={thinking}
+            />
             {thinking && (
               <div className="tool-status" role="status">
                 Thinking...
@@ -271,6 +347,7 @@ export function App() {
             attachments={attachments}
             text={text}
             onTextChange={setText}
+            onSend={() => setThinking(true)}
           />
         </>
       )}

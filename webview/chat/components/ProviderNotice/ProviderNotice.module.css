@@ -1,0 +1,157 @@
+.notice {
+  color: var(--vscode-foreground);
+}
+
+.centered {
+  box-sizing: border-box;
+  min-height: calc(100% - 40px);
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-content: center;
+  align-items: center;
+  gap: 20px;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 28px 20px;
+}
+
+.artwork {
+  width: 72px;
+  height: auto;
+}
+
+.content h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.description {
+  margin: 0 0 16px;
+  color: var(--vscode-descriptionForeground);
+  line-height: 1.5;
+}
+
+.steps {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+  counter-reset: setup-step;
+}
+
+.steps li {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  counter-increment: setup-step;
+}
+
+.steps li span::before {
+  content: counter(setup-step) ". ";
+  color: var(--vscode-textLink-foreground);
+  font-weight: 600;
+}
+
+.modelName {
+  display: inline;
+  overflow-wrap: anywhere;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+}
+
+.steps code,
+.endpoint code {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 6px 8px;
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 3px;
+  background: var(--vscode-editor-background);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+}
+
+.checkButton {
+  border-color: var(--vscode-button-border, transparent);
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  padding: 6px 10px;
+}
+
+.checkButton:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settingsButton {
+  padding: 6px 10px;
+}
+
+.modelWarning {
+  margin: -6px 0 14px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.endpoint {
+  margin: 14px 0 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.endpoint code {
+  margin-top: 5px;
+}
+
+.compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--vscode-panel-border);
+  border-left: 3px solid var(--vscode-editorWarning-foreground);
+  border-radius: 4px;
+  background: var(--vscode-editor-background);
+}
+
+.compact .content {
+  min-width: 0;
+}
+
+.compact .content h2 {
+  margin-bottom: 3px;
+  font-size: 13px;
+}
+
+.compact .description {
+  margin: 0;
+  font-size: 12px;
+}
+
+@media (max-width: 360px) {
+  .centered {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 20px 8px;
+  }
+
+  .artwork {
+    width: 60px;
+  }
+
+  .compact {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

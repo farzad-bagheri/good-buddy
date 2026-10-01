@@ -14,7 +14,7 @@ import { shellHtml } from "./shell";
 import { ChatHistoryStore, StoredChat } from "./storage/ChatHistoryStore";
 import { ToolRegistry } from "./tools";
 import { WorkspaceTools } from "./tools/WorkspaceTools";
-import { formatError } from "./utils";
+import { findMissingModels, findRetryUserIndex, formatError } from "./utils";
 
 const MODEL_STATE_KEY = "goodBuddy.selectedChatModel";
 
@@ -118,6 +118,11 @@ export class ChatFeature implements vscode.WebviewViewProvider {
 
     this.context.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor(() => this.postAttachments()),
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration("goodBuddy")) {
+          void this.sendModelList();
+        }
+      }),
     );
   }
 
@@ -148,11 +153,20 @@ export class ChatFeature implements vscode.WebviewViewProvider {
           this.postAttachments();
           await this.postChatList();
           break;
+        case "wv:checkProvider":
+          await this.sendModelList();
+          break;
+        case "wv:openSettings":
+          await vscode.commands.executeCommand(
+            "workbench.action.openSettings",
+            "@ext:dabanli.good-buddy",
+          );
+          break;
         case "wv:send":
           await this.handleSend(String(message.text ?? ""));
           break;
         case "wv:retry":
-          await this.handleRetry();
+          await this.handleRetry(Number(message.historyIndex));
           break;
         case "wv:attachFiles":
           await this.pickAttachments();
@@ -163,6 +177,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
           break;
         case "wv:selectModel":
           await this.context.globalState.update(MODEL_STATE_KEY, message.model);
+          await this.sendModelList();
           break;
         case "wv:newChat":
           this.activeController?.abort();
@@ -214,6 +229,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
 
   /** Sends available models to the webview, falling back to the configured model on failure. */
   private async sendModelList(): Promise<void> {
+    this.postProviderStatus("checking");
     try {
       const models = await this.provider.listModels();
       this.view?.webview.postMessage({
@@ -221,9 +237,44 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         models,
         selected: this.getSelectedModel(),
       });
+      const missingModels = findMissingModels(
+        models.map(({ model }) => model),
+        [this.getSelectedModel(), getGoodBuddyConfig().completionModel],
+      );
+      this.postProviderStatus(
+        missingModels.length ? "models-missing" : "ready",
+        missingModels,
+      );
     } catch (err) {
       this.output.appendLine(`Good Buddy chat: failed to list models: ${err}`);
+      this.view?.webview.postMessage({
+        type: "vsc:models",
+        models: [],
+        selected: this.getSelectedModel(),
+      });
+      this.postProviderStatus("unavailable");
     }
+  }
+
+  private postProviderStatus(
+    status: "checking" | "unavailable" | "models-missing" | "ready",
+    missingModels: string[] = [],
+  ): void {
+    const webview = this.view?.webview;
+    if (!webview) return;
+
+    webview.postMessage({
+      type: "vsc:providerStatus",
+      status,
+      endpoint: getGoodBuddyConfig().endpoint,
+      chatModel: this.getSelectedModel(),
+      completionModel: getGoodBuddyConfig().completionModel,
+      missingModels,
+      artworkUri: this.resources
+        .getIcon("provider-offline")
+        .asWebUri(webview)
+        .toString(),
+    });
   }
 
   private async modelDetails(model: string): Promise<ProviderModel | null> {
@@ -237,17 +288,19 @@ export class ChatFeature implements vscode.WebviewViewProvider {
   }
 
   /** Sends chat history to the webview, rendering assistant messages as HTML. */
-  private postHistory() {
-    const messages = this.history.map(({ role, content, displayContent }) => {
-      return {
+  private postHistory(thinking = false) {
+    const messages = this.history.map(
+      ({ role, content, displayContent, suggestions }, historyIndex) => ({
         role,
         content: marked.parse(displayContent ?? content),
-      };
-    });
+        suggestions,
+        historyIndex,
+      }),
+    );
     this.view?.webview.postMessage({
       type: "vsc:history",
       messages,
-      suggestions: this.getSuggestions(),
+      thinking,
     });
   }
 
@@ -385,25 +438,28 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     };
   }
 
-  private getSuggestions(): string[] | undefined {
-    const lastItem = this.history[this.history.length - 1];
-    return lastItem ? lastItem.suggestions : undefined;
-  }
+  private async handleRetry(assistantIndex: number): Promise<void> {
+    if (this.activeController) return;
 
-  private handleRetry() {
-    const lastUserMessage = this.history[this.history.length - 2];
-    this.history.pop();
-    return (
-      lastUserMessage?.role === "user" &&
-      this.handleSend(lastUserMessage.content)
-    );
+    const userIndex = findRetryUserIndex(this.history, assistantIndex);
+    if (userIndex === undefined) return;
+
+    const userMessage = this.history[userIndex];
+    this.history = this.history.slice(0, userIndex);
+    this.postHistory(true);
+    await this.handleSend(userMessage.content, userMessage);
   }
 
   /** Adds a user message and runs the agent, reporting its result to the webview. */
-  private async handleSend(userMessage: string): Promise<void> {
-    // Return early if the message is empty and there are no attachments, or if the webview is not available.
+  private async handleSend(
+    userMessage: string,
+    replayMessage?: ChatMessage,
+  ): Promise<void> {
+    // Return early if a new message is empty and has no attachments, or the webview is unavailable.
     if (
-      (!userMessage.trim() && this.attachments.all.length === 0) ||
+      (!replayMessage &&
+        !userMessage.trim() &&
+        this.attachments.all.length === 0) ||
       !this.view
     ) {
       return;
@@ -416,17 +472,28 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     );
     const modelName = this.getSelectedModel();
     const selectedModel = await this.modelDetails(modelName);
-    const activeDocument = this.attachments.activeDocumentAttachment();
-    const attachmentBlock = this.attachments.formatForPrompt(activeDocument);
-    const userContent = `${userMessage}${attachmentBlock}`.trim();
-    const attachmentLabel = this.attachments.all.length
-      ? `\n\n>Attached: ${this.attachments.names(activeDocument).join(", ")}`
-      : activeDocument
-        ? `\n\n>Open file: ${activeDocument.name}`
-        : "";
-    const displayContent = `${userMessage}${attachmentLabel}`.trim();
-    this.attachments.clear();
-    this.postAttachments();
+    const activeDocument = replayMessage
+      ? undefined
+      : this.attachments.activeDocumentAttachment();
+    const attachmentBlock = replayMessage
+      ? ""
+      : this.attachments.formatForPrompt(activeDocument);
+    const userContent =
+      replayMessage?.content ?? `${userMessage}${attachmentBlock}`.trim();
+    const attachmentLabel = replayMessage
+      ? ""
+      : this.attachments.all.length
+        ? `\n\n>Attached: ${this.attachments.names(activeDocument).join(", ")}`
+        : activeDocument
+          ? `\n\n>Open file: ${activeDocument.name}`
+          : "";
+    const displayContent =
+      replayMessage?.displayContent ??
+      `${userMessage}${attachmentLabel}`.trim();
+    if (!replayMessage) {
+      this.attachments.clear();
+      this.postAttachments();
+    }
     const conversation = this.history;
     const { id, createdAt } = this.ensureCurrentChat();
     conversation.push({
@@ -438,6 +505,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       type: "vsc:userMessage",
       text: displayContent,
       html: marked.parse(displayContent),
+      historyIndex: conversation.length - 1,
     });
 
     // Prepare to run the agent and generate the assistant's response.
@@ -480,7 +548,10 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       });
       await this.persistChat(id, createdAt, conversation, modelName, chatTitle);
       // Notify the webview that the assistant has started generating its response.
-      this.view.webview.postMessage({ type: "vsc:assistantStart" });
+      this.view.webview.postMessage({
+        type: "vsc:assistantStart",
+        historyIndex: conversation.length - 1,
+      });
       // Send the initial chunk of the assistant's response to the webview.
       this.view.webview.postMessage({
         type: "vsc:assistantChunk",

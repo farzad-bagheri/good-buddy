@@ -12,6 +12,33 @@ export function formatError(error: unknown): string {
   return String(error);
 }
 
+export function findRetryUserIndex(
+  history: readonly ChatMessage[],
+  assistantIndex: number,
+): number | undefined {
+  if (
+    !Number.isInteger(assistantIndex) ||
+    history[assistantIndex]?.role !== "assistant"
+  ) {
+    return undefined;
+  }
+
+  for (let index = assistantIndex - 1; index >= 0; index--) {
+    if (history[index].role === "user") return index;
+  }
+
+  return undefined;
+}
+
+export function findMissingModels(
+  availableModels: readonly string[],
+  requiredModels: readonly string[],
+): string[] {
+  return [...new Set(requiredModels)].filter(
+    (model) => !availableModels.includes(model),
+  );
+}
+
 export function agentInstructions(
   model: ProviderModel,
   projectContext: string,

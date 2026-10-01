@@ -8,6 +8,21 @@ export interface ChatSummary {
   updatedAt: string;
 }
 
+export type ProviderStatus =
+  | "checking"
+  | "unavailable"
+  | "models-missing"
+  | "ready";
+
+export interface ProviderStatusInfo {
+  status: ProviderStatus;
+  endpoint: string;
+  chatModel: string;
+  completionModel: string;
+  missingModels: string[];
+  artworkUri: string;
+}
+
 export type TimelineItem =
   | {
       id: string;
@@ -15,6 +30,7 @@ export type TimelineItem =
       role: "user" | "assistant" | "error";
       text: string;
       html?: string;
+      historyIndex?: number;
       suggestions?: string[];
     }
   | { id: string; kind: "toolStatus"; text: string }

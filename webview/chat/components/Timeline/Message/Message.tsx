@@ -8,10 +8,12 @@ type MessageItem = Extract<TimelineItem, { kind: "message" }>;
 
 interface MessageProps {
   item: MessageItem;
-  onRetry: () => void;
+  onRetry: (historyIndex: number) => void;
+  retryDisabled: boolean;
 }
-export function Message({ item, onRetry }: MessageProps) {
+export function Message({ item, onRetry, retryDisabled }: MessageProps) {
   const [copied, setCopied] = useState(false);
+  const historyIndex = item.historyIndex;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(item.text);
@@ -28,7 +30,7 @@ export function Message({ item, onRetry }: MessageProps) {
         }}
       />
 
-      {item.role === "assistant" && (
+      {item.role === "assistant" && historyIndex !== undefined && (
         <div className={styles["action"]}>
           <IconButton
             className={styles["button"]}
@@ -43,7 +45,8 @@ export function Message({ item, onRetry }: MessageProps) {
             iconName="retry-icon"
             title="Retry generating response"
             aria-label="retry"
-            onClick={onRetry}
+            onClick={() => onRetry(historyIndex)}
+            disabled={retryDisabled}
           />
         </div>
       )}

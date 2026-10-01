@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ToolDefinition } from "./types";
-import { assistantResponseFormat, parseAssistantEnvelope } from "./utils";
+import {
+  assistantResponseFormat,
+  findMissingModels,
+  findRetryUserIndex,
+  parseAssistantEnvelope,
+} from "./utils";
 
 const tools: ToolDefinition[] = [
   {
@@ -77,5 +82,42 @@ describe("assistant response envelope", () => {
     expect(assistantResponseFormat(tools, true)).toMatchObject({
       properties: { title: { type: "string" } },
     });
+  });
+});
+
+describe("findRetryUserIndex", () => {
+  const history = [
+    { role: "user", content: "First question" },
+    { role: "assistant", content: "First answer" },
+    { role: "user", content: "Second question" },
+    { role: "assistant", content: "Second answer" },
+  ] as const;
+
+  it("finds the user turn belonging to the selected assistant response", () => {
+    expect(findRetryUserIndex(history, 1)).toBe(0);
+    expect(findRetryUserIndex(history, 3)).toBe(2);
+  });
+
+  it("rejects invalid indices and non-assistant messages", () => {
+    expect(findRetryUserIndex(history, 2)).toBeUndefined();
+    expect(findRetryUserIndex(history, 4)).toBeUndefined();
+    expect(findRetryUserIndex(history, Number.NaN)).toBeUndefined();
+  });
+});
+
+describe("findMissingModels", () => {
+  it("returns only distinct configured models not installed locally", () => {
+    expect(
+      findMissingModels(
+        ["qwen3:8b", "qwen2.5-coder:7b"],
+        ["qwen3:8b", "moophlo/Qwen3-Coder-30B-A3B-Instruct-GGUF:latest"],
+      ),
+    ).toEqual(["moophlo/Qwen3-Coder-30B-A3B-Instruct-GGUF:latest"]);
+  });
+
+  it("does not repeat a model configured for both purposes", () => {
+    expect(findMissingModels([], ["same:model", "same:model"])).toEqual([
+      "same:model",
+    ]);
   });
 });

@@ -8,15 +8,22 @@ interface ComposerProps {
   attachments: AttachmentState;
   text: string;
   onTextChange: (text: string) => void;
+  onSend: () => void;
 }
 
-export function Composer({ attachments, text, onTextChange }: ComposerProps) {
+export function Composer({
+  attachments,
+  text,
+  onTextChange,
+  onSend,
+}: ComposerProps) {
   const handleRemoveAttachment = (index: number) => () => {
     vscode.postMessage({ type: "wv:removeAttachment", index });
   };
 
   const handleSend = () => {
     if (!text.trim()) return;
+    onSend();
     vscode.postMessage({ type: "wv:send", text });
     onTextChange("");
   };

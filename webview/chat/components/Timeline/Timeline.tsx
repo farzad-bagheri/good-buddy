@@ -6,16 +6,24 @@ import { WriteProposal } from "./WriteProposal";
 
 interface TimelineProps {
   items: TimelineItem[];
-  onRetry: () => void;
+  onRetry: (historyIndex: number) => void;
+  retryDisabled: boolean;
 }
 
-export function Timeline({ onRetry, items }: TimelineProps) {
+export function Timeline({ onRetry, retryDisabled, items }: TimelineProps) {
   return (
     <>
       {items.map((item) => {
         switch (item.kind) {
           case "message":
-            return <Message key={item.id} item={item} onRetry={onRetry} />;
+            return (
+              <Message
+                key={item.id}
+                item={item}
+                onRetry={onRetry}
+                retryDisabled={retryDisabled}
+              />
+            );
           case "toolStatus":
             return <ToolStatus key={item.id} item={item} />;
           case "writeProposal":
