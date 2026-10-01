@@ -21,9 +21,7 @@ export function ProviderNotice({
   const missingCompletionModel = provider.missingModels.includes(
     provider.completionModel,
   );
-  const hasLargeDefault =
-    provider.completionModel ===
-    "moophlo/Qwen3-Coder-30B-A3B-Instruct-GGUF:latest";
+
   const title = checking
     ? "Checking Ollama"
     : hasMissingModels
@@ -76,12 +74,6 @@ export function ProviderNotice({
               )}
             </li>
           </ol>
-        )}
-        {!compact && !checking && hasLargeDefault && (
-          <p className={styles.modelWarning}>
-            The configured inline model is large. Choose a smaller model in
-            Settings if needed.
-          </p>
         )}
         <div className={styles.actions}>
           {!checking && (

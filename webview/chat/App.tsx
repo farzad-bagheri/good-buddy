@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { ChatHeader } from "./components/ChatHeader";
 import { ChatHistory } from "./components/ChatHistory";
 import { Composer } from "./components/Composer";
+import { ProviderNotice } from "./components/ProviderNotice";
+import { Suggestions } from "./components/Suggestions";
 import { Timeline } from "./components/Timeline";
 import type {
   AttachmentState,
@@ -13,8 +15,6 @@ import type {
 } from "./types";
 import { createItemId } from "./utils";
 import { vscode } from "./vscode";
-import { Suggestions } from "./components/Suggestions";
-import { ProviderNotice } from "./components/ProviderNotice/ProviderNotice";
 
 export function App() {
   const [models, setModels] = useState<ProviderModel[]>([]);
