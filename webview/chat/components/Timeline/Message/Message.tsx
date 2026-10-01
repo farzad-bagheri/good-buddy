@@ -6,7 +6,11 @@ import styles from "./Message.module.css";
 
 type MessageItem = Extract<TimelineItem, { kind: "message" }>;
 
-export function Message({ item }: { item: MessageItem }) {
+interface MessageProps {
+  item: MessageItem;
+  onRetry: () => void;
+}
+export function Message({ item, onRetry }: MessageProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -25,14 +29,23 @@ export function Message({ item }: { item: MessageItem }) {
       />
 
       {item.role === "assistant" && (
-        <IconButton
-          className={styles["copy-button"]}
-          iconName={copied ? "check-icon" : "copy-icon"}
-          title={copied ? "Copied!" : "Copy message"}
-          aria-label={copied ? "Copied!" : "Copy message"}
-          onClick={handleCopy}
-          disabled={copied}
-        />
+        <div className={styles["action"]}>
+          <IconButton
+            className={styles["button"]}
+            iconName={copied ? "check-icon" : "copy-icon"}
+            title={copied ? "Copied!" : "Copy message"}
+            aria-label={copied ? "Copied!" : "Copy message"}
+            onClick={handleCopy}
+            disabled={copied}
+          />
+          <IconButton
+            className={styles["button"]}
+            iconName="retry-icon"
+            title="Retry generating response"
+            aria-label="retry"
+            onClick={onRetry}
+          />
+        </div>
       )}
     </article>
   );

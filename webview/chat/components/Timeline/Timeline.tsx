@@ -4,25 +4,26 @@ import { Message } from "./Message";
 import { ToolStatus } from "./ToolStatus";
 import { WriteProposal } from "./WriteProposal";
 
-export function Timeline({ items }: { items: TimelineItem[] }) {
-  return (
-    <>
-      {items.map((item) => (
-        <TimelineEntry item={item} key={item.id} />
-      ))}
-    </>
-  );
+interface TimelineProps {
+  items: TimelineItem[];
+  onRetry: () => void;
 }
 
-function TimelineEntry({ item }: { item: TimelineItem }) {
-  switch (item.kind) {
-    case "message":
-      return <Message item={item} />;
-    case "toolStatus":
-      return <ToolStatus item={item} />;
-    case "writeProposal":
-      return <WriteProposal item={item} />;
-    case "commandProposal":
-      return <CommandProposal item={item} />;
-  }
+export function Timeline({ onRetry, items }: TimelineProps) {
+  return (
+    <>
+      {items.map((item) => {
+        switch (item.kind) {
+          case "message":
+            return <Message key={item.id} item={item} onRetry={onRetry} />;
+          case "toolStatus":
+            return <ToolStatus key={item.id} item={item} />;
+          case "writeProposal":
+            return <WriteProposal key={item.id} item={item} />;
+          case "commandProposal":
+            return <CommandProposal key={item.id} item={item} />;
+        }
+      })}
+    </>
+  );
 }

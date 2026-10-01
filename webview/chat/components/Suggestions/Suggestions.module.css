@@ -1,0 +1,11 @@
+.suggestions{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.suggestion{
+    text-align: left;
+    padding: 8px;
+    border: 1px solid var(--vscode-editorWidget-border);
+}

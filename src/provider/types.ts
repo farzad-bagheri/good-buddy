@@ -38,6 +38,8 @@ export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
   displayContent?: string;
+  /** Short follow-up replies the user could send next, shown only for the latest assistant message. */
+  suggestions?: string[];
 }
 
 export interface ChatOptions {

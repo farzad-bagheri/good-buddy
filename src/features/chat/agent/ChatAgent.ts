@@ -12,6 +12,7 @@ import {
 export interface ChatAgentResult {
   response: string;
   title?: string;
+  suggestions?: string[];
 }
 
 export interface ChatAgentEvents {
@@ -75,7 +76,11 @@ export class ChatAgent {
       const envelope = parseAssistantEnvelope(response, availableTools);
       title ??= envelope.title;
       if (envelope.type === "final") {
-        return { response: envelope.response, title };
+        return {
+          response: envelope.response,
+          title,
+          suggestions: envelope.suggestions,
+        };
       }
       const toolCall = envelope.tool;
 

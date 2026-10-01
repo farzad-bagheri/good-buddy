@@ -21,6 +21,12 @@
   color: var(--vscode-errorForeground);
 }
 
-.copy-button {
+.action{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.button {
   margin: 8px 0;
 }

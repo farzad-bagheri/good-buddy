@@ -15,6 +15,7 @@ export type TimelineItem =
       role: "user" | "assistant" | "error";
       text: string;
       html?: string;
+      suggestions?: string[];
     }
   | { id: string; kind: "toolStatus"; text: string }
   | {

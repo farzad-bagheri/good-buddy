@@ -2,7 +2,7 @@ import { ChatMessage, ProviderModel } from "@/provider";
 import type { ToolCall, ToolDefinition } from "./types";
 
 export type AssistantEnvelope =
-  | { type: "final"; response: string; title?: string }
+  | { type: "final"; response: string; title?: string; suggestions?: string[] }
   | { type: "tool_call"; tool: ToolCall; title?: string };
 
 export function formatError(error: unknown): string {
@@ -28,10 +28,11 @@ export function agentInstructions(
     role: "system",
     content: `You are Good Buddy, a concise coding assistant with workspace tools. Your technical details are as follows: ${JSON.stringify(model)}.
 Every reply must be exactly one JSON object matching this contract, with no Markdown fences or surrounding prose:
-{"type":"final","response":"Markdown answer","tool":null,"autoApprove":false,"arguments":{},${titleExample}}
+{"type":"final","response":"Markdown answer","tool":null,"autoApprove":false,"arguments":{},${titleExample}, "suggestions": []}
 {"type":"tool_call","response":"","tool":"tool_id","autoApprove":false,"arguments":{},${titleExample}}
 Use type "final" when answering the user. The response value is Markdown and should contain the complete user-facing answer. Use type "tool_call" only when a listed tool is needed. For write_file, replace_in_file, and run_command, always set autoApprove to false. The user must approve these actions with the proposal UI; a chat message such as "okay" does not execute or approve a pending tool call.
 ${requestTitle ? "On this first response, include a short descriptive title in title. On later responses, set title to null." : "Set title to null."}
+Only on type "final" replies, you may include a "suggestions" array with up to 2 short, specific follow-up replies the user could send next (each under 60 characters, phrased as something the user would say). Omit or leave it empty when no natural follow-up exists; never suggest anything for tool_call replies.
 Available tools:
 ${toolInstructions}
 Current project context:\n${projectContext}\n\nWhen the user asks about or changes this project, inspect relevant files before answering. Do not stop after saying what you will do: request the next tool in the same response. For small edits, prefer replace_in_file. The user must approve every write and command. Paths must be relative to the workspace. After a tool result, either request another tool or give the final answer. Never claim a write was applied unless its tool result explicitly starts with 'Wrote '. Approval alone is not completion; if a write is cancelled, denied, or errors, clearly say that the file was not changed.`,
@@ -54,6 +55,11 @@ export function assistantResponseFormat(
       autoApprove: { type: "boolean" },
       arguments: { type: "object", additionalProperties: true },
       title: requestTitle ? { type: "string" } : { type: ["string", "null"] },
+      suggestions: {
+        type: "array",
+        items: { type: "string" },
+        maxItems: 2,
+      },
     },
     required: ["type", "response", "tool", "autoApprove", "arguments", "title"],
     additionalProperties: false,
@@ -76,7 +82,21 @@ export function parseAssistantEnvelope(
           : undefined;
 
       if (value.type === "final" && typeof value.response === "string") {
-        return { type: "final", response: value.response, title };
+        const suggestions = Array.isArray(value.suggestions)
+          ? value.suggestions
+              .filter(
+                (suggestion): suggestion is string =>
+                  typeof suggestion === "string" && suggestion.trim() !== "",
+              )
+              .map((suggestion) => suggestion.trim().slice(0, 80))
+              .slice(0, 2)
+          : undefined;
+        return {
+          type: "final",
+          response: value.response,
+          title,
+          suggestions: suggestions?.length ? suggestions : undefined,
+        };
       }
 
       if (

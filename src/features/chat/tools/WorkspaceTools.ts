@@ -1,8 +1,13 @@
 import { exec } from "child_process";
 import * as path from "path";
 import * as vscode from "vscode";
+import {
+  MAX_LIST_PROJECT_DEPTH,
+  MAX_LIST_PROJECT_ITEMS,
+  MAX_OUTPUT_LENGTH,
+  TOOL_TIMEOUT,
+} from "../constants";
 import type { ToolCall, ToolDefinition } from "../types";
-import { MAX_OUTPUT_LENGTH, TOOL_TIMEOUT } from "../constants";
 import {
   createDiff,
   readTextIfExists,
@@ -34,8 +39,14 @@ export class WorkspaceTools {
     return [
       {
         id: "list_project",
-        description: "List the workspace project tree.",
-        execute: async () => this.listProject(this.workspaceRoot()),
+        description:
+          "List files under a workspace folder. Optional arguments: path (relative subfolder, defaults to the workspace root) and depth (1-5, defaults to 3).",
+        execute: async (call) =>
+          this.listProject(
+            this.workspaceRoot(),
+            this.optionalPath(call.arguments.path),
+            this.optionalDepth(call.arguments.depth),
+          ),
       },
       {
         id: "read_file",
@@ -66,18 +77,25 @@ export class WorkspaceTools {
   }
 
   /**
-   * Retrieves the project context, including the workspace root and a project tree up to depth 3.
+   * Lists files under a workspace folder, scoped to an optional relative subfolder and depth.
    * @param root The root directory of the workspace.
-   * @returns A string representing the project context, including the workspace root and a project tree up to depth 3.
+   * @param startRelative The relative subfolder to start listing from (empty for the workspace root).
+   * @param maxDepth The maximum number of nested levels to list, relative to the start folder.
+   * @returns A string representing the project tree rooted at the start folder, up to the given depth.
    */
-  private async listProject(root: string): Promise<string> {
+  private async listProject(
+    root: string,
+    startRelative = "",
+    maxDepth = MAX_LIST_PROJECT_DEPTH,
+  ): Promise<string> {
+    const startUri = workspaceFile(root, startRelative || ".");
     const entries: string[] = [];
     const visit = async (
       folder: vscode.Uri,
       relative: string,
       depth: number,
     ) => {
-      if (depth > 3 || entries.length >= 250) return;
+      if (depth > maxDepth || entries.length >= MAX_LIST_PROJECT_ITEMS) return;
 
       for (const [name, type] of await vscode.workspace.fs.readDirectory(
         folder,
@@ -100,8 +118,28 @@ export class WorkspaceTools {
       }
     };
 
-    await visit(vscode.Uri.file(root), "", 0);
-    return entries.join("\n") || "The workspace is empty.";
+    await visit(startUri, startRelative, 0);
+    return entries.join("\n") || "The folder is empty.";
+  }
+
+  /**
+   * Normalizes an optional tool argument into a workspace-relative path, or the workspace root if absent.
+   * @param value The raw argument value provided by the model.
+   * @returns A relative path string, defaulting to an empty string (the workspace root).
+   */
+  private optionalPath(value: unknown): string {
+    return typeof value === "string" ? value.trim() : "";
+  }
+
+  /**
+   * Normalizes an optional tool argument into a listing depth, clamped to a safe range.
+   * @param value The raw argument value provided by the model.
+   * @returns A depth between 1 and 5, defaulting to 3 when unspecified or invalid.
+   */
+  private optionalDepth(value: unknown): number {
+    const depth = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(depth)) return 3;
+    return Math.min(5, Math.max(1, Math.round(depth)));
   }
 
   /**

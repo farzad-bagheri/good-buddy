@@ -151,6 +151,9 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         case "wv:send":
           await this.handleSend(String(message.text ?? ""));
           break;
+        case "wv:retry":
+          await this.handleRetry();
+          break;
         case "wv:attachFiles":
           await this.pickAttachments();
           break;
@@ -234,20 +237,17 @@ export class ChatFeature implements vscode.WebviewViewProvider {
   }
 
   /** Sends chat history to the webview, rendering assistant messages as HTML. */
-  private async postHistory(): Promise<void> {
-    const messages = await Promise.all(
-      this.history.map(async ({ role, content, displayContent }) => {
-        // Use displayContent if available, otherwise fall back to content.
-        const visibleMessage = { role, content: displayContent ?? content };
-        // Render the assistant's message as HTML if it is an assistant message.
-        return role === "assistant"
-          ? { ...visibleMessage, html: await marked.parse(content) }
-          : visibleMessage;
-      }),
-    );
+  private postHistory() {
+    const messages = this.history.map(({ role, content, displayContent }) => {
+      return {
+        role,
+        content: marked.parse(displayContent ?? content),
+      };
+    });
     this.view?.webview.postMessage({
       type: "vsc:history",
       messages,
+      suggestions: this.getSuggestions(),
     });
   }
 
@@ -385,10 +385,27 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     };
   }
 
+  private getSuggestions(): string[] | undefined {
+    const lastItem = this.history[this.history.length - 1];
+    return lastItem ? lastItem.suggestions : undefined;
+  }
+
+  private handleRetry() {
+    const lastUserMessage = this.history[this.history.length - 2];
+    this.history.pop();
+    return (
+      lastUserMessage?.role === "user" &&
+      this.handleSend(lastUserMessage.content)
+    );
+  }
+
   /** Adds a user message and runs the agent, reporting its result to the webview. */
-  private async handleSend(text: string): Promise<void> {
+  private async handleSend(userMessage: string): Promise<void> {
     // Return early if the message is empty and there are no attachments, or if the webview is not available.
-    if ((!text.trim() && this.attachments.all.length === 0) || !this.view) {
+    if (
+      (!userMessage.trim() && this.attachments.all.length === 0) ||
+      !this.view
+    ) {
       return;
     }
 
@@ -401,13 +418,13 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     const selectedModel = await this.modelDetails(modelName);
     const activeDocument = this.attachments.activeDocumentAttachment();
     const attachmentBlock = this.attachments.formatForPrompt(activeDocument);
-    const userContent = `${text}${attachmentBlock}`.trim();
+    const userContent = `${userMessage}${attachmentBlock}`.trim();
     const attachmentLabel = this.attachments.all.length
-      ? `\n\nAttached: ${this.attachments.names(activeDocument).join(", ")}`
+      ? `\n\n>Attached: ${this.attachments.names(activeDocument).join(", ")}`
       : activeDocument
-        ? `\n\nOpen file: ${activeDocument.name}`
+        ? `\n\n>Open file: ${activeDocument.name}`
         : "";
-    const displayContent = `${text}${attachmentLabel}`.trim();
+    const displayContent = `${userMessage}${attachmentLabel}`.trim();
     this.attachments.clear();
     this.postAttachments();
     const conversation = this.history;
@@ -456,7 +473,11 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         return;
       }
 
-      conversation.push({ role: "assistant", content: assistantText });
+      conversation.push({
+        role: "assistant",
+        content: assistantText,
+        suggestions: result.suggestions,
+      });
       await this.persistChat(id, createdAt, conversation, modelName, chatTitle);
       // Notify the webview that the assistant has started generating its response.
       this.view.webview.postMessage({ type: "vsc:assistantStart" });
@@ -466,7 +487,10 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         html: marked.parse(assistantText),
       });
       // Notify the webview that the assistant has finished generating its response.
-      this.view.webview.postMessage({ type: "vsc:assistantDone" });
+      this.view.webview.postMessage({
+        type: "vsc:assistantDone",
+        suggestions: result.suggestions,
+      });
     } catch (err) {
       // If an error occurs and the request was not aborted, notify the webview of the error.
       if (!controller.signal.aborted) {

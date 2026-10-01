@@ -12,12 +12,14 @@ import type {
 } from "./types";
 import { createItemId } from "./utils";
 import { vscode } from "./vscode";
+import { Suggestions } from "./components/Suggestions";
 
 export function App() {
   const [models, setModels] = useState<ProviderModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [history, setHistory] = useState<ChatSummary[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   /**
    * The list of timeline items representing the conversation and other events.
    */
@@ -64,12 +66,18 @@ export function App() {
               }),
             ),
           );
+          setSuggestions(message.suggestions);
           break;
         case "vsc:chatList":
           setHistory(message.chats);
           break;
         case "vsc:userMessage":
-          appendItem({ kind: "message", role: "user", text: message.text, html: message.html });
+          appendItem({
+            kind: "message",
+            role: "user",
+            text: message.text,
+            html: message.html,
+          });
           break;
         case "vsc:assistantStart": {
           setThinking(false);
@@ -96,6 +104,7 @@ export function App() {
         case "vsc:assistantDone":
           setThinking(false);
           assistantId.current = undefined;
+          setSuggestions(message.suggestions || []);
           break;
         case "vsc:assistantError":
           setThinking(false);
@@ -213,6 +222,10 @@ export function App() {
     if (opening) vscode.postMessage({ type: "wv:listChats" });
   }
 
+  function handleRetry() {
+    vscode.postMessage({ type: "wv:retry" });
+  }
+
   return (
     <main className="chat-app">
       <ChatHeader
@@ -239,11 +252,18 @@ export function App() {
       ) : (
         <>
           <section className="messages" aria-live="polite" hidden={historyOpen}>
-            <Timeline items={items} />
+            <Timeline items={items} onRetry={handleRetry} />
             {thinking && (
               <div className="tool-status" role="status">
                 Thinking...
               </div>
+            )}
+
+            {suggestions?.length && (
+              <Suggestions
+                suggestions={suggestions}
+                onSuggest={(t) => setText(t)}
+              />
             )}
             <div ref={endOfMessages} />
           </section>
