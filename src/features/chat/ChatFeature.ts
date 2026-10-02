@@ -267,7 +267,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       type: "vsc:providerStatus",
       status,
       endpoint: getGoodBuddyConfig().endpoint,
-      chatModel: this.getSelectedModel(),
+      chatModel:  getGoodBuddyConfig().chatModel,
       completionModel: getGoodBuddyConfig().completionModel,
       missingModels,
       artworkUri: this.resources

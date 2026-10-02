@@ -35,7 +35,7 @@
 .steps {
   display: grid;
   gap: 12px;
-  margin: 0 0 18px;
+  margin: 0 0 16px;
   padding: 0;
   list-style: none;
   counter-reset: setup-step;
@@ -44,7 +44,7 @@
 .steps li {
   min-width: 0;
   display: grid;
-  gap: 5px;
+  gap: 4px;
   counter-increment: setup-step;
 }
 
@@ -57,28 +57,51 @@
 .modelName {
   display: inline;
   overflow-wrap: anywhere;
+  padding: 0;
+  border: 0;
+  background: transparent;
   font-family: var(--vscode-editor-font-family);
   font-size: 12px;
 }
 
-.steps code,
+.command {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.command code,
 .endpoint code {
   display: block;
+  min-width: 0;
+  flex: 1;
   max-width: 100%;
   overflow-wrap: anywhere;
-  padding: 6px 8px;
+  padding: 8px;
   border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--vscode-editor-background);
   font-family: var(--vscode-editor-font-family);
   font-size: 12px;
+}
+
+.copyButton {
+  flex: none;
+  padding: 4px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.copyButton:hover {
+  background: var(--vscode-toolbar-hoverBackground);
 }
 
 .checkButton {
   border-color: var(--vscode-button-border, transparent);
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
-  padding: 6px 10px;
+  padding: 8px 12px;
 }
 
 .checkButton:hover {
@@ -92,24 +115,24 @@
 }
 
 .settingsButton {
-  padding: 6px 10px;
+  padding: 8px 12px;
 }
 
 .modelWarning {
-  margin: -6px 0 14px;
+  margin: -4px 0 12px;
   color: var(--vscode-descriptionForeground);
   font-size: 12px;
   line-height: 1.4;
 }
 
 .endpoint {
-  margin: 14px 0 0;
+  margin: 12px 0 0;
   color: var(--vscode-descriptionForeground);
   font-size: 12px;
 }
 
 .endpoint code {
-  margin-top: 5px;
+  margin-top: 4px;
 }
 
 .compact {
@@ -117,8 +140,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 0 0 14px;
-  padding: 10px 12px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
   border: 1px solid var(--vscode-panel-border);
   border-left: 3px solid var(--vscode-editorWarning-foreground);
   border-radius: 4px;
@@ -130,7 +153,7 @@
 }
 
 .compact .content h2 {
-  margin-bottom: 3px;
+  margin-bottom: 4px;
   font-size: 13px;
 }
 

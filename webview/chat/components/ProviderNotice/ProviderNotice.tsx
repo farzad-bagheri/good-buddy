@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { IconButton } from "../../components/IconButton";
 import type { ProviderStatusInfo } from "../../types";
 import styles from "./ProviderNotice.module.css";
 
@@ -52,7 +54,7 @@ export function ProviderNotice({
             {unavailable && (
               <li>
                 <span>Start the server</span>
-                <code>ollama serve</code>
+                <CopyCommand command="ollama serve" />
               </li>
             )}
             <li>
@@ -61,7 +63,7 @@ export function ProviderNotice({
                 <code className={styles.modelName}>{provider.chatModel}</code>
               </span>
               {(!hasMissingModels || missingChatModel) && (
-                <code>ollama pull {provider.chatModel}</code>
+                <CopyCommand command={`ollama pull ${provider.chatModel}`} />
               )}
             </li>
             <li>
@@ -72,7 +74,9 @@ export function ProviderNotice({
                 </code>
               </span>
               {(!hasMissingModels || missingCompletionModel) && (
-                <code>ollama pull {provider.completionModel}</code>
+                <CopyCommand
+                  command={`ollama pull ${provider.completionModel}`}
+                />
               )}
             </li>
           </ol>
@@ -96,5 +100,38 @@ export function ProviderNotice({
         )}
       </div>
     </section>
+  );
+}
+
+function CopyCommand({ command }: { command: string }) {
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(command);
+      setStatus("copied");
+    } catch {
+      setStatus("failed");
+    }
+    window.setTimeout(() => setStatus("idle"), 2000);
+  };
+
+  const title =
+    status === "copied"
+      ? "Command copied"
+      : status === "failed"
+        ? "Copy failed"
+        : "Copy command";
+
+  return (
+    <div className={styles.command}>
+      <code>{command}</code>
+      <IconButton
+        className={styles.copyButton}
+        iconName={status === "copied" ? "check-icon" : "copy-icon"}
+        title={title}
+        onClick={handleCopy}
+      />
+    </div>
   );
 }
