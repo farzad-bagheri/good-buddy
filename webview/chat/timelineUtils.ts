@@ -28,8 +28,9 @@ export function mapHistoryToTimelineItems(
 export function appendTimelineItem(
   items: TimelineItem[],
   item: NewTimelineItem,
+  id = createItemId(),
 ): TimelineItem[] {
-  return [...items, { ...item, id: createItemId() } as TimelineItem];
+  return [...items, { ...item, id } as TimelineItem];
 }
 
 export function appendCommandProposal(
@@ -51,7 +52,7 @@ export function appendCommandProposal(
 export function updateAssistantMessage(
   items: TimelineItem[],
   id: string,
-  updates: Partial<Pick<MessageTimelineItem, "html" | "suggestions">>,
+  updates: Partial<Pick<MessageTimelineItem, "text" | "html" | "suggestions">>,
 ): TimelineItem[] {
   return items.map((item) =>
     item.id === id && item.kind === "message" && item.role === "assistant"

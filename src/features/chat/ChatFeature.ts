@@ -546,7 +546,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         content: assistantText,
         suggestions: result.suggestions,
       });
-      await this.persistChat(id, createdAt, conversation, modelName, chatTitle);
+      const assistantHtml = marked.parse(assistantText);
       // Notify the webview that the assistant has started generating its response.
       this.view.webview.postMessage({
         type: "vsc:assistantStart",
@@ -555,13 +555,15 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       // Send the initial chunk of the assistant's response to the webview.
       this.view.webview.postMessage({
         type: "vsc:assistantChunk",
-        html: marked.parse(assistantText),
+        text: assistantText,
+        html: assistantHtml,
       });
       // Notify the webview that the assistant has finished generating its response.
       this.view.webview.postMessage({
         type: "vsc:assistantDone",
         suggestions: result.suggestions,
       });
+      void this.persistChat(id, createdAt, conversation, modelName, chatTitle);
     } catch (err) {
       // If an error occurs and the request was not aborted, notify the webview of the error.
       if (!controller.signal.aborted) {

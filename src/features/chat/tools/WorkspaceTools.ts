@@ -6,6 +6,10 @@ import {
   MAX_LIST_PROJECT_ITEMS,
   MAX_OUTPUT_LENGTH,
   TOOL_TIMEOUT,
+  MAX_SEARCH_RESULTS,
+  MAX_SEARCH_FILES,
+  MAX_SEARCH_FILE_BYTES,
+  SEARCH_EXCLUDES,
 } from "../constants";
 import type { ToolCall, ToolDefinition } from "../types";
 import {
@@ -49,12 +53,59 @@ export class WorkspaceTools {
           ),
       },
       {
+        id: "search_files",
+        description:
+          "Find workspace files using a glob pattern (for example **/*.ts or **/*Config*). Optional limit defaults to 50.",
+        execute: async (call) =>
+          this.searchFiles(
+            this.workspaceRoot(),
+            requiredString(call.arguments.pattern, "pattern"),
+            this.optionalLimit(call.arguments.limit),
+          ),
+      },
+      {
+        id: "search_file_contents",
+        description:
+          "Search text within workspace files. Required query; optional path glob, caseSensitive, contextLines (0-3), and limit (default 50).",
+        execute: async (call) =>
+          this.searchFileContents(
+            this.workspaceRoot(),
+            requiredString(call.arguments.query, "query"),
+            this.optionalGlob(call.arguments.path),
+            call.arguments.caseSensitive === true,
+            this.optionalContextLines(call.arguments.contextLines),
+            this.optionalLimit(call.arguments.limit),
+          ),
+      },
+      {
         id: "read_file",
         description: "Read a text file from the workspace.",
         execute: async (call) =>
           this.readFile(
             this.workspaceRoot(),
             requiredString(call.arguments.path, "path"),
+          ),
+      },
+      {
+        id: "get_diagnostics",
+        description:
+          "Get VS Code errors and warnings for the workspace or one workspace-relative file. Optional argument: path.",
+        execute: async (call) =>
+          this.getDiagnostics(
+            this.workspaceRoot(),
+            this.optionalPath(call.arguments.path),
+          ),
+      },
+      {
+        id: "find_references",
+        description:
+          "Find symbol references at a workspace file position. Required arguments: path and 1-based line and character.",
+        execute: async (call) =>
+          this.findReferences(
+            this.workspaceRoot(),
+            requiredString(call.arguments.path, "path"),
+            this.requiredPositiveInteger(call.arguments.line, "line"),
+            this.requiredPositiveInteger(call.arguments.character, "character"),
           ),
       },
       {
@@ -66,6 +117,13 @@ export class WorkspaceTools {
         id: "replace_in_file",
         description: "Propose replacing one exact section in a workspace file.",
         execute: executeWrite,
+      },
+      {
+        id: "delete_file",
+        description:
+          "Move one workspace file to the OS trash after an explicit VS Code confirmation. Never auto-approve this operation.",
+        execute: async (call) =>
+          this.deleteFile(requiredString(call.arguments.path, "path")),
       },
       {
         id: "run_command",
@@ -140,6 +198,242 @@ export class WorkspaceTools {
     const depth = typeof value === "number" ? value : Number(value);
     if (!Number.isFinite(depth)) return 3;
     return Math.min(5, Math.max(1, Math.round(depth)));
+  }
+
+  private optionalLimit(value: unknown): number {
+    const limit = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(limit)) return MAX_SEARCH_RESULTS;
+    return Math.min(MAX_SEARCH_RESULTS, Math.max(1, Math.floor(limit)));
+  }
+
+  private optionalContextLines(value: unknown): number {
+    const lines = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(lines)) return 1;
+    return Math.min(3, Math.max(0, Math.floor(lines)));
+  }
+
+  private requiredPositiveInteger(value: unknown, name: string): number {
+    const number = Number(value);
+    if (!Number.isInteger(number) || number < 1) {
+      throw new Error(`Tool argument '${name}' must be a positive integer.`);
+    }
+    return number;
+  }
+
+  private optionalGlob(value: unknown): string {
+    const pattern = typeof value === "string" ? value.trim() : "**/*";
+    const normalized = pattern.replaceAll("\\", "/");
+    if (
+      normalized.startsWith("/") ||
+      /^[A-Za-z]:/.test(normalized) ||
+      normalized.split("/").includes("..")
+    ) {
+      throw new Error("Search patterns must stay inside the opened workspace.");
+    }
+    return normalized || "**/*";
+  }
+
+  private async searchFiles(
+    root: string,
+    pattern: string,
+    limit: number,
+  ): Promise<string> {
+    if (!pattern.trim()) throw new Error("Search pattern must not be empty.");
+    const files = await vscode.workspace.findFiles(
+      new vscode.RelativePattern(
+        vscode.Uri.file(root),
+        this.optionalGlob(pattern),
+      ),
+      SEARCH_EXCLUDES,
+      limit + 1,
+    );
+    const results = files
+      .slice(0, limit)
+      .map((uri) => path.relative(root, uri.fsPath).split(path.sep).join("/"));
+    if (results.length === 0) return "No files matched that pattern.";
+    return truncate(
+      `${results.join("\n")}${files.length > limit ? "\n[More matches omitted]" : ""}`,
+    );
+  }
+
+  private async searchFileContents(
+    root: string,
+    query: string,
+    pattern: string,
+    caseSensitive: boolean,
+    contextLines: number,
+    limit: number,
+  ): Promise<string> {
+    query = query.trim();
+    if (!query) throw new Error("Search query must not be empty.");
+    const files = await vscode.workspace.findFiles(
+      new vscode.RelativePattern(vscode.Uri.file(root), pattern),
+      SEARCH_EXCLUDES,
+      MAX_SEARCH_FILES + 1,
+    );
+    const searchQuery = caseSensitive ? query : query.toLocaleLowerCase();
+    const results: string[] = [];
+    let skippedFiles = 0;
+
+    for (const uri of files.slice(0, MAX_SEARCH_FILES)) {
+      let content: string;
+      try {
+        const stat = await vscode.workspace.fs.stat(uri);
+        if (stat.size > MAX_SEARCH_FILE_BYTES) continue;
+        content = await this.readContent(uri);
+      } catch {
+        skippedFiles++;
+        continue;
+      }
+      if (content.includes("\0")) continue;
+      const lines = content.split(/\r?\n/);
+      const matchingLines: number[] = [];
+      for (let index = 0; index < lines.length; index++) {
+        const line = caseSensitive
+          ? lines[index]
+          : lines[index].toLocaleLowerCase();
+        if (line.includes(searchQuery)) matchingLines.push(index);
+      }
+
+      const relativePath = path
+        .relative(root, uri.fsPath)
+        .split(path.sep)
+        .join("/");
+      for (const index of matchingLines) {
+        if (results.length >= limit) break;
+        const start = Math.max(0, index - contextLines);
+        const end = Math.min(lines.length, index + contextLines + 1);
+        const excerpt = lines
+          .slice(start, end)
+          .map((line, offset) => `${start + offset + 1}: ${line}`)
+          .join("\n");
+        results.push(`${relativePath}:${index + 1}\n${excerpt}`);
+      }
+      if (results.length >= limit) break;
+    }
+
+    if (results.length === 0) {
+      if (files.length > MAX_SEARCH_FILES) {
+        return `No matches found in the first ${MAX_SEARCH_FILES} candidate files; the scan limit was reached.`;
+      }
+      return skippedFiles
+        ? `No matches found. Skipped ${skippedFiles} unavailable files.`
+        : "No matching text found.";
+    }
+    const limited = results.length >= limit || files.length > MAX_SEARCH_FILES;
+    return truncate(
+      `${results.join("\n\n")}${limited ? "\n\n[Search results limited]" : ""}${skippedFiles ? `\n[Skipped ${skippedFiles} unavailable files]` : ""}`,
+    );
+  }
+
+  private async getDiagnostics(
+    root: string,
+    relativePath: string,
+  ): Promise<string> {
+    let entries: { uri: vscode.Uri; diagnostic: vscode.Diagnostic[][number] }[];
+    if (relativePath) {
+      const uri = workspaceFile(root, relativePath);
+      entries = vscode.languages
+        .getDiagnostics(uri)
+        .map((diagnostic) => ({ uri, diagnostic }));
+    } else {
+      entries = vscode.languages
+        .getDiagnostics()
+        .filter(([uri]) => {
+          const relative = path.relative(root, uri.fsPath);
+          return (
+            relative !== ".." &&
+            !relative.startsWith(`..${path.sep}`) &&
+            !path.isAbsolute(relative)
+          );
+        })
+        .flatMap(([uri, diagnostics]) =>
+          diagnostics.map((diagnostic) => ({ uri, diagnostic })),
+        );
+    }
+    const formatted = entries
+      .slice(0, MAX_SEARCH_RESULTS)
+      .map(({ uri, diagnostic }) => {
+        const relative = path
+          .relative(root, uri.fsPath)
+          .split(path.sep)
+          .join("/");
+        const severity =
+          ["Error", "Warning", "Information", "Hint"][diagnostic.severity] ??
+          "Diagnostic";
+        return `${relative}:${diagnostic.range.start.line + 1}:${diagnostic.range.start.character + 1} [${severity}] ${diagnostic.message}`;
+      });
+    if (formatted.length === 0) return "No diagnostics found.";
+    return truncate(
+      `${formatted.join("\n")}${entries.length > MAX_SEARCH_RESULTS ? "\n[More diagnostics omitted]" : ""}`,
+    );
+  }
+
+  private async findReferences(
+    root: string,
+    relativePath: string,
+    line: number,
+    character: number,
+  ): Promise<string> {
+    const uri = workspaceFile(root, relativePath);
+    const document = await vscode.workspace.openTextDocument(uri);
+    const position = new vscode.Position(line - 1, character - 1);
+    const references =
+      (await vscode.commands.executeCommand<
+        (vscode.Location | vscode.LocationLink)[]
+      >("vscode.executeReferenceProvider", document.uri, position)) ?? [];
+    const formatted = references
+      .flatMap((reference) => {
+        const targetUri =
+          "targetUri" in reference ? reference.targetUri : reference.uri;
+        const targetRange =
+          "targetRange" in reference ? reference.targetRange : reference.range;
+        const relative = path.relative(root, targetUri.fsPath);
+        if (
+          relative === ".." ||
+          relative.startsWith(`..${path.sep}`) ||
+          path.isAbsolute(relative)
+        ) {
+          return [];
+        }
+        return [
+          `${relative.split(path.sep).join("/")}:${targetRange.start.line + 1}:${targetRange.start.character + 1}`,
+        ];
+      })
+      .slice(0, MAX_SEARCH_RESULTS);
+    if (formatted.length === 0) return "No symbol references found.";
+    return truncate(
+      `${formatted.join("\n")}${references.length > MAX_SEARCH_RESULTS ? "\n[More references omitted]" : ""}`,
+    );
+  }
+
+  private async deleteFile(relativePath: string): Promise<string> {
+    const uri = workspaceFile(this.workspaceRoot(), relativePath);
+    const stat = await vscode.workspace.fs.stat(uri);
+    if (stat.type !== vscode.FileType.File) {
+      throw new Error("Only individual files can be moved to the trash.");
+    }
+    const openDocument = this.openDocument(uri);
+    if (openDocument?.isDirty) {
+      throw new Error("Save or discard the open file before deleting it.");
+    }
+
+    const choice = await vscode.window.showWarningMessage(
+      `Move "${relativePath}" to the OS trash?`,
+      { modal: true },
+      "Move to Trash",
+    );
+    if (choice !== "Move to Trash") return "Deletion cancelled by the user.";
+
+    const currentStat = await vscode.workspace.fs.stat(uri);
+    if (currentStat.mtime !== stat.mtime || currentStat.size !== stat.size) {
+      return `Deletion cancelled: ${relativePath} changed while awaiting confirmation.`;
+    }
+    if (this.openDocument(uri)?.isDirty) {
+      return `Deletion cancelled: ${relativePath} has unsaved changes.`;
+    }
+    await vscode.workspace.fs.delete(uri, { useTrash: true });
+    return `Moved ${relativePath} to the OS trash.`;
   }
 
   /**

@@ -107,7 +107,7 @@ export function App() {
               role: "assistant",
               text: "",
               historyIndex: message.historyIndex,
-            }),
+            }, id),
           );
           break;
         }
@@ -115,7 +115,10 @@ export function App() {
           if (assistantId.current) {
             const id = assistantId.current;
             setItems((current) =>
-              updateAssistantMessage(current, id, { html: message.html }),
+              updateAssistantMessage(current, id, {
+                text: message.text,
+                html: message.html,
+              }),
             );
           }
           break;

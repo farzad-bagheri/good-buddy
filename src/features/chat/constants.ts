@@ -5,3 +5,7 @@ export const MAX_ATTACHMENTS = 5;
 export const MAX_ATTACHMENT_BYTES = 10 * 1024;
 export const MAX_LIST_PROJECT_DEPTH = 5;
 export const MAX_LIST_PROJECT_ITEMS = 250;
+export const MAX_SEARCH_RESULTS = 50;
+export const MAX_SEARCH_FILES = 500;
+export const MAX_SEARCH_FILE_BYTES = 512 * 1024;
+export const SEARCH_EXCLUDES = "**/{node_modules,.git,out,dist}/**";

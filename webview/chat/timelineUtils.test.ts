@@ -3,6 +3,7 @@ import type { TimelineItem } from "./types";
 import {
   appendCommandOutput,
   appendCommandProposal,
+  appendTimelineItem,
   completeCommandProposal,
   mapHistoryToTimelineItems,
   updateAssistantMessage,
@@ -59,11 +60,36 @@ describe("timeline utilities", () => {
     const items = updateAssistantMessage(
       [assistantItem, proposalItem],
       assistantItem.id,
-      { suggestions: ["Next"] },
+      { text: "Updated answer", suggestions: ["Next"] },
     );
 
+    expect(items[0]).toMatchObject({ text: "Updated answer" });
     expect(items[0]).toMatchObject({ suggestions: ["Next"] });
     expect(items[1]).toBe(proposalItem);
+  });
+
+  it("appends a streamed assistant message with the reserved update ID", () => {
+    const id = "streamed-assistant";
+    const appended = appendTimelineItem(
+      [],
+      {
+        kind: "message",
+        role: "assistant",
+        text: "",
+        historyIndex: 1,
+      },
+      id,
+    );
+    const updated = updateAssistantMessage(appended, id, {
+      text: "The response is visible.",
+      html: "<p>The response is visible.</p>",
+    });
+
+    expect(updated[0]).toMatchObject({
+      id,
+      text: "The response is visible.",
+      html: "<p>The response is visible.</p>",
+    });
   });
 
   it("updates write proposal status from the result", () => {
