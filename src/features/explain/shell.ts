@@ -166,6 +166,7 @@ export const shellHtml = () => `<!doctype html>
   max-width: 100%;
   overflow-x: auto;
   margin: 16px 0;
+  background-color: wheat;
 }
 
 .markdown-content .mermaid-diagram svg {

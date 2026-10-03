@@ -282,7 +282,7 @@ export function App() {
               retryDisabled={thinking}
             />
             {thinking && (
-              <div className="tool-status" role="status">
+              <div className="thinking" role="status">
                 Thinking...
               </div>
             )}

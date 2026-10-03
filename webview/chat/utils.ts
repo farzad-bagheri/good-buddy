@@ -1,7 +1,7 @@
 import mermaid from "mermaid";
 
 let nextItemId = 0;
-mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
+mermaid.initialize({ startOnLoad: false, securityLevel: "strict", darkMode: false });
 
 export function createItemId(): string {
   nextItemId += 1;
