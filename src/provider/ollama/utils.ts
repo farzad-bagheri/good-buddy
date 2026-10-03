@@ -1,3 +1,5 @@
+import { ProviderModel } from "../types";
+
 // Defensive: some models emit <think>...</think> reasoning even when not requested.
 export function stripThinking(text: string): string {
   return text.replace(/<think>[\s\S]*?<\/think>/gi, "").trimStart();
@@ -51,3 +53,8 @@ export function processStreamLine(
     );
   }
 }
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+export const makeModelCaption= (model: ProviderModel) =>
+  `${model.details.parameter_size} ${capitalize(model.details.family)}`;

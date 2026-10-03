@@ -1,7 +1,19 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
 .toolbar {
   display: grid;
   grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+}
+
+.note {
+  display: block;
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
 }

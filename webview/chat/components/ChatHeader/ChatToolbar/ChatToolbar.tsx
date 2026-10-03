@@ -22,6 +22,7 @@ export function ChatToolbar({
   };
 
   return (
+    <div className={styles.container}>
     <div className={styles.toolbar}>
       <select
         aria-label="Chat model"
@@ -29,7 +30,7 @@ export function ChatToolbar({
         onChange={handleModelChange}
       >
         {models.map((model) => (
-          <option key={model.model} value={model.model}>
+          <option key={model.model} value={model.model} title={model.model}>
             {model.caption}
           </option>
         ))}
@@ -44,6 +45,8 @@ export function ChatToolbar({
         iconName="history-icon"
         onClick={onToggleHistory}
       />
+    </div>
+    <span className={styles.note}>{selectedModel}</span>
     </div>
   );
 }

@@ -11,7 +11,12 @@ import type {
   GenerateResponse,
   ListModelsResponse,
 } from "./types";
-import { parseJsonResponse, processStreamLine, stripThinking } from "./utils";
+import {
+  makeModelCaption,
+  parseJsonResponse,
+  processStreamLine,
+  stripThinking,
+} from "./utils";
 
 /**
  * Minimal provider for the Ollama HTTP API
@@ -101,7 +106,7 @@ export class OllamaProvider implements GoodBuddyProvider {
 
     return (json.models ?? []).map((m) => ({
       ...m,
-      caption: `${m.details.family} ${m.details.parameter_size}`,
+      caption: makeModelCaption(m),
     }));
   }
 
