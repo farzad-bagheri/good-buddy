@@ -3,6 +3,7 @@ import { CommandProposal } from "./CommandProposal";
 import { Message } from "./Message";
 import { ToolStatus } from "./ToolStatus";
 import { WriteProposal } from "./WriteProposal";
+import styles from "./Timeline.module.css";
 
 interface TimelineProps {
   items: TimelineItem[];
@@ -12,7 +13,7 @@ interface TimelineProps {
 
 export function Timeline({ onRetry, retryDisabled, items }: TimelineProps) {
   return (
-    <>
+    <div className={styles.timeline}>
       {items.map((item) => {
         switch (item.kind) {
           case "message":
@@ -32,6 +33,6 @@ export function Timeline({ onRetry, retryDisabled, items }: TimelineProps) {
             return <CommandProposal key={item.id} item={item} />;
         }
       })}
-    </>
+    </div>
   );
 }

@@ -1,5 +1,4 @@
 .proposal {
-  max-width: 900px;
   margin: 8px auto 12px;
   padding: 8px;
   border: 1px solid var(--vscode-editorWidget-border);

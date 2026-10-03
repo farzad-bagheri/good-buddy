@@ -1,0 +1,6 @@
+.timeline {
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
