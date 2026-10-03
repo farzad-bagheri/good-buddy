@@ -162,17 +162,6 @@ export const shellHtml = () => `<!doctype html>
   background: var(--vscode-textCodeBlock-background);
 }
 
-.markdown-content .mermaid-diagram {
-  max-width: 100%;
-  overflow-x: auto;
-  margin: 16px 0;
-  background-color: wheat;
-}
-
-.markdown-content .mermaid-diagram svg {
-  max-width: 100%;
-}
-
 
       /* Error */
 

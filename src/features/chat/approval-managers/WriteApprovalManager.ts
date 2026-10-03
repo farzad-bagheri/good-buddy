@@ -20,8 +20,16 @@ export interface WriteApprovalEvents {
    * @param id The unique ID of the proposed write operation.
    * @param path The file path of the proposed write operation.
    * @param diff The diff representing the changes in the proposed write operation.
+   * @param before The content of the file before the proposed change.
+   * @param after The content of the file after the proposed change.
    */
-  propose(id: string, path: string, diff: string): void;
+  propose(
+    id: string,
+    path: string,
+    diff: string,
+    before: string,
+    after: string,
+  ): void;
   complete(id: string, result: string): void;
 }
 
@@ -77,7 +85,7 @@ export class WriteApprovalManager {
     const proposal =
       edit?.proposal ?? (await this.workspaceTools.proposeWrite(path, content));
     const id = String(this.nextId++);
-    this.events.propose(id, proposal.path, proposal.diff);
+    this.events.propose(id, proposal.path, proposal.diff, before, content);
 
     // Return a promise that will be resolved once the user reviews the write operation.
     return new Promise((resolve) =>

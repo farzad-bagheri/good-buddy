@@ -65,6 +65,13 @@ describe("approval managers", () => {
     });
 
     await vi.waitFor(() => expect(propose).toHaveBeenCalledOnce());
+    expect(propose).toHaveBeenCalledWith(
+      "1",
+      "notes.txt",
+      "diff",
+      "before",
+      "after",
+    );
     expect(applyWrite).not.toHaveBeenCalled();
     await manager.review("1", true);
     await expect(pending).resolves.toBe("Wrote notes.txt.");

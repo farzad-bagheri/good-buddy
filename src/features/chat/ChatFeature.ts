@@ -1,37 +1,32 @@
-import { getGoodBuddyConfig } from "@/config";
-import { ChatMessage, GoodBuddyProvider, ProviderModel } from "@/provider";
+import { ChatMessage, GoodBuddyProvider } from "@/provider";
 import { Resources } from "@/resources";
 import { marked } from "marked";
-import { randomUUID } from "node:crypto";
 import * as vscode from "vscode";
 import { ChatAgent } from "./agent";
 import {
   CommandApprovalManager,
   WriteApprovalManager,
 } from "./approval-managers";
-import { AttachmentStore } from "./attachment";
+import { ChatSession } from "./ChatSession";
+import { ChatViewState } from "./ChatViewState";
+import { ChatWebviewMessageRouter } from "./ChatWebviewMessageRouter";
+import { ProposalDiffEditor } from "./ProposalDiffEditor";
 import { shellHtml } from "./shell";
-import { ChatHistoryStore, StoredChat } from "./storage/ChatHistoryStore";
+import { ChatHistoryStore } from "./storage/ChatHistoryStore";
 import { ToolRegistry } from "./tools";
 import { WorkspaceTools } from "./tools/WorkspaceTools";
-import { findMissingModels, findRetryUserIndex, formatError } from "./utils";
-
-const MODEL_STATE_KEY = "goodBuddy.selectedChatModel";
+import { findRetryUserIndex, formatError } from "./utils";
 
 export class ChatFeature implements vscode.WebviewViewProvider {
   public static readonly viewType = "goodBuddy.chatView";
 
   private view?: vscode.WebviewView;
-  private history: ChatMessage[] = [];
   private activeController?: AbortController;
   private readonly resources: Resources;
-  private readonly chatStorage: ChatHistoryStore;
-  private currentChatId?: string;
-  private currentChatCreatedAt?: string;
-  private currentChatTitle?: string;
-  private readonly deletedChatIds = new Set<string>();
+  private readonly session: ChatSession;
+  private readonly viewState: ChatViewState;
+  private readonly proposalDiffEditor: ProposalDiffEditor;
   private readonly workspaceTools = new WorkspaceTools();
-  private readonly attachments = new AttachmentStore();
   private readonly writeApprovals: WriteApprovalManager;
   private readonly commandApprovals: CommandApprovalManager;
   private readonly tools: ToolRegistry;
@@ -44,22 +39,50 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     private readonly provider: GoodBuddyProvider,
   ) {
     this.resources = new Resources(context);
-    this.chatStorage = new ChatHistoryStore(context.globalStorageUri);
+    this.viewState = new ChatViewState(
+      context,
+      provider,
+      this.resources,
+      output,
+      () => this.view?.webview,
+    );
+    this.session = new ChatSession(
+      new ChatHistoryStore(context.globalStorageUri),
+      output,
+      () => this.viewState.getSelectedModel(),
+      () => this.postChatList(),
+    );
+    this.proposalDiffEditor = new ProposalDiffEditor();
+    context.subscriptions.push(this.proposalDiffEditor);
     this.writeApprovals = new WriteApprovalManager(this.workspaceTools, {
       // Handle write proposals from the workspace tools.
-      propose: (id, path, diff) =>
+      propose: (id, path, diff, before, after) => {
         this.view?.webview.postMessage({
           type: "vsc:writeProposal",
           id,
           path,
           diff,
-        }),
-      complete: (id, result) =>
+        });
+        void this.proposalDiffEditor.open(id, path, before, after).catch(
+          (error: unknown) => {
+            const message = formatError(error);
+            this.output.appendLine(
+              `[proposal diff error] Could not open ${path}: ${message}`,
+            );
+            void vscode.window.showErrorMessage(
+              `Could not open the proposed change in a diff editor: ${message}`,
+            );
+          },
+        );
+      },
+      complete: (id, result) => {
         this.view?.webview.postMessage({
           type: "vsc:writeComplete",
           id,
           result,
-        }),
+        });
+        this.proposalDiffEditor.complete(id);
+      },
     });
 
     // Initialize the command approval manager.
@@ -116,14 +139,6 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       },
     );
 
-    this.context.subscriptions.push(
-      vscode.window.onDidChangeActiveTextEditor(() => this.postAttachments()),
-      vscode.workspace.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration("goodBuddy")) {
-          void this.sendModelList();
-        }
-      }),
-    );
   }
 
   /** Configures the chat webview and handles messages sent by its UI. */
@@ -144,152 +159,55 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     };
     webviewView.webview.html = this.renderHtml(webviewView.webview);
 
-    // Handle incoming messages from the webview.
-    webviewView.webview.onDidReceiveMessage(async (message) => {
-      switch (message.type) {
-        case "wv:ready":
-          await this.sendModelList();
-          await this.postHistory();
-          this.postAttachments();
-          await this.postChatList();
-          break;
-        case "wv:checkProvider":
-          await this.sendModelList();
-          break;
-        case "wv:openSettings":
-          await vscode.commands.executeCommand(
-            "workbench.action.openSettings",
-            "@ext:dabanli.good-buddy",
-          );
-          break;
-        case "wv:send":
-          await this.handleSend(String(message.text ?? ""));
-          break;
-        case "wv:retry":
-          await this.handleRetry(Number(message.historyIndex));
-          break;
-        case "wv:attachFiles":
-          await this.pickAttachments();
-          break;
-        case "wv:removeAttachment":
-          this.attachments.removeAt(Number(message.index));
-          this.postAttachments();
-          break;
-        case "wv:selectModel":
-          await this.context.globalState.update(MODEL_STATE_KEY, message.model);
-          await this.sendModelList();
-          break;
-        case "wv:newChat":
-          this.activeController?.abort();
-          this.writeApprovals.rejectAll();
-          this.commandApprovals.rejectAll();
-          await this.saveCurrentChat();
-          this.history = [];
-          this.currentChatId = undefined;
-          this.currentChatCreatedAt = undefined;
-          this.currentChatTitle = undefined;
-          this.attachments.clear();
-          this.postAttachments();
-          await this.postHistory();
-          await this.postChatList();
-          break;
-        case "wv:listChats":
-          await this.postChatList();
-          break;
-        case "wv:resumeChat":
-          await this.resumeChat(String(message.id ?? ""));
-          break;
-        case "wv:deleteChat":
-          await this.confirmDeleteChat(String(message.id ?? ""));
-          break;
-        case "wv:cancel":
-          this.activeController?.abort();
-          break;
-        case "wv:reviewWrite":
-          await this.writeApprovals.review(
-            String(message.id ?? ""),
-            Boolean(message.approved),
-          );
-          break;
-        case "wv:reviewCommand":
-          await this.commandApprovals.executeOrReject(
-            String(message.id ?? ""),
-            Boolean(message.approved),
-          );
-          break;
-      }
+    const router = new ChatWebviewMessageRouter(webviewView.webview, {
+      ready: async () => {
+        await this.viewState.sendModelList();
+        this.postHistory();
+        this.viewState.postAttachments();
+        await this.postChatList();
+      },
+      checkProvider: () => this.viewState.sendModelList(),
+      openSettings: async () => {
+        await vscode.commands.executeCommand(
+          "workbench.action.openSettings",
+          "@ext:dabanli.good-buddy",
+        );
+      },
+      send: (text) => this.handleSend(text),
+      retry: (historyIndex) => this.handleRetry(historyIndex),
+      attachFiles: () => this.viewState.pickAttachments(),
+      removeAttachment: (index) => {
+        this.viewState.attachments.removeAt(index);
+        this.viewState.postAttachments();
+      },
+      selectModel: (model) => this.viewState.selectModel(model),
+      newChat: async () => {
+        this.activeController?.abort();
+        this.writeApprovals.rejectAll();
+        this.commandApprovals.rejectAll();
+        await this.saveCurrentChat();
+        this.session.clear();
+        this.viewState.attachments.clear();
+        this.viewState.postAttachments();
+        await this.postHistory();
+        await this.postChatList();
+      },
+      listChats: () => this.postChatList(),
+      resumeChat: (id) => this.resumeChat(id),
+      deleteChat: (id) => this.confirmDeleteChat(id),
+      cancel: () => this.activeController?.abort(),
+      reviewWrite: (id, approved) =>
+        this.writeApprovals.review(id, approved),
+      reviewCommand: (id, approved) =>
+        this.commandApprovals.executeOrReject(id, approved),
     });
-  }
-
-  /** Returns the saved chat model, falling back to the configured default. */
-  private getSelectedModel(): string {
-    const { chatModel } = getGoodBuddyConfig();
-    return this.context.globalState.get<string>(MODEL_STATE_KEY, chatModel);
-  }
-
-  /** Sends available models to the webview, falling back to the configured model on failure. */
-  private async sendModelList(): Promise<void> {
-    this.postProviderStatus("checking");
-    try {
-      const models = await this.provider.listModels();
-      this.view?.webview.postMessage({
-        type: "vsc:models",
-        models,
-        selected: this.getSelectedModel(),
-      });
-      const missingModels = findMissingModels(
-        models.map(({ model }) => model),
-        [this.getSelectedModel(), getGoodBuddyConfig().completionModel],
-      );
-      this.postProviderStatus(
-        missingModels.length ? "models-missing" : "ready",
-        missingModels,
-      );
-    } catch (err) {
-      this.output.appendLine(`Good Buddy chat: failed to list models: ${err}`);
-      this.view?.webview.postMessage({
-        type: "vsc:models",
-        models: [],
-        selected: this.getSelectedModel(),
-      });
-      this.postProviderStatus("unavailable");
-    }
-  }
-
-  private postProviderStatus(
-    status: "checking" | "unavailable" | "models-missing" | "ready",
-    missingModels: string[] = [],
-  ): void {
-    const webview = this.view?.webview;
-    if (!webview) return;
-
-    webview.postMessage({
-      type: "vsc:providerStatus",
-      status,
-      endpoint: getGoodBuddyConfig().endpoint,
-      chatModel:  getGoodBuddyConfig().chatModel,
-      completionModel: getGoodBuddyConfig().completionModel,
-      missingModels,
-      artworkUri: this.resources
-        .getIcon("provider-offline")
-        .asWebUri(webview)
-        .toString(),
-    });
-  }
-
-  private async modelDetails(model: string): Promise<ProviderModel | null> {
-    try {
-      const models = await this.provider.listModels();
-      return models.find((m) => m.model === model) ?? null;
-    } catch (err) {
-      this.output.appendLine(`Good Buddy chat: failed to list models: ${err}`);
-    }
-    return null;
+    const messageSubscription = router.register();
+    webviewView.onDidDispose(() => messageSubscription.dispose());
   }
 
   /** Sends chat history to the webview, rendering assistant messages as HTML. */
   private postHistory(thinking = false) {
-    const messages = this.history.map(
+    const messages = this.session.history.map(
       ({ role, content, displayContent, suggestions }, historyIndex) => ({
         role,
         content: marked.parse(displayContent ?? content),
@@ -308,7 +226,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     try {
       this.view?.webview.postMessage({
         type: "vsc:chatList",
-        chats: await this.chatStorage.list(),
+        chats: await this.session.list(),
       });
     } catch (err) {
       this.output.appendLine(
@@ -318,72 +236,26 @@ export class ChatFeature implements vscode.WebviewViewProvider {
   }
 
   private async saveCurrentChat(): Promise<void> {
-    if (!this.currentChatId || !this.currentChatCreatedAt) return;
-    await this.persistChat(
-      this.currentChatId,
-      this.currentChatCreatedAt,
-      this.history,
-      this.getSelectedModel(),
-    );
-  }
-
-  private async persistChat(
-    id: string,
-    createdAt: string,
-    messages: ChatMessage[],
-    model: string,
-    title?: string,
-  ): Promise<void> {
-    if (this.deletedChatIds.has(id) || messages.length === 0) return;
-
-    const firstUserMessage = messages.find(({ role }) => role === "user");
-    const rawTitle =
-      title ??
-      this.currentChatTitle ??
-      firstUserMessage?.displayContent ??
-      firstUserMessage?.content ??
-      "New chat";
-    const chatTitle =
-      rawTitle.split("\n", 1)[0].trim().slice(0, 80) || "New chat";
-    const chat: StoredChat = {
-      id,
-      title: chatTitle,
-      createdAt,
-      updatedAt: new Date().toISOString(),
-      model,
-      messages: messages.map((message) => ({ ...message })),
-    };
-
-    try {
-      await this.chatStorage.save(chat);
-      await this.postChatList();
-    } catch (err) {
-      this.output.appendLine(`Good Buddy chat: failed to save chat: ${err}`);
-    }
+    await this.session.saveCurrent();
   }
 
   private async resumeChat(id: string): Promise<void> {
-    const chat = await this.chatStorage.get(id);
+    const chat = await this.session.get(id);
     if (!chat) return;
 
     this.activeController?.abort();
     this.writeApprovals.rejectAll();
     this.commandApprovals.rejectAll();
-    this.deletedChatIds.delete(chat.id);
-    this.currentChatId = chat.id;
-    this.currentChatCreatedAt = chat.createdAt;
-    this.currentChatTitle = chat.title;
-    this.history = chat.messages;
-    this.attachments.clear();
-    await this.context.globalState.update(MODEL_STATE_KEY, chat.model);
-    await this.sendModelList();
-    this.postAttachments();
+    this.session.setCurrent(chat);
+    this.viewState.attachments.clear();
+    await this.viewState.selectModel(chat.model);
+    this.viewState.postAttachments();
     await this.postHistory();
     await this.postChatList();
   }
 
   private async confirmDeleteChat(id: string): Promise<void> {
-    const chat = await this.chatStorage.get(id);
+    const chat = await this.session.get(id);
     if (!chat) {
       await this.postChatList();
       return;
@@ -400,52 +272,28 @@ export class ChatFeature implements vscode.WebviewViewProvider {
   }
 
   private async deleteChat(id: string): Promise<void> {
-    this.deletedChatIds.add(id);
-    try {
-      await this.chatStorage.delete(id);
-    } catch (err) {
-      this.deletedChatIds.delete(id);
-      this.output.appendLine(`Good Buddy chat: failed to delete chat: ${err}`);
-      void vscode.window.showErrorMessage(
-        `Good Buddy could not delete the saved chat: ${err}`,
-      );
-      return;
-    }
+    if (!(await this.session.delete(id))) return;
 
-    if (id === this.currentChatId) {
+    if (id === this.session.currentId) {
       this.activeController?.abort();
       this.writeApprovals.rejectAll();
       this.commandApprovals.rejectAll();
-      this.currentChatId = undefined;
-      this.currentChatCreatedAt = undefined;
-      this.currentChatTitle = undefined;
-      this.history = [];
-      this.postAttachments();
+      this.session.clear();
+      this.viewState.postAttachments();
       await this.postHistory();
     }
 
     await this.postChatList();
   }
 
-  private ensureCurrentChat(): { id: string; createdAt: string } {
-    if (!this.currentChatId || !this.currentChatCreatedAt) {
-      this.currentChatId = randomUUID();
-      this.currentChatCreatedAt = new Date().toISOString();
-    }
-    return {
-      id: this.currentChatId,
-      createdAt: this.currentChatCreatedAt,
-    };
-  }
-
   private async handleRetry(assistantIndex: number): Promise<void> {
     if (this.activeController) return;
 
-    const userIndex = findRetryUserIndex(this.history, assistantIndex);
+    const userIndex = findRetryUserIndex(this.session.history, assistantIndex);
     if (userIndex === undefined) return;
 
-    const userMessage = this.history[userIndex];
-    this.history = this.history.slice(0, userIndex);
+    const userMessage = this.session.history[userIndex];
+    this.session.history = this.session.history.slice(0, userIndex);
     this.postHistory(true);
     await this.handleSend(userMessage.content, userMessage);
   }
@@ -459,7 +307,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     if (
       (!replayMessage &&
         !userMessage.trim() &&
-        this.attachments.all.length === 0) ||
+        this.viewState.attachments.all.length === 0) ||
       !this.view
     ) {
       return;
@@ -470,20 +318,20 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     this.writeApprovals.rejectAll(
       "Write cancelled because a new chat request was sent.",
     );
-    const modelName = this.getSelectedModel();
-    const selectedModel = await this.modelDetails(modelName);
+    const modelName = this.viewState.getSelectedModel();
+    const selectedModel = await this.viewState.modelDetails(modelName);
     const activeDocument = replayMessage
       ? undefined
-      : this.attachments.activeDocumentAttachment();
+      : this.viewState.attachments.activeDocumentAttachment();
     const attachmentBlock = replayMessage
       ? ""
-      : this.attachments.formatForPrompt(activeDocument);
+      : this.viewState.attachments.formatForPrompt(activeDocument);
     const userContent =
       replayMessage?.content ?? `${userMessage}${attachmentBlock}`.trim();
     const attachmentLabel = replayMessage
       ? ""
-      : this.attachments.all.length
-        ? `\n\n>Attached: ${this.attachments.names(activeDocument).join(", ")}`
+      : this.viewState.attachments.all.length
+        ? `\n\n>Attached: ${this.viewState.attachments.names(activeDocument).join(", ")}`
         : activeDocument
           ? `\n\n>Open file: ${activeDocument.name}`
           : "";
@@ -491,11 +339,11 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       replayMessage?.displayContent ??
       `${userMessage}${attachmentLabel}`.trim();
     if (!replayMessage) {
-      this.attachments.clear();
-      this.postAttachments();
+      this.viewState.attachments.clear();
+      this.viewState.postAttachments();
     }
-    const conversation = this.history;
-    const { id, createdAt } = this.ensureCurrentChat();
+    const conversation = this.session.history;
+    const { id, createdAt } = this.session.ensureCurrent();
     conversation.push({
       role: "user",
       content: userContent,
@@ -514,7 +362,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
 
     let assistantText = "";
     try {
-      if (controller.signal.aborted || this.currentChatId !== id) return;
+      if (controller.signal.aborted || this.session.currentId !== id) return;
 
       // Run the agent to generate the assistant's response.
       const result = await this.agent.run(
@@ -523,14 +371,14 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         controller.signal,
       );
       assistantText = result.response;
-      const chatTitle = result.title ?? this.currentChatTitle;
-      if (this.currentChatId === id && result.title) {
-        this.currentChatTitle = result.title;
+      const chatTitle = result.title ?? this.session.currentTitle;
+      if (this.session.currentId === id && result.title) {
+        this.session.currentTitle = result.title;
       }
-      if (controller.signal.aborted || this.currentChatId !== id) {
+      if (controller.signal.aborted || this.session.currentId !== id) {
         if (assistantText) {
           conversation.push({ role: "assistant", content: assistantText });
-          await this.persistChat(
+          await this.session.persist(
             id,
             createdAt,
             conversation,
@@ -563,25 +411,25 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         type: "vsc:assistantDone",
         suggestions: result.suggestions,
       });
-      void this.persistChat(id, createdAt, conversation, modelName, chatTitle);
+      void this.session.persist(id, createdAt, conversation, modelName, chatTitle);
     } catch (err) {
       // If an error occurs and the request was not aborted, notify the webview of the error.
       if (!controller.signal.aborted) {
-        if (this.currentChatId === id) {
+        if (this.session.currentId === id) {
           this.view?.webview.postMessage({
             type: "vsc:assistantError",
             text: formatError(err),
           });
-          await this.persistChat(id, createdAt, conversation, modelName);
+          await this.session.persist(id, createdAt, conversation, modelName);
         }
       } else {
         // If the request was aborted, but some assistant text was generated, push it to the history.
         if (assistantText) {
           conversation.push({ role: "assistant", content: assistantText });
         }
-        if (this.currentChatId === id) {
+        if (this.session.currentId === id) {
           if (this.activeController === controller) {
-            await this.persistChat(id, createdAt, conversation, modelName);
+            await this.session.persist(id, createdAt, conversation, modelName);
           }
           this.view?.webview.postMessage({ type: "vsc:assistantDone" });
         }
@@ -590,22 +438,6 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       if (this.activeController === controller)
         this.activeController = undefined;
     }
-  }
-
-  /** Opens the attachment picker and refreshes the webview's attachment list. */
-  private async pickAttachments(): Promise<void> {
-    await this.attachments.pick();
-    this.postAttachments();
-  }
-
-  /** Sends the current attachment names to the webview. */
-  private postAttachments(): void {
-    const activeDocument = this.attachments.activeDocumentAttachment();
-    this.view?.webview.postMessage({
-      type: "vsc:attachments",
-      attached: this.attachments.allBase,
-      activeDocument: activeDocument,
-    });
   }
 
   /** Renders the webview shell with a generated Content Security Policy nonce. */
@@ -624,6 +456,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       this.resources.getIcon(name).asWebUri(webview).toString();
     return shellHtml(cspSource, nonce, scriptUri, styleUri, iconUri);
   }
+
 }
 
 /**

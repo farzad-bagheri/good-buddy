@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GoodBuddyProvider } from "@/provider";
+import type { GoodBuddyProvider, ProviderModel } from "@/provider";
 import type { ToolDefinition } from "../types";
 import { ChatAgent } from "./ChatAgent";
 
@@ -54,7 +54,9 @@ describe("ChatAgent", () => {
     await expect(
       agent.run(
         [{ role: "user", content: "Review the entry point" }],
-        "qwen3:8b",
+        {
+          model: "qwen3:8b",
+        } as unknown as ProviderModel,
         AbortSignal.abort(),
       ),
     ).resolves.toEqual({
