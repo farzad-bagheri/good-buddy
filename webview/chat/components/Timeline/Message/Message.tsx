@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { IconButton } from "../../../components/IconButton";
 import type { TimelineItem } from "../../../types";
-import { sanitizeHtml } from "../../../utils";
+import { renderMermaidDiagrams, sanitizeHtml } from "../../../utils";
 import styles from "./Message.module.css";
 
 type MessageItem = Extract<TimelineItem, { kind: "message" }>;
@@ -13,7 +13,26 @@ interface MessageProps {
 }
 export function Message({ item, onRetry, retryDisabled }: MessageProps) {
   const [copied, setCopied] = useState(false);
+  const [html, setHtml] = useState(() => sanitizeHtml(item.html ?? item.text));
   const historyIndex = item.historyIndex;
+
+  useEffect(() => {
+    let cancelled = false;
+    const markdown = item.html ?? item.text;
+
+    (async () => {
+      try {
+        const renderedHtml = await renderMermaidDiagrams(markdown);
+        if (!cancelled) setHtml(renderedHtml);
+      } catch (error: unknown) {
+        console.error("Failed to render Mermaid diagrams.", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [item.html, item.text]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(item.text);
@@ -26,7 +45,7 @@ export function Message({ item, onRetry, retryDisabled }: MessageProps) {
       <div
         className="markdown-content"
         dangerouslySetInnerHTML={{
-          __html: sanitizeHtml(item.html ?? item.text),
+          __html: html,
         }}
       />
 

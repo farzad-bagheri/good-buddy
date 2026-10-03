@@ -2,8 +2,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: 900px;
-  margin: -8px auto 16px;
   color: var(--vscode-descriptionForeground);
   font-size: 0.9em;
 }

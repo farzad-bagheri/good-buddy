@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { ProviderModel } from "@/provider";
 import type { ToolDefinition } from "./types";
 import {
   assistantResponseFormat,
+  agentInstructions,
   findMissingModels,
   findRetryUserIndex,
   parseAssistantEnvelope,
@@ -16,6 +18,27 @@ const tools: ToolDefinition[] = [
 ];
 
 describe("assistant response envelope", () => {
+  it("tells the assistant that the chat UI renders Mermaid diagrams", () => {
+    const model: ProviderModel = {
+      caption: "Qwen",
+      name: "qwen3:8b",
+      model: "qwen3:8b",
+      details: {
+        format: "gguf",
+        family: "qwen",
+        parameter_size: "8B",
+        quantization_level: "Q4",
+        context_length: 8192,
+        embedding_length: 4096,
+      },
+      capabilities: ["tools"],
+    };
+
+    expect(agentInstructions(model, "", [], false).content).toContain(
+      "The chat UI renders Mermaid diagrams",
+    );
+  });
+
   it("preserves Markdown and a suggested title in final responses", () => {
     expect(
       parseAssistantEnvelope(
