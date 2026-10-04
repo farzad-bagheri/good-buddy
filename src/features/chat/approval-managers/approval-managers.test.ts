@@ -78,6 +78,39 @@ describe("approval managers", () => {
     expect(complete).toHaveBeenCalledWith("1", "Wrote notes.txt.");
   });
 
+  it("accepts contents as a fallback for the write_file content argument", async () => {
+    const applyWrite = vi.fn().mockResolvedValue("Wrote pom.xml.");
+    const propose = vi.fn();
+    const manager = new WriteApprovalManager(
+      {
+        currentContent: vi.fn().mockResolvedValue(""),
+        proposeWrite: vi.fn().mockResolvedValue({
+          path: "pom.xml",
+          diff: "diff",
+        }),
+        applyWrite,
+      } as unknown as WorkspaceTools,
+      { propose, complete: vi.fn() },
+    );
+    const pending = manager.executeOrPropose({
+      tool: "write_file",
+      autoApprove: false,
+      arguments: { path: "pom.xml", contents: "<project/>" },
+    });
+
+    await vi.waitFor(() => expect(propose).toHaveBeenCalledOnce());
+    expect(propose).toHaveBeenCalledWith(
+      "1",
+      "pom.xml",
+      "diff",
+      "",
+      "<project/>",
+    );
+    await manager.review("1", true);
+    await expect(pending).resolves.toBe("Wrote pom.xml.");
+    expect(applyWrite).toHaveBeenCalledWith("pom.xml", "", "<project/>");
+  });
+
   it("reports pending writes cancelled when the active turn is abandoned", async () => {
     const complete = vi.fn();
     const propose = vi.fn();

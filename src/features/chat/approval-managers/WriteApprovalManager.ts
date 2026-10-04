@@ -70,7 +70,7 @@ export class WriteApprovalManager {
       edit?.before ?? (await this.workspaceTools.currentContent(path));
 
     // Determine the content of the file after the write operation.
-    const content = edit?.after ?? toolArgument(toolCall, "content");
+    const content = edit?.after ?? this.writeContent(toolCall);
 
     // If the tool call is auto-approved, apply the write immediately. Otherwise, propose it for user approval.
     if (toolCall.autoApprove) {
@@ -132,5 +132,16 @@ export class WriteApprovalManager {
       this.events.complete(id, reason);
     }
     this.pending.clear();
+  }
+
+  private writeContent(toolCall: ToolCall): string {
+    const value =
+      toolCall.arguments.content === undefined
+        ? toolCall.arguments.contents
+        : toolCall.arguments.content;
+    if (typeof value !== "string" || !value) {
+      return toolArgument(toolCall, "content");
+    }
+    return value;
   }
 }

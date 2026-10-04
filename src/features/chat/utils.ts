@@ -116,12 +116,16 @@ export function parseAssistantEnvelope(
   response: string,
   tools: readonly ToolDefinition[],
 ): AssistantEnvelope {
+  let sawEnvelope = false;
   for (const json of jsonCandidates(response)) {
     try {
       const candidate: unknown = JSON.parse(json);
       if (!candidate || typeof candidate !== "object") continue;
 
       const value = candidate as Record<string, unknown>;
+      if (value.type === "final" || value.type === "tool_call") {
+        sawEnvelope = true;
+      }
       const title =
         typeof value.title === "string" && value.title.trim()
           ? value.title.trim().slice(0, 80)
@@ -167,7 +171,78 @@ export function parseAssistantEnvelope(
     }
   }
 
+  if (
+    sawEnvelope ||
+    /"type"\s*:\s*"(?:final|tool_call)"/.test(response)
+  ) {
+    const recovered = recoverFinalResponse(response);
+    if (recovered?.complete) {
+      return { type: "final", response: recovered.text };
+    }
+    return {
+      type: "final",
+      response:
+        "The model returned malformed or incomplete structured output. Please try again.",
+    };
+  }
+
   return { type: "final", response: response.trim() };
+}
+
+function recoverFinalResponse(
+  response: string,
+): { text: string; complete: boolean } | undefined {
+  if (!/"type"\s*:\s*"final"/.test(response)) return undefined;
+  const match = /"response"\s*:\s*"/.exec(response);
+  if (!match) return undefined;
+
+  let text = "";
+  for (let index = match.index + match[0].length; index < response.length; index++) {
+    const character = response[index];
+    if (character === "\\") {
+      const escaped = response[++index];
+      if (escaped === undefined) return { text, complete: false };
+      const escapes: Record<string, string> = {
+        '"': '"',
+        "\\": "\\",
+        "/": "/",
+        b: "\b",
+        f: "\f",
+        n: "\n",
+        r: "\r",
+        t: "\t",
+      };
+      if (escaped === "u") {
+        const codePoint = response.slice(index + 1, index + 5);
+        if (!/^[\da-f]{4}$/i.test(codePoint)) return { text, complete: false };
+        text += String.fromCharCode(Number.parseInt(codePoint, 16));
+        index += 4;
+      } else if (escaped in escapes) {
+        text += escapes[escaped];
+      } else {
+        return { text, complete: false };
+      }
+      continue;
+    }
+
+    if (character === '"' && isJsonFieldTerminator(response, index + 1)) {
+      return { text, complete: true };
+    }
+    text += character;
+  }
+
+  return { text, complete: false };
+}
+
+function isJsonFieldTerminator(value: string, start: number): boolean {
+  let index = start;
+  while (/\s/.test(value[index] ?? "")) index++;
+  if (value[index] === "}") return true;
+  if (value[index] !== ",") return false;
+
+  index++;
+  while (/\s/.test(value[index] ?? "")) index++;
+  return /^"[^"]+"\s*:/.test(value.slice(index));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

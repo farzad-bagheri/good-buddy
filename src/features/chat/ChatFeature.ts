@@ -77,6 +77,17 @@ export class ChatFeature implements vscode.WebviewViewProvider {
             );
           },
         );
+        void vscode.window
+          .showInformationMessage(
+            `Review proposed change: ${path}`,
+            "Approve",
+            "Reject",
+          )
+          .then((choice) => {
+            if (choice) {
+              return this.writeApprovals.review(id, choice === "Approve");
+            }
+          });
       },
       complete: (id, result) => {
         this.view?.webview.postMessage({

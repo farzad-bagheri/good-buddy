@@ -59,7 +59,7 @@ describe("assistant response envelope", () => {
     ).toEqual({
       type: "final",
       response:
-        '{"type":"tool_call","tool":"unknown","autoApprove":false,"arguments":{}}',
+        "The model returned malformed or incomplete structured output. Please try again.",
     });
   });
 
@@ -67,6 +67,27 @@ describe("assistant response envelope", () => {
     expect(parseAssistantEnvelope("A plain answer", tools)).toEqual({
       type: "final",
       response: "A plain answer",
+    });
+  });
+
+  it("recovers a final answer when the model leaves quotes unescaped", () => {
+    const malformed =
+      '{"type":"final","response":"Spring says: "Hey, inject the property here."","tool":null}';
+
+    expect(parseAssistantEnvelope(malformed, tools)).toEqual({
+      type: "final",
+      response: 'Spring says: "Hey, inject the property here."',
+    });
+  });
+
+  it("does not expose a truncated structured response", () => {
+    const truncated =
+      '{"type":"final","response":"A long answer ends before the envelope';
+
+    expect(parseAssistantEnvelope(truncated, tools)).toEqual({
+      type: "final",
+      response:
+        "The model returned malformed or incomplete structured output. Please try again.",
     });
   });
 

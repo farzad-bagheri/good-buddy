@@ -110,7 +110,8 @@ export class WorkspaceTools {
       },
       {
         id: "write_file",
-        description: "Propose complete contents for a workspace file.",
+        description:
+          "Propose complete file contents. Required arguments: path (workspace-relative string) and content (string; use the exact key 'content').",
         execute: executeWrite,
       },
       {
