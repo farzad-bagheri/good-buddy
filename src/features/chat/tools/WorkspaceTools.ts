@@ -116,7 +116,8 @@ export class WorkspaceTools {
       },
       {
         id: "replace_in_file",
-        description: "Propose replacing one exact section in a workspace file.",
+        description:
+          "Propose a localized replacement in a workspace file. Required arguments: path (workspace-relative string), oldText (the exact, unique text copied from read_file), and newText (replacement text). Use only when the exact section is known and the change is small; for structural or broad changes, use write_file with the complete updated file instead.",
         execute: executeWrite,
       },
       {

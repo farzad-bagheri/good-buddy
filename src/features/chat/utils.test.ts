@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import type { ProviderModel } from "@/provider";
 import type { ToolDefinition } from "./types";
 import {
+  agentInstructions,
   assistantResponseFormat,
   findMissingModels,
   getModelSetupStatus,
@@ -104,6 +106,50 @@ describe("assistant response envelope", () => {
     expect(assistantResponseFormat(tools, true)).toMatchObject({
       properties: { title: { type: "string" } },
     });
+  });
+
+  it("guides exact localized replacements and full-file structural edits", () => {
+    const prompt = agentInstructions(
+      {
+        caption: "Test model",
+        name: "test",
+        model: "test",
+        details: {
+          format: "",
+          family: "",
+          parameter_size: "",
+          quantization_level: "",
+          context_length: 0,
+          embedding_length: 0,
+        },
+        capabilities: [],
+      } satisfies ProviderModel,
+      "Workspace root: test",
+      [
+        ...tools,
+        {
+          id: "replace_in_file",
+          description: "Replace an exact unique section",
+          execute: async () => "",
+        },
+        {
+          id: "write_file",
+          description: "Write complete file contents",
+          execute: async () => "",
+        },
+      ],
+      false,
+    ).content;
+
+    expect(prompt).toContain(
+      "Use replace_in_file only for small, localized edits",
+    );
+    expect(prompt).toContain(
+      "For structural or broad changes, read the existing file and use write_file",
+    );
+    expect(prompt).toContain(
+      "If replace_in_file fails because oldText does not match exactly once",
+    );
   });
 });
 
