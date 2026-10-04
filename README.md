@@ -1,21 +1,49 @@
-# Good Buddy
+# Good Buddy, an alternative to GitHub Copilot
 
-Good Buddy is a VS Code extension that uses local [Ollama](https://ollama.com/) or OpenAI-compatible model servers for inline code completions, a chat view, and selected-code explanations.
+**Your coding assistant, powered by the model server you choose.**
+
+Good Buddy brings AI chat, code explanations, inline completions, and hands-on
+project tools into VS Code. Use [LM Studio](https://lmstudio.ai/),
+[llama.cpp](https://github.com/ggml-org/llama.cpp)'s OpenAI-compatible server,
+[Open WebUI](https://openwebui.com/) with its OpenAI-compatible API, or
+[Ollama](https://ollama.com/). OpenAI-compatible servers share one integration,
+so you can use many local and remote endpoints without a provider-specific
+extension.
+
+Keep your code on your own infrastructure: Good Buddy sends requests to the
+server you configure and does not require a Good Buddy cloud service.
 
 ![hero](./docs/images/hero.png)
 
-## Features
+## What you can do
 
-- 💻 Inline code completions using a local Ollama or OpenAI-compatible server.
-- 🗨️ Chat view for interactive discussions and explanations.
-- 🧩 Selected-code explanations to understand complex code snippets.
+- **Chat with your project in context.** Ask questions about your codebase,
+  explore how things work, or get help planning an implementation.
+- **Make changes with the assistant.** Ask it to add a feature, update existing
+  behavior, or fix a bug. Good Buddy can inspect files, propose edits, and run
+  project commands. Review proposed file changes in a diff and approve them
+  before they are applied; commands also require confirmation.
+- **Understand code faster.** Select code and ask Good Buddy to explain it.
+- **Get inline code completions.** Receive ghost-text suggestions as you type,
+  using a model you select for completion.
+- **Work with the model server that fits your setup.** Choose Ollama or an
+  OpenAI-compatible API such as LM Studio, llama.cpp, or Open WebUI.
+- **Stay in control.** Workspace tools are scoped to the opened workspace;
+  file changes and shell commands are shown for approval.
 
 ## Usage
 
-Once installed and configured, you can:
-- Trigger inline completions by typing in the editor.
-- Open the chat view via the **Good Buddy: Open Chat** command.
-- Request explanations for selected code using the **Good Buddy: Explain Selection** command.
+Try prompts like:
+
+- “Add a settings page for changing the theme. First inspect how settings work
+  in this project.”
+- “Find where this error is handled and explain the flow.”
+- “Update the parser to support trailing commas, then run the relevant tests.”
+
+Open **Good Buddy** from the Activity Bar to chat. Use the **Models** button in
+the chat toolbar to configure your provider and select chat and completion
+models. Select code and run **Good Buddy: Explain Selected Code** for a focused
+explanation. Inline completions appear as you type when enabled.
 
 ## Contributing
 
@@ -23,11 +51,15 @@ Contributions are welcome! Please open issues or submit pull requests on the [Gi
 
 ## Installation
 
-Good Buddy defaults to the OpenAI-compatible provider, which can talk to servers such as LM Studio, llama.cpp, and Open WebUI. [Ollama](https://ollama.com/) is also supported. The extension does not require a cloud API.
+Good Buddy defaults to the OpenAI-compatible provider. Choose Ollama instead
+from the Good Buddy settings if that is your preferred server.
 
 1. Choose and start a supported model server:
    - For Ollama, [install Ollama](https://ollama.com/download) and make sure it's running (`ollama serve`, or the desktop app's background service).
-   - For an OpenAI-compatible server such as LM Studio, llama.cpp, or Open WebUI, enable its OpenAI-compatible API.
+   - For LM Studio, start its local server and enable its OpenAI-compatible API.
+   - For llama.cpp, run its server with the OpenAI-compatible API enabled.
+   - For Open WebUI, configure its OpenAI-compatible connection to a model
+     server. The server's URL and API key depend on your setup.
 2. Make at least one model available to the server. For Ollama, pull models such as:
 
    ```sh
@@ -38,20 +70,32 @@ Good Buddy defaults to the OpenAI-compatible provider, which can talk to servers
 3. Install/enable the Good Buddy extension in VS Code, then open **Settings** and configure it under **Good Buddy** (search `goodBuddy`):
    - `goodBuddy.provider` — defaults to `openai-compatible`; choose `ollama` to use Ollama instead.
    - `goodBuddy.endpoint` — Ollama server URL. Defaults to `http://localhost:11434`.
-   - `goodBuddy.openAICompatibleEndpoint` — OpenAI-compatible API base URL, including `/v1` when required. Defaults to LM Studio's `http://localhost:1234/v1`.
+   - `goodBuddy.openAICompatibleEndpoint` — OpenAI-compatible API base URL,
+     including `/v1` when required. Defaults to LM Studio's
+     `http://localhost:1234/v1`.
    - `goodBuddy.openAICompatibleApiKey` — optional authentication key for servers that require API-key authentication.
-   - Choose the chat and inline-completion models from the models reported by the configured server in the chat setup notice. Choices are saved independently for each provider and endpoint.
+   - Use the **Models** button in the chat toolbar to check the server and
+     choose chat and inline-completion models. Choices are saved independently
+     for each provider and endpoint.
    - `goodBuddy.inlineCompletionsEnabled` — toggle ghost-text completions on/off (also available via the **Good Buddy: Toggle Inline Completions** command).
    - `goodBuddy.maxContextLines` — how many lines of surrounding code to send with each completion request.
    - `goodBuddy.completionTimeoutMs` — how long to wait for a completion before giving up; raise this if you use a larger model or have slower hardware.
 
-   When changing provider or endpoint, Good Buddy loads that connection's saved model selections. If either choice is missing or unavailable, the setup notice lets you choose a model from the server's current list. `goodBuddy.chatModel` and `goodBuddy.completionModel` are legacy Ollama fallback settings; new setups do not preselect Ollama models.
+   When changing provider or endpoint, Good Buddy loads that connection's
+   saved model selections. If either choice is missing or unavailable, choose
+   a model from the server's current list in the Models dialog.
 
-For an OpenAI-compatible server, choose model IDs returned by its `/models` endpoint in the setup notice. The server must support `/chat/completions`; chat uses JSON response formats for the assistant's structured tool protocol. Inline completion requests are sent as user prompts to the chat-completions endpoint, so model behavior can differ from Ollama's native fill-in-the-middle endpoint.
+For an OpenAI-compatible server, choose model IDs returned by its `/models`
+endpoint in the Models dialog. The server must support `/chat/completions`;
+chat uses JSON response formats for the assistant's structured tool protocol.
+Inline completion requests are sent as user prompts to the chat-completions
+endpoint, so model behavior can differ from Ollama's native fill-in-the-middle
+endpoint. Ensure your selected model server supports the API features Good
+Buddy uses, as compatibility can vary.
 
 ### Ollama model suggestions
 
-If using Ollama, pick models sized for your hardware; smaller models respond faster and are a better fit for inline completions where latency matters. Select the downloaded model IDs in the chat setup notice.
+If using Ollama, pick models sized for your hardware; smaller models respond faster and are a better fit for inline completions where latency matters. Select downloaded model IDs in the Models dialog.
 
 **Completion** — code-focused models are recommended:
 
@@ -61,7 +105,7 @@ If using Ollama, pick models sized for your hardware; smaller models respond fas
 
 **Chat / explanations**:
 
-- [`qwen3:8b`](https://ollama.com/library/qwen3) — matches the extension's default, good general-purpose reasoning.
+- [`qwen3:8b`](https://ollama.com/library/qwen3) — a good general-purpose reasoning option.
 - [`llama3.1:8b`](https://ollama.com/library/llama3.1) — widely used general-purpose alternative.
 - [`deepseek-r1:7b`](https://ollama.com/library/deepseek-r1) — stronger reasoning if you don't mind slower responses.
 
@@ -113,6 +157,21 @@ The chat view reports the response body when a provider returns malformed JSON r
 
 ## Workspace tools
 
-Ask the chat to inspect the project, read a file, make a change, or run a command. Every request begins with the opened workspace path and a compact project tree, so the model has project context before it chooses a tool. It can list the project tree and read workspace files directly. For small changes it uses an exact `replace_in_file` edit; full-file writes are also supported. Both appear as an in-chat unified diff with **Approve** and **Reject** controls, and approval checks that the file has not changed since the proposal was generated. Shell commands retain a VS Code confirmation dialog. Tool paths are limited to the opened workspace, command output is capped, and an agent request can use at most five tools.
+Ask the chat to inspect the project, read files, implement a feature, fix a bug,
+or run a command. Good Buddy provides workspace tools to:
+
+- Browse project files and search filenames or file contents.
+- Read files and inspect VS Code diagnostics or symbol references.
+- Propose exact-section edits or complete file contents. Review each unified
+  diff and choose **Approve** or **Reject**; approval verifies the file has not
+  changed since the proposal was created.
+- Run project commands after confirmation, with output shown in chat.
+- Move a selected workspace file to the OS trash only after its own explicit
+  confirmation.
+
+Each request starts with the opened workspace path and a compact project tree.
+Tool paths are scoped to the workspace, command output is capped, and each
+agent request is limited to five tool calls. Good Buddy proposes and assists
+with changes; you remain in control of applying edits and running commands.
 
 Use **Attach** in the chat footer to add up to five text files (80 KB each) to the next message. Selected filenames appear beneath the composer. Attachments are sent only with that next message and are then cleared; binary and oversized files are not attached.
