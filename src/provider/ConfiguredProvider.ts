@@ -4,6 +4,7 @@ import { OllamaProvider } from "./ollama";
 import {
   GoodBuddyProvider,
   type ChatOptions,
+  type ChatResponse,
   type GenerateOptions,
   type ProviderModel,
 } from "./index";
@@ -18,6 +19,13 @@ export class ConfiguredProvider implements GoodBuddyProvider {
 
   async chat(options: ChatOptions, signal?: AbortSignal): Promise<string> {
     return this.createProvider().chat(options, signal);
+  }
+
+  async chatWithMetadata(
+    options: ChatOptions,
+    signal?: AbortSignal,
+  ): Promise<ChatResponse> {
+    return this.createProvider().chatWithMetadata(options, signal);
   }
 
   async chatStream(

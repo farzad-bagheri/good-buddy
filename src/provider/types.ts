@@ -49,3 +49,8 @@ export interface ChatOptions {
   think?: boolean;
   format?: "json" | Record<string, unknown>;
 }
+
+export interface ChatResponse {
+  content: string;
+  finishReason?: string;
+}

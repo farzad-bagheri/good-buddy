@@ -61,4 +61,25 @@ describe("OllamaProvider", () => {
 
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).format).toEqual(format);
   });
+
+  it("returns Ollama's finish reason with the chat content", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            message: { content: "partial" },
+            done_reason: "length",
+          }),
+      }),
+    );
+
+    await expect(
+      new OllamaProvider().chatWithMetadata({
+        model: "qwen3:8b",
+        messages: [{ role: "user", content: "Say hello" }],
+      }),
+    ).resolves.toEqual({ content: "partial", finishReason: "length" });
+  });
 });

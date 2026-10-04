@@ -3,6 +3,7 @@ import { Request } from "@/gateway";
 import {
   GoodBuddyProvider,
   ProviderModel,
+  type ChatResponse as ChatResponseMetadata,
   type ChatOptions,
   type GenerateOptions,
 } from "@/provider";
@@ -60,6 +61,14 @@ export class OllamaProvider implements GoodBuddyProvider {
    * @returns The chat response text.
    */
   async chat(options: ChatOptions, signal?: AbortSignal): Promise<string> {
+    const result = await this.chatWithMetadata(options, signal);
+    return result.content;
+  }
+
+  async chatWithMetadata(
+    options: ChatOptions,
+    signal?: AbortSignal,
+  ): Promise<ChatResponseMetadata> {
     const body = JSON.stringify({
       ...options,
       stream: false,
@@ -68,7 +77,10 @@ export class OllamaProvider implements GoodBuddyProvider {
     const response = await this.request.post("/api/chat", body, signal);
     const responseText = await response.text();
     const json = parseJsonResponse<ChatResponse>(responseText, "/api/chat");
-    return stripThinking(json.message?.content ?? "");
+    return {
+      content: stripThinking(json.message?.content ?? ""),
+      finishReason: json.done_reason,
+    };
   }
 
   /**

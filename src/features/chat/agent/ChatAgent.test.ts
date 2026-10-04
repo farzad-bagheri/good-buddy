@@ -1,7 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GoodBuddyProvider, ProviderModel } from "@/provider";
+import type {
+  ChatOptions,
+  GoodBuddyProvider,
+  ProviderModel,
+} from "@/provider";
 import type { ToolDefinition } from "../types";
 import { ChatAgent } from "./ChatAgent";
+
+function createProvider(chat: GoodBuddyProvider["chat"]) {
+  return {
+    chat,
+    chatWithMetadata: async (options: ChatOptions, signal?: AbortSignal) => ({
+      content: await chat(options, signal),
+    }),
+    generate: vi.fn(),
+    chatStream: vi.fn(),
+    listModels: vi.fn(),
+  };
+}
 
 describe("ChatAgent", () => {
   it("executes structured tool calls and returns the final Markdown and title", async () => {
@@ -25,7 +41,7 @@ describe("ChatAgent", () => {
       .fn()
       .mockResolvedValueOnce(toolResponse)
       .mockResolvedValueOnce(finalResponse);
-    const provider = { chat } as unknown as GoodBuddyProvider;
+    const provider = createProvider(chat as GoodBuddyProvider["chat"]);
     const tool: ToolDefinition = {
       id: "read_file",
       description: "Read a workspace file",
@@ -84,13 +100,13 @@ describe("ChatAgent", () => {
       tool: null,
       autoApprove: false,
       arguments: {},
-      title: null,
+      title: "Answer me",
     });
     const chat = vi
       .fn()
       .mockResolvedValueOnce("Here is my answer, outside the schema.")
       .mockResolvedValueOnce(finalResponse);
-    const provider = { chat } as unknown as GoodBuddyProvider;
+    const provider = createProvider(chat as GoodBuddyProvider["chat"]);
     const tools = {
       list: () => [],
       execute: vi.fn(),
@@ -120,15 +136,69 @@ describe("ChatAgent", () => {
       {
         role: "user",
         content:
-          "Your previous response did not follow the required JSON response format: Response must be one valid JSON object. Return one corrected JSON object only.",
+          "Your previous response could not be used: Response must be one valid JSON object. Follow the required response schema and return one complete JSON object only.",
       },
     ]);
+  });
+
+  it("retries provider-reported output-limit responses with a shorter answer request", async () => {
+    const finalResponse = JSON.stringify({
+      type: "final",
+      response: "A complete concise answer.",
+      tool: null,
+      autoApprove: false,
+      arguments: {},
+      title: "Answer me",
+    });
+    const chatWithMetadata = vi
+      .fn<GoodBuddyProvider["chatWithMetadata"]>()
+      .mockResolvedValueOnce({
+        content: '{"type":"final","response":"Partial answer',
+        finishReason: "length",
+      })
+      .mockResolvedValueOnce({
+        content: finalResponse,
+        finishReason: "stop",
+      });
+    const provider = {
+      ...createProvider(async () => ""),
+      chatWithMetadata:
+        chatWithMetadata as GoodBuddyProvider["chatWithMetadata"],
+    };
+    const agent = new ChatAgent(
+      provider,
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [], execute: vi.fn() } as never,
+      {
+        onToolStatus: vi.fn(),
+        onModelStatus: vi.fn(),
+      },
+    );
+
+    await expect(
+      agent.run(
+        [{ role: "user", content: "Answer me" }],
+        { model: "qwen3:8b" } as unknown as ProviderModel,
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({ response: "A complete concise answer." });
+
+    expect(chatWithMetadata).toHaveBeenCalledTimes(2);
+    expect(
+      chatWithMetadata.mock.calls[1][0].messages.at(-1)?.content,
+    ).toContain(
+      "The provider reached its output limit. Return a shorter, complete response.",
+    );
+    expect(chatWithMetadata.mock.calls[1][0].format).toMatchObject({
+      properties: { title: { type: "string" } },
+    });
   });
 
   it("stops after the bounded number of invalid response retries", async () => {
     const chat = vi.fn().mockResolvedValue("not JSON");
     const agent = new ChatAgent(
-      { chat } as unknown as GoodBuddyProvider,
+      createProvider(chat as GoodBuddyProvider["chat"]),
       { appendLine: vi.fn() },
       { projectContext: vi.fn().mockResolvedValue("project context") } as never,
       { list: () => [], execute: vi.fn() } as never,

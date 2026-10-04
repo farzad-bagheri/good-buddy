@@ -6,6 +6,7 @@ export interface GenerateResponse {
 
 export interface ChatResponse {
   message?: { content?: string };
+  done_reason?: string;
 }
 
 export interface ListModelsResponse {

@@ -1,4 +1,9 @@
-import { ChatOptions, GenerateOptions, ProviderModel } from "./types";
+import {
+  ChatOptions,
+  ChatResponse,
+  GenerateOptions,
+  ProviderModel,
+} from "./types";
 
 /**
  * Abstract base class for Good Buddy providers, defining the interface for text generation, chat, and model listing.
@@ -22,6 +27,17 @@ export abstract class GoodBuddyProvider {
    * @returns The chat response text.
    */
   abstract chat(options: ChatOptions, signal?: AbortSignal): Promise<string>;
+
+  /**
+   * Sends a chat request and returns provider completion metadata.
+   * @param options The options for the chat request.
+   * @param signal An optional AbortSignal to cancel the request.
+   * @returns The response content and provider finish reason, when available.
+   */
+  abstract chatWithMetadata(
+    options: ChatOptions,
+    signal?: AbortSignal,
+  ): Promise<ChatResponse>;
 
   /**
    * Streams chat tokens as they arrive.

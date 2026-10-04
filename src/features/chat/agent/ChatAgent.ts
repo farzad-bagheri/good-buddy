@@ -54,14 +54,15 @@ export class ChatAgent {
     ];
     let title: string | undefined;
     let responseRetries = 0;
+    let titleRequired = requestTitle;
 
     for (let step = 0; step < MAX_CHAT_STEPS; step++) {
-      const titleRequired = requestTitle && step === 0;
       // Notify the webview that the model is processing a request.
       this.events.onModelStatus(true, signal);
       let response: string;
+      let finishReason: string | undefined;
       try {
-        response = await this.provider.chat(
+        const result = await this.provider.chatWithMetadata(
           {
             model: providerModel.model,
             messages,
@@ -69,6 +70,8 @@ export class ChatAgent {
           },
           signal,
         );
+        response = result.content;
+        finishReason = result.finishReason;
       } finally {
         this.events.onModelStatus(false, signal);
       }
@@ -76,16 +79,25 @@ export class ChatAgent {
       // Log the agent's response for debugging purposes.
       this.output.appendLine(`[agent response] ${response.slice(0, 2_000)}`); // Log the first 2,000 characters of the agent's response
 
-      let envelope: AssistantEnvelope;
-      try {
-        envelope = parseAssistantEnvelope(
-          response,
-          availableTools,
-          titleRequired,
-        );
-      } catch (error) {
-        const reason = formatError(error);
-        this.output.appendLine(`[invalid assistant response] ${reason}`);
+      let envelope: AssistantEnvelope | undefined;
+      let invalidReason: string | undefined;
+      if (finishReason === "length") {
+        invalidReason =
+          "The provider reached its output limit. Return a shorter, complete response.";
+      } else {
+        try {
+          envelope = parseAssistantEnvelope(
+            response,
+            availableTools,
+            titleRequired,
+          );
+        } catch (error) {
+          invalidReason = formatError(error);
+        }
+      }
+
+      if (invalidReason) {
+        this.output.appendLine(`[invalid assistant response] ${invalidReason}`);
         if (responseRetries >= MAX_RESPONSE_RETRIES) {
           return {
             response:
@@ -98,12 +110,15 @@ export class ChatAgent {
           { role: "assistant", content: response },
           {
             role: "user",
-            content: `Your previous response did not follow the required JSON response format: ${reason} Return one corrected JSON object only.`,
+            content: `Your previous response could not be used: ${invalidReason} Follow the required response schema and return one complete JSON object only.`,
           },
         );
         continue;
       }
 
+      responseRetries = 0;
+      titleRequired = false;
+      if (!envelope) throw new Error("The assistant response was not parsed.");
       title ??= envelope.title;
       if (envelope.type === "final") {
         return {

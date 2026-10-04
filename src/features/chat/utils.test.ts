@@ -165,6 +165,9 @@ describe("assistant response envelope", () => {
       "Use replace_in_file only for small, localized edits",
     );
     expect(prompt).toContain(
+      "finish every sentence and list, and do not end with an unfinished introduction or colon",
+    );
+    expect(prompt).toContain(
       "For structural or broad changes, read the existing file and use write_file",
     );
     expect(prompt).toContain(

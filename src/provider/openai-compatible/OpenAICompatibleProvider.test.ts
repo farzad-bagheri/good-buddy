@@ -65,6 +65,31 @@ describe("OpenAICompatibleProvider", () => {
     );
   });
 
+  it("returns the provider finish reason with the chat content", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            choices: [
+              {
+                message: { content: "partial" },
+                finish_reason: "length",
+              },
+            ],
+          }),
+      }),
+    );
+
+    await expect(
+      new OpenAICompatibleProvider().chatWithMetadata({
+        model: "local-model",
+        messages: [{ role: "user", content: "Say hello" }],
+      }),
+    ).resolves.toEqual({ content: "partial", finishReason: "length" });
+  });
+
   it("lists model IDs in Good Buddy's provider model shape", async () => {
     vi.stubGlobal(
       "fetch",

@@ -4,6 +4,7 @@ import {
   GoodBuddyProvider,
   ProviderModel,
   type ChatOptions,
+  type ChatResponse,
   type GenerateOptions,
 } from "@/provider";
 
@@ -11,6 +12,7 @@ interface ChatCompletionResponse {
   choices?: {
     message?: { content?: string };
     delta?: { content?: string };
+    finish_reason?: string | null;
   }[];
 }
 
@@ -68,6 +70,14 @@ export class OpenAICompatibleProvider implements GoodBuddyProvider {
   }
 
   async chat(options: ChatOptions, signal?: AbortSignal): Promise<string> {
+    const result = await this.chatWithMetadata(options, signal);
+    return result.content;
+  }
+
+  async chatWithMetadata(
+    options: ChatOptions,
+    signal?: AbortSignal,
+  ): Promise<ChatResponse> {
     const body = {
       model: options.model,
       messages: options.messages.map(({ role, content }) => ({
@@ -88,7 +98,10 @@ export class OpenAICompatibleProvider implements GoodBuddyProvider {
       response,
       "chat/completions",
     );
-    return json.choices?.[0]?.message?.content ?? "";
+    return {
+      content: json.choices?.[0]?.message?.content ?? "",
+      finishReason: json.choices?.[0]?.finish_reason ?? undefined,
+    };
   }
 
   async chatStream(
