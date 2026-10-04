@@ -26,6 +26,12 @@ export function ChatToolbar({
   return (
     <div className={styles.container}>
       <div className={styles.toolbar}>
+        {" "}
+        <IconButton
+          title="Configure provider and models"
+          iconName="models-icon"
+          onClick={onOpenSetup}
+        />
         <select
           aria-label="Chat model"
           value={selectedModel}
@@ -46,11 +52,6 @@ export function ChatToolbar({
             </option>
           ))}
         </select>
-        <IconButton
-          title="Configure provider and models"
-          iconName="models-icon"
-          onClick={onOpenSetup}
-        />
         <IconButton
           title="New chat"
           iconName="new-chat-icon"
