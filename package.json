@@ -1,8 +1,19 @@
 {
   "name": "good-buddy",
-  "displayName": "Good Buddy",
-  "description": "A local-LLM powered coding assistant: inline completions and code explanations.",
-  "version": "0.0.3",
+  "displayName": "Good Buddy - Local AI Coding Assistant",
+  "description": "A local-first VS Code coding assistant powered by Ollama: chat, code explanations, and inline completions.",
+  "keywords": [
+    "local ai",
+    "local llm",
+    "ollama",
+    "ai coding assistant",
+    "code assistant",
+    "code completion",
+    "inline completions",
+    "copilot alternative",
+    "private ai"
+  ],
+  "version": "0.0.4",
   "publisher": "dabanli",
   "license": "MIT",
   "type": "module",
