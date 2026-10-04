@@ -3,18 +3,8 @@ import { CommandApprovalManager } from "./CommandApprovalManager";
 import { WriteApprovalManager } from "./WriteApprovalManager";
 import type { WorkspaceTools } from "../tools";
 import type { ToolCall } from "../types";
-import { parseToolCall } from "../utils";
 
 describe("approval managers", () => {
-  it("only accepts a literal true autoApprove flag", () => {
-    expect(
-      parseToolCall('{"tool":"run_command","autoApprove":"false"}'),
-    ).toMatchObject({ autoApprove: false });
-    expect(
-      parseToolCall('{"tool":"run_command","autoApprove":true}'),
-    ).toMatchObject({ autoApprove: true });
-  });
-
   it("executes auto-approved writes without proposing them", async () => {
     const applyWrite = vi.fn().mockResolvedValue("Wrote notes.txt.");
     const propose = vi.fn();

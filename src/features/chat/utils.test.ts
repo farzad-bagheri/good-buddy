@@ -26,8 +26,12 @@ describe("assistant response envelope", () => {
           type: "final",
           response: "## Result\n\n**Done.**",
           title: "Summarize the result",
+          tool: null,
+          autoApprove: false,
+          arguments: {},
         }),
         tools,
+        true,
       ),
     ).toEqual({
       type: "final",
@@ -44,53 +48,69 @@ describe("assistant response envelope", () => {
         tool: "read_file",
         autoApprove: false,
         arguments: { path: "src/index.ts" },
-        title: null,
+        title: "Review the entry point",
       }),
       tools,
+      true,
     );
     expect(valid).toMatchObject({
       type: "tool_call",
       tool: { tool: "read_file", arguments: { path: "src/index.ts" } },
     });
 
-    expect(
+    expect(() =>
       parseAssistantEnvelope(
-        '{"type":"tool_call","tool":"unknown","autoApprove":false,"arguments":{}}',
+        JSON.stringify({
+          type: "tool_call",
+          response: "",
+          tool: "unknown",
+          autoApprove: false,
+          arguments: {},
+          title: null,
+        }),
         tools,
       ),
-    ).toEqual({
-      type: "final",
-      response:
-        "The model returned malformed or incomplete structured output. Please try again.",
-    });
+    ).toThrow("Unknown tool 'unknown'.");
   });
 
-  it("falls back to plain text when structured output is malformed", () => {
-    expect(parseAssistantEnvelope("A plain answer", tools)).toEqual({
-      type: "final",
-      response: "A plain answer",
-    });
+  it("accepts null titles after the initial response", () => {
+    expect(
+      parseAssistantEnvelope(
+        JSON.stringify({
+          type: "final",
+          response: "Done",
+          tool: null,
+          autoApprove: false,
+          arguments: {},
+          title: null,
+        }),
+        tools,
+      ),
+    ).toMatchObject({ type: "final", response: "Done", title: undefined });
   });
 
-  it("recovers a final answer when the model leaves quotes unescaped", () => {
+  it("rejects plain text rather than treating it as a final answer", () => {
+    expect(() => parseAssistantEnvelope("A plain answer", tools)).toThrow(
+      "Response must be one valid JSON object.",
+    );
+  });
+
+  it("rejects malformed JSON without attempting to recover answer text", () => {
     const malformed =
       '{"type":"final","response":"Spring says: "Hey, inject the property here."","tool":null}';
 
-    expect(parseAssistantEnvelope(malformed, tools)).toEqual({
-      type: "final",
-      response: 'Spring says: "Hey, inject the property here."',
-    });
+    expect(() => parseAssistantEnvelope(malformed, tools)).toThrow(
+      "Response must be one valid JSON object.",
+    );
   });
 
-  it("does not expose a truncated structured response", () => {
+  it("rejects truncated JSON", () => {
     const truncated =
       '{"type":"final","response":"A long answer ends before the envelope';
 
-    expect(parseAssistantEnvelope(truncated, tools)).toEqual({
-      type: "final",
-      response:
-        "The model returned malformed or incomplete structured output. Please try again.",
-    });
+    expect(() => parseAssistantEnvelope(truncated, tools)).toThrow(
+      "Response must be one valid JSON object.",
+    );
   });
 
   it("limits tool names in the Ollama response schema", () => {

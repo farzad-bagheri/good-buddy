@@ -1,5 +1,5 @@
 import { ChatMessage, GoodBuddyProvider, ProviderModel } from "@/provider";
-import { MAX_CHAT_STEPS } from "../constants";
+import { MAX_CHAT_STEPS, MAX_RESPONSE_RETRIES } from "../constants";
 import { ToolRegistry, WorkspaceTools } from "../tools";
 import { ToolCall } from "../types";
 import {
@@ -7,6 +7,7 @@ import {
   assistantResponseFormat,
   formatError,
   parseAssistantEnvelope,
+  type AssistantEnvelope,
 } from "../utils";
 
 export interface ChatAgentResult {
@@ -52,8 +53,10 @@ export class ChatAgent {
       ...history.map(({ role, content }) => ({ role, content })),
     ];
     let title: string | undefined;
+    let responseRetries = 0;
 
     for (let step = 0; step < MAX_CHAT_STEPS; step++) {
+      const titleRequired = requestTitle && step === 0;
       // Notify the webview that the model is processing a request.
       this.events.onModelStatus(true, signal);
       let response: string;
@@ -62,7 +65,7 @@ export class ChatAgent {
           {
             model: providerModel.model,
             messages,
-            format: assistantResponseFormat(availableTools, requestTitle),
+            format: assistantResponseFormat(availableTools, titleRequired),
           },
           signal,
         );
@@ -73,7 +76,34 @@ export class ChatAgent {
       // Log the agent's response for debugging purposes.
       this.output.appendLine(`[agent response] ${response.slice(0, 2_000)}`); // Log the first 2,000 characters of the agent's response
 
-      const envelope = parseAssistantEnvelope(response, availableTools);
+      let envelope: AssistantEnvelope;
+      try {
+        envelope = parseAssistantEnvelope(
+          response,
+          availableTools,
+          titleRequired,
+        );
+      } catch (error) {
+        const reason = formatError(error);
+        this.output.appendLine(`[invalid assistant response] ${reason}`);
+        if (responseRetries >= MAX_RESPONSE_RETRIES) {
+          return {
+            response:
+              "I couldn't get a valid response after asking the model to correct its format. Please try again.",
+            title,
+          };
+        }
+        responseRetries++;
+        messages.push(
+          { role: "assistant", content: response },
+          {
+            role: "user",
+            content: `Your previous response did not follow the required JSON response format: ${reason} Return one corrected JSON object only.`,
+          },
+        );
+        continue;
+      }
+
       title ??= envelope.title;
       if (envelope.type === "final") {
         return {
@@ -104,7 +134,7 @@ export class ChatAgent {
 
     // If the loop completes without returning, it means the agent reached the maximum number of tool calls.
     return {
-      response: `I stopped after ${MAX_CHAT_STEPS} tool calls. Please narrow the request and try again.`,
+      response: `I stopped after ${MAX_CHAT_STEPS} assistant steps. Please narrow the request and try again.`,
       title,
     };
   }

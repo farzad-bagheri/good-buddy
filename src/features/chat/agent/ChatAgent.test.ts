@@ -69,5 +69,85 @@ describe("ChatAgent", () => {
       arguments: { path: "src/index.ts" },
     });
     expect(chat).toHaveBeenCalledTimes(2);
+    expect(chat.mock.calls[0][0].format).toMatchObject({
+      properties: { title: { type: "string" } },
+    });
+    expect(chat.mock.calls[1][0].format).toMatchObject({
+      properties: { title: { type: ["string", "null"] } },
+    });
+  });
+
+  it("asks the model to correct invalid JSON and returns its valid retry", async () => {
+    const finalResponse = JSON.stringify({
+      type: "final",
+      response: "Recovered answer",
+      tool: null,
+      autoApprove: false,
+      arguments: {},
+      title: null,
+    });
+    const chat = vi
+      .fn()
+      .mockResolvedValueOnce("Here is my answer, outside the schema.")
+      .mockResolvedValueOnce(finalResponse);
+    const provider = { chat } as unknown as GoodBuddyProvider;
+    const tools = {
+      list: () => [],
+      execute: vi.fn(),
+    };
+    const agent = new ChatAgent(
+      provider,
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      tools as never,
+      {
+        onToolStatus: vi.fn(),
+        onModelStatus: vi.fn(),
+      },
+    );
+
+    await expect(
+      agent.run(
+        [{ role: "user", content: "Answer me" }],
+        { model: "qwen3:8b" } as unknown as ProviderModel,
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({ response: "Recovered answer" });
+
+    expect(chat).toHaveBeenCalledTimes(2);
+    expect(chat.mock.calls[1][0].messages.slice(-2)).toEqual([
+      { role: "assistant", content: "Here is my answer, outside the schema." },
+      {
+        role: "user",
+        content:
+          "Your previous response did not follow the required JSON response format: Response must be one valid JSON object. Return one corrected JSON object only.",
+      },
+    ]);
+  });
+
+  it("stops after the bounded number of invalid response retries", async () => {
+    const chat = vi.fn().mockResolvedValue("not JSON");
+    const agent = new ChatAgent(
+      { chat } as unknown as GoodBuddyProvider,
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [], execute: vi.fn() } as never,
+      {
+        onToolStatus: vi.fn(),
+        onModelStatus: vi.fn(),
+      },
+    );
+
+    await expect(
+      agent.run(
+        [{ role: "user", content: "Answer me" }],
+        { model: "qwen3:8b" } as unknown as ProviderModel,
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({
+      response:
+        "I couldn't get a valid response after asking the model to correct its format. Please try again.",
+    });
+    expect(chat).toHaveBeenCalledTimes(3);
   });
 });

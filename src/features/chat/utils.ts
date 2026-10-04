@@ -78,7 +78,7 @@ Every reply must be exactly one JSON object matching this contract, with no Mark
 {"type":"tool_call","response":"","tool":"tool_id","autoApprove":false,"arguments":{},${titleExample}}
 Use type "final" when answering the user. The response value is Markdown and should contain the complete user-facing answer. Use type "tool_call" only when a listed tool is needed. For write_file, replace_in_file, run_command, and delete_file, always set autoApprove to false. The user must approve writes and commands through their confirmation UI; delete_file always requires its own explicit modal confirmation and moves only one file to the OS trash. A chat message such as "okay" does not execute or approve a pending operation.
 ${requestTitle ? "On this first response, include a short descriptive title in title. On later responses, set title to null." : "Set title to null."}
-Only on type "final" replies, you may include a "suggestions" array with up to 7 short, specific follow-up replies the user could send next (each under 60 characters, phrased as something the user would say or as answer for your question). Omit or leave it empty when no natural follow-up exists; never suggest anything for tool_call replies.
+Only on type "final" replies, you may include a "suggestions" array with up to 2 short, specific follow-up replies the user could send next (each under 60 characters, phrased as something the user would say or as answer for your question). Omit or leave it empty when no natural follow-up exists; never suggest anything for tool_call replies.
 Available tools:
 ${toolInstructions}
 Current project context:\n${projectContext}\n\nWhen the user asks about or changes this project, inspect relevant files before answering. Do not stop after saying what you will do: request the next tool in the same response. Use replace_in_file only for small, localized edits when you have copied the exact unique oldText from read_file. For structural or broad changes, read the existing file and use write_file with its complete updated contents. If replace_in_file fails because oldText does not match exactly once, do not apologize or stop: read the file, reassess the change, and retry with the exact section or switch to write_file. The user must approve every write and command. Paths must be relative to the workspace. After a tool result, either request another tool or give the final answer. Never claim a write was applied unless its tool result explicitly starts with 'Wrote '. Approval alone is not completion; if a write is cancelled, denied, or errors, clearly say that the file was not changed.`,
@@ -115,204 +115,78 @@ export function assistantResponseFormat(
 export function parseAssistantEnvelope(
   response: string,
   tools: readonly ToolDefinition[],
+  titleRequired = false,
 ): AssistantEnvelope {
-  let sawEnvelope = false;
-  for (const json of jsonCandidates(response)) {
-    try {
-      const candidate: unknown = JSON.parse(json);
-      if (!candidate || typeof candidate !== "object") continue;
-
-      const value = candidate as Record<string, unknown>;
-      if (value.type === "final" || value.type === "tool_call") {
-        sawEnvelope = true;
-      }
-      const title =
-        typeof value.title === "string" && value.title.trim()
-          ? value.title.trim().slice(0, 80)
-          : undefined;
-
-      if (value.type === "final" && typeof value.response === "string") {
-        const suggestions = Array.isArray(value.suggestions)
-          ? value.suggestions
-              .filter(
-                (suggestion): suggestion is string =>
-                  typeof suggestion === "string" && suggestion.trim() !== "",
-              )
-              .map((suggestion) => suggestion.trim().slice(0, 80))
-              .slice(0, 2)
-          : undefined;
-        return {
-          type: "final",
-          response: value.response,
-          title,
-          suggestions: suggestions?.length ? suggestions : undefined,
-        };
-      }
-
-      if (
-        value.type === "tool_call" &&
-        typeof value.tool === "string" &&
-        tools.some(({ id }) => id === value.tool) &&
-        typeof value.autoApprove === "boolean" &&
-        isRecord(value.arguments)
-      ) {
-        return {
-          type: "tool_call",
-          tool: {
-            tool: value.tool as ToolCall["tool"],
-            autoApprove: value.autoApprove,
-            arguments: value.arguments,
-          },
-          title,
-        };
-      }
-    } catch {
-      // A model may ignore the requested JSON format.
-    }
+  let value: unknown;
+  try {
+    value = JSON.parse(response);
+  } catch {
+    throw new Error("Response must be one valid JSON object.");
   }
 
+  if (!isRecord(value)) throw new Error("Response must be a JSON object.");
+  if (value.type !== "final" && value.type !== "tool_call") {
+    throw new Error("Response type must be 'final' or 'tool_call'.");
+  }
+
+  if (typeof value.response !== "string") {
+    throw new Error("Response field must be a string.");
+  }
   if (
-    sawEnvelope ||
-    /"type"\s*:\s*"(?:final|tool_call)"/.test(response)
+    typeof value.autoApprove !== "boolean" ||
+    !isRecord(value.arguments)
   ) {
-    const recovered = recoverFinalResponse(response);
-    if (recovered?.complete) {
-      return { type: "final", response: recovered.text };
+    throw new Error(
+      "Response must include boolean autoApprove and object arguments.",
+    );
+  }
+  if (titleRequired ? typeof value.title !== "string" : value.title !== null) {
+    throw new Error(
+      titleRequired
+        ? "The first response must include a title."
+        : "Title must be null after the first response.",
+    );
+  }
+  if (
+    value.suggestions !== undefined &&
+    (!Array.isArray(value.suggestions) ||
+      value.suggestions.length > 2 ||
+      value.suggestions.some((suggestion) => typeof suggestion !== "string"))
+  ) {
+    throw new Error("Suggestions must be an array of up to two strings.");
+  }
+
+  const title = typeof value.title === "string" ? value.title : undefined;
+  if (value.type === "final") {
+    if (value.tool !== null) {
+      throw new Error("A final response must set tool to null.");
     }
     return {
       type: "final",
-      response:
-        "The model returned malformed or incomplete structured output. Please try again.",
+      response: value.response,
+      title,
+      suggestions: value.suggestions,
     };
   }
 
-  return { type: "final", response: response.trim() };
-}
-
-function recoverFinalResponse(
-  response: string,
-): { text: string; complete: boolean } | undefined {
-  if (!/"type"\s*:\s*"final"/.test(response)) return undefined;
-  const match = /"response"\s*:\s*"/.exec(response);
-  if (!match) return undefined;
-
-  let text = "";
-  for (let index = match.index + match[0].length; index < response.length; index++) {
-    const character = response[index];
-    if (character === "\\") {
-      const escaped = response[++index];
-      if (escaped === undefined) return { text, complete: false };
-      const escapes: Record<string, string> = {
-        '"': '"',
-        "\\": "\\",
-        "/": "/",
-        b: "\b",
-        f: "\f",
-        n: "\n",
-        r: "\r",
-        t: "\t",
-      };
-      if (escaped === "u") {
-        const codePoint = response.slice(index + 1, index + 5);
-        if (!/^[\da-f]{4}$/i.test(codePoint)) return { text, complete: false };
-        text += String.fromCharCode(Number.parseInt(codePoint, 16));
-        index += 4;
-      } else if (escaped in escapes) {
-        text += escapes[escaped];
-      } else {
-        return { text, complete: false };
-      }
-      continue;
-    }
-
-    if (character === '"' && isJsonFieldTerminator(response, index + 1)) {
-      return { text, complete: true };
-    }
-    text += character;
+  if (typeof value.tool !== "string") {
+    throw new Error("A tool call must include a tool name.");
   }
-
-  return { text, complete: false };
-}
-
-function isJsonFieldTerminator(value: string, start: number): boolean {
-  let index = start;
-  while (/\s/.test(value[index] ?? "")) index++;
-  if (value[index] === "}") return true;
-  if (value[index] !== ",") return false;
-
-  index++;
-  while (/\s/.test(value[index] ?? "")) index++;
-  return /^"[^"]+"\s*:/.test(value.slice(index));
+  const tool = tools.find(({ id }) => id === value.tool);
+  if (!tool) throw new Error(`Unknown tool '${value.tool}'.`);
+  return {
+    type: "tool_call",
+    tool: {
+      tool: tool.id,
+      autoApprove: value.autoApprove,
+      arguments: value.arguments,
+    },
+    title,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-export function parseToolCall(response: string): ToolCall | undefined {
-  for (const json of jsonCandidates(response)) {
-    try {
-      const candidate = JSON.parse(json) as {
-        tool?: unknown;
-        autoApprove?: unknown;
-        arguments?: unknown;
-      };
-      if (
-        candidate &&
-        typeof candidate === "object" &&
-        typeof candidate.tool === "string" &&
-        (candidate.arguments === undefined ||
-          (typeof candidate.arguments === "object" &&
-            candidate.arguments !== null &&
-            !Array.isArray(candidate.arguments)))
-      ) {
-        return {
-          tool: candidate.tool,
-          autoApprove: candidate.autoApprove === true,
-          arguments: (candidate.arguments ?? {}) as Record<string, unknown>,
-        } as ToolCall;
-      }
-    } catch {
-      // Models may wrap valid JSON in prose or a code fence.
-    }
-  }
-  return undefined;
-}
-
-/**
- * Extracts potential JSON tool calls from a response string.
- * @param response The response string potentially containing JSON tool calls.
- * @returns An array of JSON strings extracted from the response, including potential tool calls.
- */
-function jsonCandidates(response: string): string[] {
-  const candidates = [response.trim()];
-  const tagged = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/i.exec(
-    response,
-  )?.[1];
-  if (tagged) candidates.push(tagged);
-  const fenced = /```(?:json)?\s*([\s\S]*?)\s*```/i.exec(response)?.[1];
-  if (fenced) candidates.push(fenced);
-
-  const start = response.indexOf("{");
-  if (start >= 0) {
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    for (let index = start; index < response.length; index++) {
-      const char = response[index];
-      if (inString) {
-        if (escaped) escaped = false;
-        else if (char === "\\") escaped = true;
-        else if (char === '"') inString = false;
-      } else if (char === '"') inString = true;
-      else if (char === "{") depth++;
-      else if (char === "}" && --depth === 0) {
-        candidates.push(response.slice(start, index + 1));
-        break;
-      }
-    }
-  }
-  return candidates;
 }
 
 /**
