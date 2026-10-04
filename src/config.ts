@@ -1,13 +1,13 @@
 import * as vscode from "vscode";
 
 export interface GoodBuddyConfig {
-  provider: "ollama";
+  provider: "ollama" | "openai-compatible";
   /**
    * The endpoint URL of the LLM server, combining the protocol, host, and port.
    */
   endpoint: string;
-  chatModel: string;
-  completionModel: string;
+  openAICompatibleEndpoint: string;
+  openAICompatibleApiKey: string;
   /**
    * The maximum number of context lines to consider.
    */
@@ -20,11 +20,21 @@ export interface GoodBuddyConfig {
 
 export function getGoodBuddyConfig(): GoodBuddyConfig {
   const configuration = vscode.workspace.getConfiguration("goodBuddy");
+  const provider = configuration.get<GoodBuddyConfig["provider"]>(
+    "provider",
+    "openai-compatible",
+  );
   return {
-    provider: configuration.get<"ollama">("provider", "ollama"),
+    provider,
     endpoint: configuration.get<string>("endpoint", "http://localhost:11434"),
-    chatModel: configuration.get<string>("chatModel", "<invalid>"),
-    completionModel: configuration.get<string>("completionModel", "<invalid>"),
+    openAICompatibleEndpoint: configuration.get<string>(
+      "openAICompatibleEndpoint",
+      "http://localhost:1234/v1",
+    ),
+    openAICompatibleApiKey: configuration.get<string>(
+      "openAICompatibleApiKey",
+      "",
+    ),
     maxContextLines: configuration.get<number>("maxContextLines", 100),
     completionTimeoutMs: configuration.get<number>(
       "completionTimeoutMs",

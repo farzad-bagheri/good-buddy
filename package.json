@@ -1,11 +1,12 @@
 {
   "name": "good-buddy",
   "displayName": "Good Buddy - Local AI Coding Assistant",
-  "description": "A local-first VS Code coding assistant powered by Ollama: chat, code explanations, and inline completions.",
+  "description": "A local-first VS Code coding assistant powered by Ollama or OpenAI-compatible model servers.",
   "keywords": [
     "local ai",
     "local llm",
     "ollama",
+    "openai-compatible",
     "ai coding assistant",
     "code assistant",
     "code completion",
@@ -81,23 +82,38 @@
       "properties": {
         "goodBuddy.provider": {
           "type": "string",
-          "default": "ollama",
-          "description": "The provider for the Good Buddy assistant. Currently, only 'ollama' is supported."
+          "enum": [
+            "ollama",
+            "openai-compatible"
+          ],
+          "default": "openai-compatible",
+          "description": "The provider for the Good Buddy assistant."
         },
         "goodBuddy.endpoint": {
           "type": "string",
           "default": "http://localhost:11434",
-          "description": "Base URL of the local Ollama server."
+          "description": "Base URL of the local Ollama server, used when goodBuddy.provider is 'ollama'."
+        },
+        "goodBuddy.openAICompatibleEndpoint": {
+          "type": "string",
+          "default": "http://localhost:1234/v1",
+          "description": "Base URL of an OpenAI-compatible API, including its API prefix (for example, LM Studio's http://localhost:1234/v1)."
+        },
+        "goodBuddy.openAICompatibleApiKey": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Optional API key sent as a Bearer token to the OpenAI-compatible API."
         },
         "goodBuddy.completionModel": {
           "type": "string",
-          "default": "moophlo/Qwen3-Coder-30B-A3B-Instruct-GGUF:latest",
-          "description": "Model used for inline code completions."
+          "default": "",
+          "description": "Legacy Ollama model ID used only when no saved completion model is available. Prefer selecting a model in the chat view."
         },
         "goodBuddy.chatModel": {
           "type": "string",
-          "default": "qwen3:8b",
-          "description": "Model used for chat-style tasks like explaining code."
+          "default": "",
+          "description": "Legacy Ollama model ID used only when no saved chat model is available. Prefer selecting a model in the chat view."
         },
         "goodBuddy.inlineCompletionsEnabled": {
           "type": "boolean",

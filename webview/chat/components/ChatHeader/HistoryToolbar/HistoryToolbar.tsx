@@ -5,7 +5,9 @@ interface ChatToolbarProps {
   onToggleHistory: () => void;
 }
 
-export function HistoryToolbar({ onToggleHistory }: ChatToolbarProps) {
+export function HistoryToolbar({
+  onToggleHistory,
+}: ChatToolbarProps) {
   return (
     <div className={styles.toolbar}>
       <IconButton

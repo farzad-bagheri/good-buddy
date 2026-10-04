@@ -15,7 +15,8 @@ const iconNames = [
   "check",
   "history",
   "new-chat",
-  "retry"
+  "retry",
+  "models"
 ];
 const iconClasses = iconNames
   .map(

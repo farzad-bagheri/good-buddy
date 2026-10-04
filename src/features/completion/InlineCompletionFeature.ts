@@ -1,5 +1,6 @@
 import { getGoodBuddyConfig, inlineCompletionsEnabled } from "@/config";
 import { GoodBuddyProvider } from "@/provider";
+import { ModelSelectionStore } from "@/provider/ModelSelectionStore";
 import * as vscode from "vscode";
 import { EXPLANATION_DEBOUNCE_MS } from "./constants";
 import { getContextRanges } from "./utils";
@@ -13,6 +14,7 @@ export class InlineCompletionFeature
     private readonly output: vscode.OutputChannel,
     private readonly statusBar: vscode.StatusBarItem,
     private readonly provider: GoodBuddyProvider,
+    private readonly modelSelections: ModelSelectionStore,
   ) {}
 
   async provideInlineCompletionItems(
@@ -35,8 +37,9 @@ export class InlineCompletionFeature
       return undefined;
     }
 
-    const { completionModel, maxContextLines, completionTimeoutMs } =
-      getGoodBuddyConfig();
+    const { maxContextLines, completionTimeoutMs } = getGoodBuddyConfig();
+    const completionModel = this.modelSelections.getCompletionModel();
+    if (!completionModel) return undefined;
     const context = getContextRanges(document, position, maxContextLines);
     if (!context) {
       return undefined;

@@ -1,5 +1,5 @@
-import { getGoodBuddyConfig } from "@/config";
 import { GoodBuddyProvider } from "@/provider";
+import { ModelSelectionStore } from "@/provider/ModelSelectionStore";
 import { Resources } from "@/resources";
 import { marked } from "marked";
 import * as vscode from "vscode";
@@ -11,12 +11,19 @@ export class ExplainCodeFeature {
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly provider: GoodBuddyProvider,
+    private readonly modelSelections: ModelSelectionStore,
   ) {
      this.resources = new Resources(context);
   }
 
   async explainCode(editor: vscode.TextEditor): Promise<void> {
-    const { chatModel } = getGoodBuddyConfig();
+    const chatModel = this.modelSelections.getChatModel();
+    if (!chatModel) {
+      vscode.window.showInformationMessage(
+        "Good Buddy: select a chat model in the chat view first.",
+      );
+      return;
+    }
 
     const selection = editor.selection;
     const code = editor.document.getText(

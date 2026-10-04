@@ -39,6 +39,25 @@ export function findMissingModels(
   );
 }
 
+export type ModelSetupStatus =
+  | "no-models"
+  | "models-unselected"
+  | "models-missing"
+  | "ready";
+
+export function getModelSetupStatus(
+  availableModels: readonly string[],
+  selectedModels: readonly string[],
+): ModelSetupStatus {
+  if (availableModels.length === 0) return "no-models";
+  const configuredModels = selectedModels.filter(Boolean);
+  if (findMissingModels(availableModels, configuredModels).length > 0) {
+    return "models-missing";
+  }
+  if (selectedModels.some((model) => !model)) return "models-unselected";
+  return "ready";
+}
+
 export function agentInstructions(
   model: ProviderModel,
   projectContext: string,

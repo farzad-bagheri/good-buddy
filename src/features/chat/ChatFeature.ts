@@ -1,4 +1,5 @@
 import { ChatMessage, GoodBuddyProvider } from "@/provider";
+import { ModelSelectionStore } from "@/provider/ModelSelectionStore";
 import { Resources } from "@/resources";
 import { marked } from "marked";
 import * as vscode from "vscode";
@@ -37,11 +38,13 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     private readonly context: vscode.ExtensionContext,
     private readonly output: vscode.OutputChannel,
     private readonly provider: GoodBuddyProvider,
+    private readonly modelSelections: ModelSelectionStore,
   ) {
     this.resources = new Resources(context);
     this.viewState = new ChatViewState(
       context,
       provider,
+      modelSelections,
       this.resources,
       output,
       () => this.view?.webview,
@@ -181,6 +184,8 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         this.viewState.postAttachments();
       },
       selectModel: (model) => this.viewState.selectModel(model),
+      selectCompletionModel: (model) =>
+        this.viewState.selectCompletionModel(model),
       newChat: async () => {
         this.activeController?.abort();
         this.writeApprovals.rejectAll();

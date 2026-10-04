@@ -10,6 +10,7 @@ interface ChatHeaderProps {
   onModelChange: (model: string) => void;
   onToggleHistory: () => void;
   onNewChat: () => void;
+  onOpenSetup: () => void;
 }
 
 export function ChatHeader({
@@ -19,11 +20,14 @@ export function ChatHeader({
   onModelChange,
   onToggleHistory,
   onNewChat,
+  onOpenSetup,
 }: ChatHeaderProps) {
   return (
     <header className={styles["chat-header"]}>
       {historyOpen ? (
-        <HistoryToolbar onToggleHistory={onToggleHistory} />
+        <HistoryToolbar
+          onToggleHistory={onToggleHistory}
+        />
       ) : (
         <ChatToolbar
           models={models}
@@ -31,6 +35,7 @@ export function ChatHeader({
           onModelChange={onModelChange}
           onToggleHistory={onToggleHistory}
           onNewChat={onNewChat}
+          onOpenSetup={onOpenSetup}
         />
       )}
     </header>

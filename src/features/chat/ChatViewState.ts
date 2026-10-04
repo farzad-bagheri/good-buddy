@@ -1,18 +1,19 @@
 import { getGoodBuddyConfig } from "@/config";
 import { GoodBuddyProvider, ProviderModel } from "@/provider";
+import { ModelSelectionStore } from "@/provider/ModelSelectionStore";
 import { Resources } from "@/resources";
 import * as vscode from "vscode";
 import { AttachmentStore } from "./attachment";
-import { findMissingModels } from "./utils";
-
-const MODEL_STATE_KEY = "goodBuddy.selectedChatModel";
+import { findMissingModels, getModelSetupStatus } from "./utils";
 
 export class ChatViewState {
   readonly attachments = new AttachmentStore();
+  private modelListRequest = 0;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly provider: GoodBuddyProvider,
+    private readonly modelSelections: ModelSelectionStore,
     private readonly resources: Resources,
     private readonly output: vscode.OutputChannel,
     private readonly getWebview: () => vscode.Webview | undefined,
@@ -28,35 +29,50 @@ export class ChatViewState {
   }
 
   getSelectedModel(): string {
-    return this.context.globalState.get<string>(
-      MODEL_STATE_KEY,
-      getGoodBuddyConfig().chatModel,
-    );
+    return this.modelSelections.getChatModel();
   }
 
   async selectModel(model: unknown): Promise<void> {
-    await this.context.globalState.update(MODEL_STATE_KEY, model);
+    if (typeof model !== "string") return;
+    await this.modelSelections.selectChatModel(model);
+    await this.sendModelList();
+  }
+
+  async selectCompletionModel(model: unknown): Promise<void> {
+    if (typeof model !== "string") return;
+    await this.modelSelections.selectCompletionModel(model);
     await this.sendModelList();
   }
 
   async sendModelList(): Promise<void> {
+    const requestId = ++this.modelListRequest;
     this.postProviderStatus("checking");
     try {
       const models = await this.provider.listModels();
+      if (requestId !== this.modelListRequest) return;
       this.getWebview()?.postMessage({
         type: "vsc:models",
         models,
         selected: this.getSelectedModel(),
       });
+      const chatModel = this.modelSelections.getChatModel();
+      const completionModel = this.modelSelections.getCompletionModel();
+      const availableModels = models.map(({ model }) => model);
+      const selectedModels = [chatModel, completionModel].filter(Boolean);
       const missingModels = findMissingModels(
-        models.map(({ model }) => model),
-        [this.getSelectedModel(), getGoodBuddyConfig().completionModel],
+        availableModels,
+        selectedModels,
       );
-      this.postProviderStatus(
-        missingModels.length ? "models-missing" : "ready",
-        missingModels,
-      );
+      const status = getModelSetupStatus(availableModels, [
+        chatModel,
+        completionModel,
+      ]);
+      this.postProviderStatus(status, missingModels, {
+        chatModel,
+        completionModel,
+      });
     } catch (error) {
+      if (requestId !== this.modelListRequest) return;
       this.output.appendLine(`Good Buddy chat: failed to list models: ${error}`);
       this.getWebview()?.postMessage({
         type: "vsc:models",
@@ -92,8 +108,15 @@ export class ChatViewState {
   }
 
   private postProviderStatus(
-    status: "checking" | "unavailable" | "models-missing" | "ready",
+    status:
+      | "checking"
+      | "unavailable"
+      | "no-models"
+      | "models-unselected"
+      | "models-missing"
+      | "ready",
     missingModels: string[] = [],
+    selection?: { chatModel: string; completionModel: string },
   ): void {
     const webview = this.getWebview();
     if (!webview) return;
@@ -101,9 +124,15 @@ export class ChatViewState {
     webview.postMessage({
       type: "vsc:providerStatus",
       status,
-      endpoint: config.endpoint,
-      chatModel: config.chatModel,
-      completionModel: config.completionModel,
+      provider: config.provider,
+      endpoint:
+        config.provider === "openai-compatible"
+          ? config.openAICompatibleEndpoint
+          : config.endpoint,
+      chatModel: selection?.chatModel ?? this.modelSelections.getChatModel(),
+      completionModel:
+        selection?.completionModel ??
+        this.modelSelections.getCompletionModel(),
       missingModels,
       artworkUri: this.resources
         .getIcon("provider-offline")

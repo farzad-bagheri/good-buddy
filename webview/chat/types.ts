@@ -11,11 +11,14 @@ export interface ChatSummary {
 export type ProviderStatus =
   | "checking"
   | "unavailable"
+  | "no-models"
+  | "models-unselected"
   | "models-missing"
   | "ready";
 
 export interface ProviderStatusInfo {
   status: ProviderStatus;
+  provider: "ollama" | "openai-compatible";
   endpoint: string;
   chatModel: string;
   completionModel: string;

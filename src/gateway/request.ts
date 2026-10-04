@@ -1,5 +1,8 @@
 export class Request {
-  public constructor(private baseUrl: string) {}
+  public constructor(
+    private baseUrl: string,
+    private headers: Record<string, string> = {},
+  ) {}
 
   /**
    * Sends a POST request to the specified path with the given body and optional abort signal.
@@ -41,13 +44,16 @@ export class Request {
   ): Promise<Response> {
     const response = await fetch(new URL(path, this.baseUrl), {
       method,
-      headers: body ? { "Content-Type": "application/json" } : undefined,
+      headers: {
+        ...this.headers,
+        ...(body ? { "Content-Type": "application/json" } : {}),
+      },
       body,
       signal,
     });
 
     if (!response.ok) {
-      throw new Error(`Ollama request failed (${response.status})`);
+      throw new Error(`Request failed (${response.status}) for ${path}`);
     }
 
     return response;

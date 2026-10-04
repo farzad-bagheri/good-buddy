@@ -1,12 +1,12 @@
 # Good Buddy
 
-Good Buddy is a VS Code extension that uses a local [Ollama](https://ollama.com/) server for inline code completions, a chat view, and selected-code explanations.
+Good Buddy is a VS Code extension that uses local [Ollama](https://ollama.com/) or OpenAI-compatible model servers for inline code completions, a chat view, and selected-code explanations.
 
 ![hero](./docs/images/hero.png)
 
 ## Features
 
-- 💻 Inline code completions using a local Ollama server.
+- 💻 Inline code completions using a local Ollama or OpenAI-compatible server.
 - 🗨️ Chat view for interactive discussions and explanations.
 - 🧩 Selected-code explanations to understand complex code snippets.
 
@@ -23,10 +23,12 @@ Contributions are welcome! Please open issues or submit pull requests on the [Gi
 
 ## Installation
 
-Good Buddy does not call any cloud API — it talks to a local [Ollama](https://ollama.com/) server, so you need Ollama installed and running before the extension is useful.
+Good Buddy defaults to the OpenAI-compatible provider, which can talk to servers such as LM Studio, llama.cpp, and Open WebUI. [Ollama](https://ollama.com/) is also supported. The extension does not require a cloud API.
 
-1. [Install Ollama](https://ollama.com/download) and make sure it's running (`ollama serve`, or the desktop app's background service).
-2. Pull at least one completion model and one chat model, for example:
+1. Choose and start a supported model server:
+   - For Ollama, [install Ollama](https://ollama.com/download) and make sure it's running (`ollama serve`, or the desktop app's background service).
+   - For an OpenAI-compatible server such as LM Studio, llama.cpp, or Open WebUI, enable its OpenAI-compatible API.
+2. Make at least one model available to the server. For Ollama, pull models such as:
 
    ```sh
    ollama pull qwen2.5-coder:7b
@@ -34,26 +36,30 @@ Good Buddy does not call any cloud API — it talks to a local [Ollama](https://
    ```
 
 3. Install/enable the Good Buddy extension in VS Code, then open **Settings** and configure it under **Good Buddy** (search `goodBuddy`):
-   - `goodBuddy.endpoint` — Ollama server URL. Defaults to `http://localhost:11434`, which is correct for a local install.
-   - `goodBuddy.completionModel` — **required**, must match a model tag you've pulled (see suggestions below). The default (`moophlo/Qwen3-Coder-30B-A3B-Instruct-GGUF:latest`) is a large 30B model that may time out on modest hardware.
-   - `goodBuddy.chatModel` — **required**, must match a model tag you've pulled (see suggestions below).
+   - `goodBuddy.provider` — defaults to `openai-compatible`; choose `ollama` to use Ollama instead.
+   - `goodBuddy.endpoint` — Ollama server URL. Defaults to `http://localhost:11434`.
+   - `goodBuddy.openAICompatibleEndpoint` — OpenAI-compatible API base URL, including `/v1` when required. Defaults to LM Studio's `http://localhost:1234/v1`.
+   - `goodBuddy.openAICompatibleApiKey` — optional authentication key for servers that require API-key authentication.
+   - Choose the chat and inline-completion models from the models reported by the configured server in the chat setup notice. Choices are saved independently for each provider and endpoint.
    - `goodBuddy.inlineCompletionsEnabled` — toggle ghost-text completions on/off (also available via the **Good Buddy: Toggle Inline Completions** command).
    - `goodBuddy.maxContextLines` — how many lines of surrounding code to send with each completion request.
    - `goodBuddy.completionTimeoutMs` — how long to wait for a completion before giving up; raise this if you use a larger model or have slower hardware.
 
-   Good Buddy does **not** validate these model names — if a configured model isn't pulled locally, requests will fail and the error surfaces in the status bar tooltip and the **Good Buddy** output channel.
+   When changing provider or endpoint, Good Buddy loads that connection's saved model selections. If either choice is missing or unavailable, the setup notice lets you choose a model from the server's current list. `goodBuddy.chatModel` and `goodBuddy.completionModel` are legacy Ollama fallback settings; new setups do not preselect Ollama models.
 
-### Suggested models
+For an OpenAI-compatible server, choose model IDs returned by its `/models` endpoint in the setup notice. The server must support `/chat/completions`; chat uses JSON response formats for the assistant's structured tool protocol. Inline completion requests are sent as user prompts to the chat-completions endpoint, so model behavior can differ from Ollama's native fill-in-the-middle endpoint.
 
-Pick models sized for your hardware; smaller models respond faster and are a better fit for inline completions where latency matters.
+### Ollama model suggestions
 
-**Completion (`goodBuddy.completionModel`)** — should support fill-in-the-middle (FIM):
+If using Ollama, pick models sized for your hardware; smaller models respond faster and are a better fit for inline completions where latency matters. Select the downloaded model IDs in the chat setup notice.
+
+**Completion** — code-focused models are recommended:
 
 - [`qwen2.5-coder:7b`](https://ollama.com/library/qwen2.5-coder) — good balance of speed and quality, recommended default.
 - [`qwen2.5-coder:1.5b`](https://ollama.com/library/qwen2.5-coder) — fastest option, best for low-resource machines.
 - [`codellama:7b-code`](https://ollama.com/library/codellama) — alternative code-focused model.
 
-**Chat / explanations (`goodBuddy.chatModel`)**:
+**Chat / explanations**:
 
 - [`qwen3:8b`](https://ollama.com/library/qwen3) — matches the extension's default, good general-purpose reasoning.
 - [`llama3.1:8b`](https://ollama.com/library/llama3.1) — widely used general-purpose alternative.
@@ -68,14 +74,14 @@ Browse the full catalog at [ollama.com/library](https://ollama.com/library) for 
 - `src/features/chat/` contains the chat webview and its lifecycle.
 - `src/features/completion/` contains inline-completion behavior.
 - `src/features/explain/` contains selected-code explanation behavior.
-- `src/provider/` contains the provider abstraction and Ollama implementation.
+- `src/provider/` contains the provider abstraction and Ollama/OpenAI-compatible implementations.
 - `src/gateway/` contains the HTTP request helpers.
 - `out/` is generated JavaScript. Do not edit it directly.
 
 ## Develop
 
 1. Install dependencies with `pnpm install`.
-2. Start Ollama and ensure the configured models are available.
+2. Start your configured model server and ensure the configured models are available.
 3. Run `pnpm run watch`, then launch **Run Good Buddy Extension** from VS Code.
 
 Run `pnpm run check` and `pnpm run lint` before committing. Use `pnpm run build` to create a production bundle.
@@ -88,7 +94,7 @@ This project now includes a Vitest-based unit-test setup for fast validation and
 - Re-run automatically while editing with `pnpm test:watch`
 - Generate a coverage report with `pnpm coverage`
 
-The test suite uses mocked fetch responses for Ollama HTTP calls so you can verify request/response handling without a live local model server.
+The test suite uses mocked fetch responses for provider HTTP calls so you can verify request/response handling without a live model server.
 
 ## License
 
@@ -103,7 +109,7 @@ Good Buddy contributors.
 
 ## Troubleshooting chat
 
-The chat view reports the response body when Ollama returns malformed JSON rather than presenting an opaque parse error. Check the **Good Buddy** output channel for model-listing failures, and verify `goodBuddy.endpoint` points to the Ollama server (normally `http://localhost:11434`).
+The chat view reports the response body when a provider returns malformed JSON rather than presenting an opaque parse error. Check the **Good Buddy** output channel for model-listing failures, and verify the endpoint setting for the selected provider.
 
 ## Workspace tools
 

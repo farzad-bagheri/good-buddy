@@ -1,0 +1,123 @@
+.dialog {
+  width: min(480px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  padding: 20px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.header p,
+.message,
+.help,
+.endpoint {
+  color: var(--vscode-descriptionForeground);
+  line-height: 1.5;
+}
+
+.header p {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.closeButton {
+  padding: 2px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--vscode-foreground);
+  font-size: 22px;
+}
+
+.message {
+  margin: 16px 0;
+}
+
+.help {
+  margin: -8px 0 16px;
+  font-size: 12px;
+}
+
+.modelSelections {
+  display: grid;
+  gap: 14px;
+}
+
+.modelPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.modelPicker select {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 2px;
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+}
+
+.endpoint {
+  margin: 16px 0;
+  font-size: 12px;
+}
+
+.endpoint code {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  padding: 8px;
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  background: var(--vscode-sideBar-background);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.actions button {
+  padding: 6px 10px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.actions .primaryButton {
+  border-color: var(--vscode-button-border, transparent);
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.actions .primaryButton:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+@media (max-width: 380px) {
+  .dialog {
+    padding: 14px;
+  }
+}

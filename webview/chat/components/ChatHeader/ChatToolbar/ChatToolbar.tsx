@@ -8,6 +8,7 @@ interface ChatToolbarProps {
   onModelChange: (model: string) => void;
   onToggleHistory: () => void;
   onNewChat: () => void;
+  onOpenSetup: () => void;
 }
 
 export function ChatToolbar({
@@ -16,6 +17,7 @@ export function ChatToolbar({
   onModelChange,
   onToggleHistory,
   onNewChat,
+  onOpenSetup,
 }: ChatToolbarProps) {
   const handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     onModelChange(event.target.value);
@@ -23,30 +25,44 @@ export function ChatToolbar({
 
   return (
     <div className={styles.container}>
-    <div className={styles.toolbar}>
-      <select
-        aria-label="Chat model"
-        value={selectedModel}
-        onChange={handleModelChange}
-      >
-        {models.map((model) => (
-          <option key={model.model} value={model.model} title={model.model}>
-            {model.caption}
+      <div className={styles.toolbar}>
+        <select
+          aria-label="Chat model"
+          value={selectedModel}
+          onChange={handleModelChange}
+        >
+          <option value="" disabled>
+            {models.length ? "Select a chat model" : "No models available"}
           </option>
-        ))}
-      </select>
-      <IconButton
-        title="New chat"
-        iconName="new-chat-icon"
-        onClick={onNewChat}
-      />
-      <IconButton
-        title="Saved chats"
-        iconName="history-icon"
-        onClick={onToggleHistory}
-      />
-    </div>
-    <span className={styles.note}>{selectedModel}</span>
+          {selectedModel &&
+            !models.some(({ model }) => model === selectedModel) && (
+              <option value={selectedModel} disabled>
+                Unavailable: {selectedModel}
+              </option>
+            )}
+          {models.map((model) => (
+            <option key={model.model} value={model.model} title={model.model}>
+              {model.caption}
+            </option>
+          ))}
+        </select>
+        <IconButton
+          title="Configure provider and models"
+          iconName="models-icon"
+          onClick={onOpenSetup}
+        />
+        <IconButton
+          title="New chat"
+          iconName="new-chat-icon"
+          onClick={onNewChat}
+        />
+        <IconButton
+          title="Saved chats"
+          iconName="history-icon"
+          onClick={onToggleHistory}
+        />
+      </div>
+      <span className={styles.note}>{selectedModel}</span>
     </div>
   );
 }

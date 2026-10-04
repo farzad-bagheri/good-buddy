@@ -3,7 +3,8 @@ import { InlineCompletionFeature } from "@/features/completion";
 import { ChatFeature } from "@/features/chat";
 import { ExplainCodeFeature } from "@/features/explain";
 import { toggleInlineCompletions } from "./config";
-import { OllamaProvider } from "@/provider/ollama";
+import { ConfiguredProvider } from "@/provider/ConfiguredProvider";
+import { ModelSelectionStore } from "@/provider/ModelSelectionStore";
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("Good Buddy");
@@ -17,14 +18,25 @@ export function activate(context: vscode.ExtensionContext): void {
   statusBar.command = "workbench.view.extension.goodBuddy";
   statusBar.show();
 
-  const ollamaProvider = new OllamaProvider();
-  const explainCodeFeature = new ExplainCodeFeature(context, ollamaProvider);
+  const provider = new ConfiguredProvider();
+  const modelSelections = new ModelSelectionStore(context.globalState);
+  const explainCodeFeature = new ExplainCodeFeature(
+    context,
+    provider,
+    modelSelections,
+  );
   const inlineCompletionFeature = new InlineCompletionFeature(
     output,
     statusBar,
-    ollamaProvider,
+    provider,
+    modelSelections,
   );
-  const chatFeature = new ChatFeature(context, output, ollamaProvider);
+  const chatFeature = new ChatFeature(
+    context,
+    output,
+    provider,
+    modelSelections,
+  );
 
   context.subscriptions.push(
     output,

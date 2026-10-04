@@ -14,6 +14,7 @@ export interface ChatWebviewMessageHandlers {
   attachFiles(): Promise<void>;
   removeAttachment(index: number): void;
   selectModel(model: unknown): Promise<void>;
+  selectCompletionModel(model: unknown): Promise<void>;
   newChat(): Promise<void>;
   listChats(): Promise<void>;
   resumeChat(id: string): Promise<void>;
@@ -48,6 +49,8 @@ export class ChatWebviewMessageRouter {
           return this.handlers.removeAttachment(Number(message.index));
         case "wv:selectModel":
           return this.handlers.selectModel(message.model);
+        case "wv:selectCompletionModel":
+          return this.handlers.selectCompletionModel(message.model);
         case "wv:newChat":
           return this.handlers.newChat();
         case "wv:listChats":

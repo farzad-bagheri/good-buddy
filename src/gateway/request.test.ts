@@ -8,7 +8,7 @@ describe("Request", () => {
     vi.restoreAllMocks();
   });
 
-  it("posts JSON payloads using the configured Ollama base URL", async () => {
+  it("posts JSON payloads using the configured base URL", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -30,6 +30,19 @@ describe("Request", () => {
     });
   });
 
+  it("adds configured headers to requests", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new Request("http://localhost:1234/v1", {
+      Authorization: "Bearer example-key",
+    }).get("models");
+
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({
+      Authorization: "Bearer example-key",
+    });
+  });
+
   it("throws when the remote HTTP call fails", async () => {
     vi.stubGlobal(
       "fetch",
@@ -42,7 +55,7 @@ describe("Request", () => {
     const request = new Request("http://localhost:11434");
 
     await expect(request.get("/api/tags")).rejects.toThrow(
-      "Ollama request failed (500)",
+      "Request failed (500) for /api/tags",
     );
   });
 });

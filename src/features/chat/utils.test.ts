@@ -3,6 +3,7 @@ import type { ToolDefinition } from "./types";
 import {
   assistantResponseFormat,
   findMissingModels,
+  getModelSetupStatus,
   findRetryUserIndex,
   parseAssistantEnvelope,
 } from "./utils";
@@ -113,6 +114,28 @@ describe("findMissingModels", () => {
         ["qwen3:8b", "moophlo/Qwen3-Coder-30B-A3B-Instruct-GGUF:latest"],
       ),
     ).toEqual(["moophlo/Qwen3-Coder-30B-A3B-Instruct-GGUF:latest"]);
+  });
+
+  describe("getModelSetupStatus", () => {
+    it("recognizes an empty server model list", () => {
+      expect(getModelSetupStatus([], ["chat", "completion"])).toBe("no-models");
+    });
+
+    it("asks for model choices when selections are empty", () => {
+      expect(getModelSetupStatus(["chat"], ["", ""])).toBe("models-unselected");
+    });
+
+    it("detects selections that are no longer available", () => {
+      expect(
+        getModelSetupStatus(["chat"], ["chat", "removed-completion"]),
+      ).toBe("models-missing");
+    });
+
+    it("marks setup ready once both selections are available", () => {
+      expect(
+        getModelSetupStatus(["chat", "completion"], ["chat", "completion"]),
+      ).toBe("ready");
+    });
   });
 
   it("does not repeat a model configured for both purposes", () => {

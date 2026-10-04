@@ -3,6 +3,7 @@ import { ChatHeader } from "./components/ChatHeader";
 import { ChatHistory } from "./components/ChatHistory";
 import { Composer } from "./components/Composer";
 import { ProviderNotice } from "./components/ProviderNotice";
+import { ProviderSetupDialog } from "./components/ProviderSetupDialog";
 import { Suggestions } from "./components/Suggestions";
 import { Timeline } from "./components/Timeline";
 import {
@@ -30,8 +31,10 @@ export function App() {
   const [selectedModel, setSelectedModel] = useState("");
   const [history, setHistory] = useState<ChatSummary[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
   const [provider, setProvider] = useState<ProviderStatusInfo>({
     status: "checking",
+    provider: "openai-compatible",
     endpoint: "",
     chatModel: "",
     completionModel: "",
@@ -72,6 +75,7 @@ export function App() {
         case "vsc:providerStatus":
           setProvider({
             status: message.status,
+            provider: message.provider,
             endpoint: message.endpoint,
             chatModel: message.chatModel,
             completionModel: message.completionModel,
@@ -102,12 +106,16 @@ export function App() {
           const id = createItemId();
           assistantId.current = id;
           setItems((current) =>
-            appendTimelineItem(current, {
-              kind: "message",
-              role: "assistant",
-              text: "",
-              historyIndex: message.historyIndex,
-            }, id),
+            appendTimelineItem(
+              current,
+              {
+                kind: "message",
+                role: "assistant",
+                text: "",
+                historyIndex: message.historyIndex,
+              },
+              id,
+            ),
           );
           break;
         }
@@ -255,6 +263,10 @@ export function App() {
           setHistoryOpen(false);
           vscode.postMessage({ type: "wv:newChat" });
         }}
+        onOpenSetup={() => {
+          setSetupOpen(true);
+          handleCheckProvider();
+        }}
       />
 
       {historyOpen ? (
@@ -270,10 +282,10 @@ export function App() {
               <ProviderNotice
                 provider={provider}
                 compact={hasConversation}
-                onCheck={handleCheckProvider}
-                onOpenSettings={() =>
-                  vscode.postMessage({ type: "wv:openSettings" })
-                }
+                onOpenSetup={() => {
+                  setSetupOpen(true);
+                  handleCheckProvider();
+                }}
               />
             )}
             <Timeline
@@ -302,6 +314,25 @@ export function App() {
             onSend={() => setThinking(true)}
           />
         </>
+      )}
+      {setupOpen && (
+        <ProviderSetupDialog
+          provider={provider}
+          models={models}
+          onClose={() => setSetupOpen(false)}
+          onCheck={handleCheckProvider}
+          onSelectChatModel={(model) => {
+            setSelectedModel(model);
+            vscode.postMessage({ type: "wv:selectModel", model });
+          }}
+          onSelectCompletionModel={(model) =>
+            vscode.postMessage({
+              type: "wv:selectCompletionModel",
+              model,
+            })
+          }
+          onOpenSettings={() => vscode.postMessage({ type: "wv:openSettings" })}
+        />
       )}
     </main>
   );
