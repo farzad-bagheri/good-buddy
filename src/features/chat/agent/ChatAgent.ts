@@ -109,7 +109,7 @@ export class ChatAgent {
         messages.push(
           { role: "assistant", content: response },
           {
-            role: "user",
+            role: "system",
             content: `Your previous response could not be used: ${invalidReason} Follow the required response schema and return one complete JSON object only.`,
           },
         );

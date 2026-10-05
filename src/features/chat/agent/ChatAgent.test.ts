@@ -134,7 +134,7 @@ describe("ChatAgent", () => {
     expect(chat.mock.calls[1][0].messages.slice(-2)).toEqual([
       { role: "assistant", content: "Here is my answer, outside the schema." },
       {
-        role: "user",
+        role: "system",
         content:
           "Your previous response could not be used: Response must be one valid JSON object. Follow the required response schema and return one complete JSON object only.",
       },

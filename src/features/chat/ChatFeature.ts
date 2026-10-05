@@ -37,10 +37,11 @@ export class ChatFeature implements vscode.WebviewViewProvider {
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly output: vscode.OutputChannel,
-    private readonly provider: GoodBuddyProvider,
-    private readonly modelSelections: ModelSelectionStore,
+    readonly provider: GoodBuddyProvider,
+    readonly modelSelections: ModelSelectionStore,
   ) {
     this.resources = new Resources(context);
+
     this.viewState = new ChatViewState(
       context,
       provider,
@@ -49,14 +50,19 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       output,
       () => this.view?.webview,
     );
+
     this.session = new ChatSession(
       new ChatHistoryStore(context.globalStorageUri),
       output,
       () => this.viewState.getSelectedModel(),
       () => this.postChatList(),
     );
+
+    // Initialize the proposal diff editor.
     this.proposalDiffEditor = new ProposalDiffEditor();
     context.subscriptions.push(this.proposalDiffEditor);
+
+    // Initialize the write approval manager.
     this.writeApprovals = new WriteApprovalManager(this.workspaceTools, {
       // Handle write proposals from the workspace tools.
       propose: (id, path, diff, before, after) => {
