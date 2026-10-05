@@ -29,6 +29,8 @@ describe("assistant response envelope", () => {
           tool: null,
           autoApprove: false,
           arguments: {},
+          suggestions: ["Show me the changes"],
+          files: [{ name: "index.ts", path: "src/index.ts" }],
         }),
         tools,
         true,
@@ -37,6 +39,8 @@ describe("assistant response envelope", () => {
       type: "final",
       response: "## Result\n\n**Done.**",
       title: "Summarize the result",
+      suggestions: ["Show me the changes"],
+      files: [{ name: "index.ts", path: "src/index.ts" }],
     });
   });
 
@@ -49,6 +53,8 @@ describe("assistant response envelope", () => {
         autoApprove: false,
         arguments: { path: "src/index.ts" },
         title: "Review the entry point",
+        suggestions: [],
+        files: [],
       }),
       tools,
       true,
@@ -67,6 +73,8 @@ describe("assistant response envelope", () => {
           autoApprove: false,
           arguments: {},
           title: null,
+          suggestions: [],
+          files: [],
         }),
         tools,
       ),
@@ -83,10 +91,81 @@ describe("assistant response envelope", () => {
           autoApprove: false,
           arguments: {},
           title: null,
+          suggestions: [],
+          files: [],
         }),
         tools,
       ),
-    ).toMatchObject({ type: "final", response: "Done", title: undefined });
+    ).toMatchObject({
+      type: "final",
+      response: "Done",
+      title: undefined,
+      suggestions: [],
+      files: [],
+    });
+  });
+
+  it("validates suggestion and file values", () => {
+    const base = {
+      type: "final",
+      response: "Done",
+      tool: null,
+      autoApprove: false,
+      arguments: {},
+      title: null,
+      suggestions: [],
+      files: [],
+    };
+    const parse = (overrides: Record<string, unknown>) =>
+      parseAssistantEnvelope(JSON.stringify({ ...base, ...overrides }), tools);
+
+    expect(
+      parse({
+        suggestions: ["A short follow-up", "Another one"],
+        files: [{ name: "index.ts", path: "src/index.ts" }],
+      }),
+    ).toMatchObject({
+      suggestions: ["A short follow-up", "Another one"],
+      files: [{ name: "index.ts", path: "src/index.ts" }],
+    });
+    expect(() => parse({ suggestions: [""] })).toThrow("Suggestions must be");
+    expect(() => parse({ suggestions: ["x".repeat(60)] })).toThrow(
+      "Suggestions must be",
+    );
+    expect(() => parse({ files: [{ name: " ", path: "src/index.ts" }] })).toThrow(
+      "Files must be",
+    );
+    expect(() => {
+      const withoutFiles: Record<string, unknown> = { ...base };
+      delete withoutFiles.files;
+      parseAssistantEnvelope(JSON.stringify(withoutFiles), tools);
+    }).toThrow("Files must be");
+  });
+
+  it("requires a non-empty title on the first response and null on later responses", () => {
+    const response = {
+      type: "final",
+      response: "Done",
+      tool: null,
+      autoApprove: false,
+      arguments: {},
+      suggestions: [],
+      files: [],
+    };
+    expect(() =>
+      parseAssistantEnvelope(
+        JSON.stringify({ ...response, title: "  " }),
+        tools,
+        true,
+      ),
+    ).toThrow("The first response must include a title.");
+    expect(() =>
+      parseAssistantEnvelope(
+        JSON.stringify({ ...response, title: "Unexpected title" }),
+        tools,
+        false,
+      ),
+    ).toThrow("Title must be null after the first response.");
   });
 
   it("rejects plain text rather than treating it as a final answer", () => {
@@ -119,6 +198,7 @@ describe("assistant response envelope", () => {
       properties: {
         tool: { enum: [null, "read_file"] },
       },
+      required: expect.arrayContaining(["suggestions", "files", "title"]),
     });
   });
 
@@ -173,6 +253,7 @@ describe("assistant response envelope", () => {
     expect(prompt).toContain(
       "If replace_in_file fails because oldText does not match exactly once",
     );
+    expect(prompt).toContain('"suggestions":[],"files":[]');
   });
 });
 

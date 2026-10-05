@@ -28,6 +28,8 @@ describe("ChatAgent", () => {
       autoApprove: false,
       arguments: { path: "src/index.ts" },
       title: "Review the entry point",
+      suggestions: [],
+      files: [],
     });
     const finalResponse = JSON.stringify({
       type: "final",
@@ -36,6 +38,8 @@ describe("ChatAgent", () => {
       autoApprove: false,
       arguments: {},
       title: null,
+      suggestions: ["Show the relevant code"],
+      files: [{ name: "index.ts", path: "src/index.ts" }],
     });
     const chat = vi
       .fn()
@@ -78,7 +82,10 @@ describe("ChatAgent", () => {
     ).resolves.toEqual({
       response: "## Findings\n\nNo issues found.",
       title: "Review the entry point",
+      suggestions: ["Show the relevant code"],
+      files: [{ name: "index.ts", path: "src/index.ts" }],
     });
+
     expect(execute).toHaveBeenCalledWith({
       tool: "read_file",
       autoApprove: false,
@@ -93,6 +100,45 @@ describe("ChatAgent", () => {
     });
   });
 
+  it("requires a title when retrying the first user message", async () => {
+    const chat = vi.fn().mockResolvedValue(
+      JSON.stringify({
+        type: "final",
+        response: "Retried answer",
+        tool: null,
+        autoApprove: false,
+        arguments: {},
+        title: "Retry the first question",
+        suggestions: [],
+        files: [],
+      }),
+    );
+    const agent = new ChatAgent(
+      createProvider(chat as GoodBuddyProvider["chat"]),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [], execute: vi.fn() } as never,
+      {
+        onToolStatus: vi.fn(),
+        onModelStatus: vi.fn(),
+      },
+    );
+
+    await expect(
+      agent.run(
+        [{ role: "user", content: "First question" }],
+        { model: "qwen3:8b" } as unknown as ProviderModel,
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({
+      response: "Retried answer",
+      title: "Retry the first question",
+    });
+    expect(chat.mock.calls[0][0].format).toMatchObject({
+      properties: { title: { type: "string" } },
+    });
+  });
+
   it("asks the model to correct invalid JSON and returns its valid retry", async () => {
     const finalResponse = JSON.stringify({
       type: "final",
@@ -101,6 +147,8 @@ describe("ChatAgent", () => {
       autoApprove: false,
       arguments: {},
       title: "Answer me",
+      suggestions: [],
+      files: [],
     });
     const chat = vi
       .fn()
@@ -149,6 +197,8 @@ describe("ChatAgent", () => {
       autoApprove: false,
       arguments: {},
       title: "Answer me",
+      suggestions: [],
+      files: [],
     });
     const chatWithMetadata = vi
       .fn<GoodBuddyProvider["chatWithMetadata"]>()

@@ -14,6 +14,7 @@ export interface ChatAgentResult {
   response: string;
   title?: string;
   suggestions?: string[];
+  files?: { name: string; path: string }[];
 }
 
 export interface ChatAgentEvents {
@@ -125,6 +126,7 @@ export class ChatAgent {
           response: envelope.response,
           title,
           suggestions: envelope.suggestions,
+          files: envelope.files,
         };
       }
       const toolCall = envelope.tool;

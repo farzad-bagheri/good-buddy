@@ -2,7 +2,13 @@ import { ChatMessage, ProviderModel } from "@/provider";
 import type { ToolCall, ToolDefinition } from "./types";
 
 export type AssistantEnvelope =
-  | { type: "final"; response: string; title?: string; suggestions?: string[] }
+  | {
+      type: "final";
+      response: string;
+      title?: string;
+      suggestions: string[];
+      files: { name: string; path: string }[];
+    }
   | { type: "tool_call"; tool: ToolCall; title?: string };
 
 export function formatError(error: unknown): string {
@@ -67,19 +73,20 @@ export function agentInstructions(
   const toolInstructions = tools
     .map((tool) => `- ${tool.id}: ${tool.description}`)
     .join("\n");
-  const titleExample = requestTitle
-    ? '"title":"Short descriptive title"'
-    : '"title":null';
+  const titleExample = requestTitle ? '"Short descriptive title"' : "null";
   return {
     role: "system",
     content: `You are Good Buddy, a concise coding assistant with workspace tools. Your technical details are as follows: ${JSON.stringify(model)}.
-Every reply must be exactly one JSON object matching this contract(you choose either "final" or "tool_call"), with no Markdown fences or surrounding prose:
-{"type":"final","title":null|string,"response":"Markdown answer","tool":null,"autoApprove":false,"arguments":{},${titleExample}, "suggestions": []}
-{"type":"tool_call","title":null,"response":"","tool":"tool_id","autoApprove":true|false,"arguments":{},${titleExample}}
+Every reply must be exactly one JSON object matching one of these contracts, with no Markdown fences or surrounding prose:
+{"type":"final","title":${titleExample},"response":"Markdown answer","tool":null,"autoApprove":false,"arguments":{},"suggestions":[],"files":[]}
+{"type":"tool_call","title":${titleExample},"response":"","tool":"tool_id","autoApprove":false,"arguments":{},"suggestions":[],"files":[]}
 Use type "final" when answering the user. The "response" value is Markdown and should contain the complete user-facing answer: finish every sentence and list, and do not end with an unfinished introduction or colon.
 Use type "tool_call" only when a listed tool is needed. For write_file, replace_in_file, run_command, and delete_file, always set autoApprove to false. The user must approve writes and commands through their confirmation UI; delete_file always requires its own explicit modal confirmation and moves only one file to the OS trash. A chat message such as "okay" does not execute or approve a pending operation.
 ${requestTitle ? 'On this first response, include a short descriptive title in "title". On later responses, set title to null.' : "Set title to null."}
-Only on type "final" replies, you may include a "suggestions" array with up to 2 short, specific follow-up replies the user could send next (each under 60 characters, phrased as something the user would say or as answer for your question). Omit or leave it empty when no natural follow-up exists; never suggest anything for tool_call replies.
+On final replies:
+Set "suggestions" to up to 2 short, specific follow-up replies the user could send next (each under 60 characters), or [] if none. Always set it to [] on tool_call replies.
+Use "files" for up to 5 workspace files mentioned in a final response, each with its name and workspace-relative path (like { "name": "index.ts", "path": "src/index.ts" }). Use [] when there are no such files.
+On tool_call replies, always set "suggestions" to [] and files to [].
 Available tools:
 ${toolInstructions}
 Current project context:\n${projectContext}\n\nWhen the user asks about or changes this project, inspect relevant files before answering. Do not stop after saying what you will do: request the next tool in the same response. Use replace_in_file only for small, localized edits when you have copied the exact unique oldText from read_file. For structural or broad changes, read the existing file and use write_file with its complete updated contents.
@@ -107,11 +114,35 @@ export function assistantResponseFormat(
       title: requestTitle ? { type: "string" } : { type: ["string", "null"] },
       suggestions: {
         type: "array",
-        items: { type: "string" },
+        items: { type: "string", minLength: 1, maxLength: 59 },
+        minItems: 0,
         maxItems: 2,
       },
+      files: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", minLength: 1 },
+            path: { type: "string", minLength: 1 },
+          },
+          required: ["name", "path"],
+          additionalProperties: false,
+        },
+        minItems: 0,
+        maxItems: 5,
+      },
     },
-    required: ["type", "response", "tool", "autoApprove", "arguments", "title"],
+    required: [
+      "type",
+      "response",
+      "tool",
+      "autoApprove",
+      "arguments",
+      "title",
+      "suggestions",
+      "files",
+    ],
     additionalProperties: false,
   };
 }
@@ -141,7 +172,11 @@ export function parseAssistantEnvelope(
       "Response must include boolean autoApprove and object arguments.",
     );
   }
-  if (titleRequired ? typeof value.title !== "string" : value.title !== null) {
+  if (
+    titleRequired
+      ? typeof value.title !== "string" || !value.title.trim()
+      : value.title !== null
+  ) {
     throw new Error(
       titleRequired
         ? "The first response must include a title."
@@ -149,12 +184,35 @@ export function parseAssistantEnvelope(
     );
   }
   if (
-    value.suggestions !== undefined &&
-    (!Array.isArray(value.suggestions) ||
-      value.suggestions.length > 2 ||
-      value.suggestions.some((suggestion) => typeof suggestion !== "string"))
+    !Array.isArray(value.suggestions) ||
+    value.suggestions.length > 2 ||
+    value.suggestions.some(
+      (suggestion) =>
+        typeof suggestion !== "string" ||
+        !suggestion.trim() ||
+        suggestion.length >= 60,
+    )
   ) {
-    throw new Error("Suggestions must be an array of up to two strings.");
+    throw new Error(
+      "Suggestions must be an array of up to two non-empty strings under 60 characters.",
+    );
+  }
+
+  if (
+    !Array.isArray(value.files) ||
+    value.files.length > 5 ||
+    value.files.some(
+      (file) =>
+        !isRecord(file) ||
+        typeof file.name !== "string" ||
+        !file.name.trim() ||
+        typeof file.path !== "string" ||
+        !file.path.trim(),
+    )
+  ) {
+    throw new Error(
+      "Files must be an array of up to five objects with name and path strings.",
+    );
   }
 
   const title = typeof value.title === "string" ? value.title : undefined;
@@ -162,16 +220,27 @@ export function parseAssistantEnvelope(
     if (value.tool !== null) {
       throw new Error("A final response must set tool to null.");
     }
+
     return {
       type: "final",
       response: value.response,
       title,
       suggestions: value.suggestions,
+      files: value.files,
     };
   }
 
   if (typeof value.tool !== "string") {
     throw new Error("A tool call must include a tool name.");
+  }
+  if (
+    value.response !== "" ||
+    value.suggestions.length > 0 ||
+    value.files.length > 0
+  ) {
+    throw new Error(
+      "Tool calls must have an empty response, suggestions array, and files array.",
+    );
   }
   const tool = tools.find(({ id }) => id === value.tool);
   if (!tool) throw new Error(`Unknown tool '${value.tool}'.`);
