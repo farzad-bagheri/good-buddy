@@ -9,6 +9,7 @@ export interface ChatWebviewMessageHandlers {
   ready(): Promise<void>;
   checkProvider(): Promise<void>;
   openSettings(): Promise<void>;
+  openFile(filePath: string): Promise<void>;
   send(text: string): Promise<void>;
   retry(historyIndex: number): Promise<void>;
   attachFiles(): Promise<void>;
@@ -39,6 +40,8 @@ export class ChatWebviewMessageRouter {
           return this.handlers.checkProvider();
         case "wv:openSettings":
           return this.handlers.openSettings();
+        case "wv:openFile":
+          return this.handlers.openFile(String(message.filePath ?? ""));
         case "wv:send":
           return this.handlers.send(String(message.text ?? ""));
         case "wv:retry":

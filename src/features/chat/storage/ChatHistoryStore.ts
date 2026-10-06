@@ -109,7 +109,15 @@ function isStoredChat(value: unknown): value is StoredChat {
         (message.role === "user" || message.role === "assistant") &&
         typeof message.content === "string" &&
         (message.displayContent === undefined ||
-          typeof message.displayContent === "string"),
+          typeof message.displayContent === "string") &&
+        (message.files === undefined ||
+          (Array.isArray(message.files) &&
+            message.files.every(
+              (file) =>
+                file &&
+                typeof file.name === "string" &&
+                typeof file.path === "string",
+            ))),
     )
   );
 }

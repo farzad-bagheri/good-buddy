@@ -2,6 +2,7 @@ import { ChatMessage, GoodBuddyProvider } from "@/provider";
 import { ModelSelectionStore } from "@/provider/ModelSelectionStore";
 import { Resources } from "@/resources";
 import { marked } from "marked";
+import * as path from "node:path";
 import * as vscode from "vscode";
 import { ChatAgent } from "./agent";
 import {
@@ -72,8 +73,9 @@ export class ChatFeature implements vscode.WebviewViewProvider {
           path,
           diff,
         });
-        void this.proposalDiffEditor.open(id, path, before, after).catch(
-          (error: unknown) => {
+        void this.proposalDiffEditor
+          .open(id, path, before, after)
+          .catch((error: unknown) => {
             const message = formatError(error);
             this.output.appendLine(
               `[proposal diff error] Could not open ${path}: ${message}`,
@@ -81,18 +83,6 @@ export class ChatFeature implements vscode.WebviewViewProvider {
             void vscode.window.showErrorMessage(
               `Could not open the proposed change in a diff editor: ${message}`,
             );
-          },
-        );
-        void vscode.window
-          .showInformationMessage(
-            `Review proposed change: ${path}`,
-            "Approve",
-            "Reject",
-          )
-          .then((choice) => {
-            if (choice) {
-              return this.writeApprovals.review(id, choice === "Approve");
-            }
           });
       },
       complete: (id, result) => {
@@ -158,7 +148,6 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         },
       },
     );
-
   }
 
   /** Configures the chat webview and handles messages sent by its UI. */
@@ -193,6 +182,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
           "@ext:dabanli.good-buddy",
         );
       },
+      openFile: (filePath) => this.openFileInVsCode(filePath),
       send: (text) => this.handleSend(text),
       retry: (historyIndex) => this.handleRetry(historyIndex),
       attachFiles: () => this.viewState.pickAttachments(),
@@ -218,8 +208,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       resumeChat: (id) => this.resumeChat(id),
       deleteChat: (id) => this.confirmDeleteChat(id),
       cancel: () => this.activeController?.abort(),
-      reviewWrite: (id, approved) =>
-        this.writeApprovals.review(id, approved),
+      reviewWrite: (id, approved) => this.writeApprovals.review(id, approved),
       reviewCommand: (id, approved) =>
         this.commandApprovals.executeOrReject(id, approved),
     });
@@ -230,10 +219,14 @@ export class ChatFeature implements vscode.WebviewViewProvider {
   /** Sends chat history to the webview, rendering assistant messages as HTML. */
   private postHistory(thinking = false) {
     const messages = this.session.history.map(
-      ({ role, content, displayContent, suggestions }, historyIndex) => ({
+      (
+        { role, content, displayContent, suggestions, files },
+        historyIndex,
+      ) => ({
         role,
         content: marked.parse(displayContent ?? content),
         suggestions,
+        files,
         historyIndex,
       }),
     );
@@ -318,6 +311,47 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     this.session.history = this.session.history.slice(0, userIndex);
     this.postHistory(true);
     await this.handleSend(userMessage.content, userMessage);
+  }
+
+  private async openFileInVsCode(filePath: string): Promise<void> {
+    try {
+      const requestedPath = filePath.trim();
+      if (!requestedPath) throw new Error("The file path is empty.");
+
+      const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+      if (workspaceFolders.length === 0) {
+        throw new Error("Open a workspace folder before opening a file.");
+      }
+
+      let absolutePath: string | undefined;
+      if (!path.isAbsolute(requestedPath)) {
+        const workspaceRoot = workspaceFolders[0].uri.fsPath;
+        absolutePath = path.resolve(workspaceRoot, requestedPath);
+        const relative = path.relative(workspaceRoot, absolutePath);
+        if (
+          relative === ".." ||
+          relative.startsWith(`..${path.sep}`) ||
+          path.isAbsolute(relative)
+        ) {
+          throw new Error("The file path must stay inside the workspace.");
+        }
+      }
+
+      if (absolutePath) {
+        const document = await vscode.workspace.openTextDocument(
+          vscode.Uri.file(absolutePath),
+        );
+        await vscode.window.showTextDocument(document, { preview: false });
+      }
+    } catch (error) {
+      const message = formatError(error);
+      this.output.appendLine(
+        `[open file error] Could not open ${filePath}: ${message}`,
+      );
+      void vscode.window.showErrorMessage(
+        `Could not open workspace file: ${message}`,
+      );
+    }
   }
 
   /** Adds a user message and runs the agent, reporting its result to the webview. */
@@ -415,6 +449,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         role: "assistant",
         content: assistantText,
         suggestions: result.suggestions,
+        files: result.files,
       });
       const assistantHtml = marked.parse(assistantText);
       // Notify the webview that the assistant has started generating its response.
@@ -432,8 +467,15 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       this.view.webview.postMessage({
         type: "vsc:assistantDone",
         suggestions: result.suggestions,
+        files: result.files,
       });
-      void this.session.persist(id, createdAt, conversation, modelName, chatTitle);
+      void this.session.persist(
+        id,
+        createdAt,
+        conversation,
+        modelName,
+        chatTitle,
+      );
     } catch (err) {
       // If an error occurs and the request was not aborted, notify the webview of the error.
       if (!controller.signal.aborted) {
@@ -478,7 +520,6 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       this.resources.getIcon(name).asWebUri(webview).toString();
     return shellHtml(cspSource, nonce, scriptUri, styleUri, iconUri);
   }
-
 }
 
 /**

@@ -96,7 +96,7 @@ describe("ChatAgent", () => {
       properties: { title: { type: "string" } },
     });
     expect(chat.mock.calls[1][0].format).toMatchObject({
-      properties: { title: { type: ["string", "null"] } },
+      properties: { title: { type: "null" } },
     });
   });
 
@@ -187,6 +187,76 @@ describe("ChatAgent", () => {
           "Your previous response could not be used: Response must be one valid JSON object. Follow the required response schema and return one complete JSON object only.",
       },
     ]);
+  });
+
+  it("requires null title when retrying a response after the first assistant response", async () => {
+    const toolResponse = JSON.stringify({
+      type: "tool_call",
+      response: "",
+      tool: "read_file",
+      autoApprove: false,
+      arguments: { path: "src/index.ts" },
+      title: "Review the entry point",
+      suggestions: [],
+      files: [],
+    });
+    const invalidResponse = JSON.stringify({
+      type: "final",
+      response: "Answer",
+      tool: null,
+      autoApprove: false,
+      arguments: {},
+      title: "Unexpected title",
+      suggestions: [],
+      files: [],
+    });
+    const validResponse = JSON.stringify({
+      type: "final",
+      response: "Recovered answer",
+      tool: null,
+      autoApprove: false,
+      arguments: {},
+      title: null,
+      suggestions: [],
+      files: [],
+    });
+    const chat = vi
+      .fn()
+      .mockResolvedValueOnce(toolResponse)
+      .mockResolvedValueOnce(invalidResponse)
+      .mockResolvedValueOnce(validResponse);
+    const agent = new ChatAgent(
+      createProvider(chat as GoodBuddyProvider["chat"]),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      {
+        list: () => [{ id: "read_file" } as ToolDefinition],
+        execute: vi.fn().mockResolvedValue("file contents"),
+      } as never,
+      {
+        onToolStatus: vi.fn(),
+        onModelStatus: vi.fn(),
+      },
+    );
+
+    await expect(
+      agent.run(
+        [{ role: "user", content: "Review the entry point" }],
+        { model: "qwen3:8b" } as unknown as ProviderModel,
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({
+      response: "Recovered answer",
+      title: "Review the entry point",
+    });
+
+    expect(chat).toHaveBeenCalledTimes(3);
+    expect(chat.mock.calls[1][0].format).toMatchObject({
+      properties: { title: { type: "null" } },
+    });
+    expect(chat.mock.calls[2][0].format).toMatchObject({
+      properties: { title: { type: "null" } },
+    });
   });
 
   it("retries provider-reported output-limit responses with a shorter answer request", async () => {

@@ -83,10 +83,8 @@ Every reply must be exactly one JSON object matching one of these contracts, wit
 Use type "final" when answering the user. The "response" value is Markdown and should contain the complete user-facing answer: finish every sentence and list, and do not end with an unfinished introduction or colon.
 Use type "tool_call" only when a listed tool is needed. For write_file, replace_in_file, run_command, and delete_file, always set autoApprove to false. The user must approve writes and commands through their confirmation UI; delete_file always requires its own explicit modal confirmation and moves only one file to the OS trash. A chat message such as "okay" does not execute or approve a pending operation.
 ${requestTitle ? 'On this first response, include a short descriptive title in "title". On later responses, set title to null.' : "Set title to null."}
-On final replies:
 Set "suggestions" to up to 2 short, specific follow-up replies the user could send next (each under 60 characters), or [] if none. Always set it to [] on tool_call replies.
-Use "files" for up to 5 workspace files mentioned in a final response, each with its name and workspace-relative path (like { "name": "index.ts", "path": "src/index.ts" }). Use [] when there are no such files.
-On tool_call replies, always set "suggestions" to [] and files to [].
+Set "files" for up to 5 workspace files mentioned in a final response, each with its name and workspace-relative path (like { "name": "index.ts", "path": "src/index.ts" }). Always set it to [] on tool_call replies.
 Available tools:
 ${toolInstructions}
 Current project context:\n${projectContext}\n\nWhen the user asks about or changes this project, inspect relevant files before answering. Do not stop after saying what you will do: request the next tool in the same response. Use replace_in_file only for small, localized edits when you have copied the exact unique oldText from read_file. For structural or broad changes, read the existing file and use write_file with its complete updated contents.
@@ -111,7 +109,7 @@ export function assistantResponseFormat(
       },
       autoApprove: { type: "boolean" },
       arguments: { type: "object", additionalProperties: true },
-      title: requestTitle ? { type: "string" } : { type: ["string", "null"] },
+      title: requestTitle ? { type: "string" } : { type: "null" },
       suggestions: {
         type: "array",
         items: { type: "string", minLength: 1, maxLength: 59 },

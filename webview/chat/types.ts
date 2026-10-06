@@ -35,6 +35,7 @@ export type TimelineItem =
       html?: string;
       historyIndex?: number;
       suggestions?: string[];
+      files?: { name: string; path: string }[];
     }
   | { id: string; kind: "toolStatus"; text: string }
   | {

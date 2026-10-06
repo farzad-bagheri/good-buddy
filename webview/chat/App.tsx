@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChatHeader } from "./components/ChatHeader";
 import { ChatHistory } from "./components/ChatHistory";
 import { Composer } from "./components/Composer";
+import { Files } from "./components/Files";
 import { ProviderNotice } from "./components/ProviderNotice";
 import { ProviderSetupDialog } from "./components/ProviderSetupDialog";
 import { Suggestions } from "./components/Suggestions";
@@ -137,6 +138,7 @@ export function App() {
             setItems((current) =>
               updateAssistantMessage(current, id, {
                 suggestions: message.suggestions,
+                files: message.files,
               }),
             );
           }
@@ -233,6 +235,10 @@ export function App() {
     vscode.postMessage({ type: "wv:checkProvider" });
   };
 
+  const handleOpenFile = (filePath: string) => {
+    vscode.postMessage({ type: "wv:openFile", filePath });
+  };
+
   const latestMessage = [...items]
     .reverse()
     .find((item) => item.kind === "message");
@@ -240,6 +246,11 @@ export function App() {
   const suggestions =
     !thinking && latestMessage?.role === "assistant"
       ? latestMessage.suggestions
+      : undefined;
+
+  const files =
+    !thinking && latestMessage?.role === "assistant"
+      ? latestMessage.files
       : undefined;
 
   const hasConversation = items.some(
@@ -288,23 +299,26 @@ export function App() {
                 }}
               />
             )}
+
             <Timeline
               items={items}
               onRetry={handleRetry}
               retryDisabled={thinking}
             />
-            {thinking && (
-              <div className="thinking" role="status">
-                Thinking...
-              </div>
+
+            {thinking && <div role="status">Thinking...</div>}
+
+            {files && files.length > 0 && (
+              <Files files={files} onOpen={handleOpenFile} />
             )}
 
-            {suggestions?.length && (
+            {suggestions && suggestions.length > 0 && (
               <Suggestions
                 suggestions={suggestions}
                 onSuggest={(t) => setText(t)}
               />
             )}
+            
             <div ref={endOfMessages} />
           </section>
           <Composer
@@ -315,6 +329,7 @@ export function App() {
           />
         </>
       )}
+      
       {setupOpen && (
         <ProviderSetupDialog
           provider={provider}

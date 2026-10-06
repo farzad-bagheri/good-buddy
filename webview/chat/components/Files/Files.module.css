@@ -1,0 +1,18 @@
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file {
+  text-align: left;
+  padding: 8px;
+  border: 1px solid var(--vscode-editorWidget-border);
+  color: var(--vscode-textLink-foreground);
+  background: transparent;
+  cursor: pointer;
+}
+
+.file:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}

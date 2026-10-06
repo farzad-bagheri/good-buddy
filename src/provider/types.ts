@@ -40,6 +40,8 @@ export interface ChatMessage {
   displayContent?: string;
   /** Short follow-up replies the user could send next, shown only for the latest assistant message. */
   suggestions?: string[];
+  /** Workspace files referenced by the assistant response. */
+  files?: { name: string; path: string }[];
 }
 
 export interface ChatOptions {

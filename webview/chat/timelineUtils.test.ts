@@ -43,6 +43,7 @@ describe("timeline utilities", () => {
           content: "<p>Answer</p>",
           historyIndex: 1,
           suggestions: ["Tell me more"],
+          files: [{ name: "App.tsx", path: "webview/chat/App.tsx" }],
         },
       ]),
     ).toMatchObject([
@@ -52,6 +53,7 @@ describe("timeline utilities", () => {
         text: "<p>Answer</p>",
         historyIndex: 1,
         suggestions: ["Tell me more"],
+        files: [{ name: "App.tsx", path: "webview/chat/App.tsx" }],
       },
     ]);
   });
@@ -60,11 +62,18 @@ describe("timeline utilities", () => {
     const items = updateAssistantMessage(
       [assistantItem, proposalItem],
       assistantItem.id,
-      { text: "Updated answer", suggestions: ["Next"] },
+      {
+        text: "Updated answer",
+        suggestions: ["Next"],
+        files: [{ name: "App.tsx", path: "webview/chat/App.tsx" }],
+      },
     );
 
     expect(items[0]).toMatchObject({ text: "Updated answer" });
     expect(items[0]).toMatchObject({ suggestions: ["Next"] });
+    expect(items[0]).toMatchObject({
+      files: [{ name: "App.tsx", path: "webview/chat/App.tsx" }],
+    });
     expect(items[1]).toBe(proposalItem);
   });
 

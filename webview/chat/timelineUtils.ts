@@ -9,6 +9,7 @@ export interface HistoryMessage {
   html?: string;
   historyIndex?: number;
   suggestions?: string[];
+  files?: { name: string; path: string }[];
 }
 
 export function mapHistoryToTimelineItems(
@@ -22,6 +23,7 @@ export function mapHistoryToTimelineItems(
     html: message.html,
     historyIndex: message.historyIndex,
     suggestions: message.suggestions,
+    files: message.files,
   }));
 }
 
@@ -52,7 +54,9 @@ export function appendCommandProposal(
 export function updateAssistantMessage(
   items: TimelineItem[],
   id: string,
-  updates: Partial<Pick<MessageTimelineItem, "text" | "html" | "suggestions">>,
+  updates: Partial<
+    Pick<MessageTimelineItem, "text" | "html" | "suggestions" | "files">
+  >,
 ): TimelineItem[] {
   return items.map((item) =>
     item.id === id && item.kind === "message" && item.role === "assistant"

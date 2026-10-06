@@ -208,6 +208,12 @@ describe("assistant response envelope", () => {
     });
   });
 
+  it("allows only a null title after the first response", () => {
+    expect(assistantResponseFormat(tools)).toMatchObject({
+      properties: { title: { type: "null" } },
+    });
+  });
+
   it("guides exact localized replacements and full-file structural edits", () => {
     const prompt = agentInstructions(
       {
