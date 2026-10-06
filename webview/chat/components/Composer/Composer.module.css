@@ -16,6 +16,11 @@
   font-size: 0.85em;
 }
 
+.attachmentError {
+  color: var(--vscode-errorForeground);
+  font-size: 0.85em;
+}
+
 .composer {
   padding: 8px 12px;
   border: 1px solid var(--vscode-input-border, transparent);

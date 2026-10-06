@@ -82,4 +82,37 @@ describe("OllamaProvider", () => {
       }),
     ).resolves.toEqual({ content: "partial", finishReason: "length" });
   });
+
+  it("sends image bytes in Ollama's native images field", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ message: { content: "A screenshot" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new OllamaProvider().chat({
+      model: "vision-model",
+      messages: [
+        {
+          role: "user",
+          content: "Describe this.",
+          images: [
+            {
+              name: "clip.png",
+              mimeType: "image/png",
+              data: "aGVsbG8=",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).messages).toEqual([
+      {
+        role: "user",
+        content: "Describe this.",
+        images: ["aGVsbG8="],
+      },
+    ]);
+  });
 });

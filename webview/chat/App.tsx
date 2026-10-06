@@ -48,6 +48,7 @@ export function App() {
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [attachments, setAttachments] = useState<AttachmentState>({
     attached: [],
+    images: [],
     activeDocument: undefined,
   });
   /**
@@ -190,6 +191,7 @@ export function App() {
         case "vsc:attachments":
           setAttachments({
             attached: message.attached,
+            images: message.images ?? [],
             activeDocument: message.activeDocument,
           });
           break;

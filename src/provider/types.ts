@@ -38,10 +38,18 @@ export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
   displayContent?: string;
+  images?: ChatImage[];
   /** Short follow-up replies the user could send next, shown only for the latest assistant message. */
   suggestions?: string[];
   /** Workspace files referenced by the assistant response. */
   files?: { name: string; path: string }[];
+}
+
+export interface ChatImage {
+  name: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp";
+  /** Base64-encoded image bytes without a data URL prefix. */
+  data: string;
 }
 
 export interface ChatOptions {

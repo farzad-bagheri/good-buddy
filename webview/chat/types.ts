@@ -69,6 +69,7 @@ export interface Attachment {
 
 export interface AttachmentState {
   attached: Attachment[];
+  images: { id: string; name: string }[];
   activeDocument?: Attachment;
 }
 

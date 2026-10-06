@@ -13,7 +13,9 @@ export interface ChatWebviewMessageHandlers {
   send(text: string): Promise<void>;
   retry(historyIndex: number): Promise<void>;
   attachFiles(): Promise<void>;
+  addImage(name: string, mimeType: string, data: string): void;
   removeAttachment(index: number): void;
+  removeImage(id: string): void;
   selectModel(model: unknown): Promise<void>;
   selectCompletionModel(model: unknown): Promise<void>;
   newChat(): Promise<void>;
@@ -48,8 +50,16 @@ export class ChatWebviewMessageRouter {
           return this.handlers.retry(Number(message.historyIndex));
         case "wv:attachFiles":
           return this.handlers.attachFiles();
+        case "wv:addImage":
+          return this.handlers.addImage(
+            String(message.name ?? ""),
+            String(message.mimeType ?? ""),
+            String(message.data ?? ""),
+          );
         case "wv:removeAttachment":
           return this.handlers.removeAttachment(Number(message.index));
+        case "wv:removeImage":
+          return this.handlers.removeImage(String(message.id ?? ""));
         case "wv:selectModel":
           return this.handlers.selectModel(message.model);
         case "wv:selectCompletionModel":

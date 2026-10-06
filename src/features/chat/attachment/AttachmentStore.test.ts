@@ -69,6 +69,34 @@ describe("AttachmentStore", () => {
     },
   );
 
+  it("accepts selected PNG files as image attachments", async () => {
+    const store = new AttachmentStore();
+    const image = Buffer.from("png image bytes");
+    vscodeState.selected = [{ path: "/workspace/screenshot.png" }];
+    vscodeState.files.set("/workspace/screenshot.png", image);
+
+    await store.pick();
+
+    expect(store.images).toHaveLength(1);
+    expect(store.images[0]).toMatchObject({
+      name: "screenshot.png",
+      mimeType: "image/png",
+      data: image.toString("base64"),
+    });
+    expect(store.all).toHaveLength(0);
+  });
+
+  it("validates clipboard image data and supports removing image attachments", () => {
+    const store = new AttachmentStore();
+    store.addImageBase64("clip.png", "image/png", "aGVsbG8=");
+    store.addImageBase64("bad.png", "image/png", "not base64!");
+    expect(store.images).toHaveLength(1);
+
+    const id = store.images[0].id;
+    store.removeImage(id);
+    expect(store.images).toHaveLength(0);
+  });
+
   it("includes a default attachment with manually selected files", async () => {
     const store = new AttachmentStore();
     vscodeState.selected = [{ path: "/workspace/manual.txt" }];

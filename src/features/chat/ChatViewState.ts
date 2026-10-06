@@ -103,11 +103,22 @@ export class ChatViewState {
     this.postAttachments();
   }
 
+  addImageAttachment(name: string, mimeType: string, data: string): void {
+    this.attachments.addImageBase64(name, mimeType, data);
+    this.postAttachments();
+  }
+
+  removeImageAttachment(id: string): void {
+    this.attachments.removeImage(id);
+    this.postAttachments();
+  }
+
   postAttachments(): void {
     const activeDocument = this.attachments.activeDocumentAttachment();
     this.getWebview()?.postMessage({
       type: "vsc:attachments",
       attached: this.attachments.allBase,
+      images: this.attachments.images.map(({ id, name }) => ({ id, name })),
       activeDocument,
     });
   }

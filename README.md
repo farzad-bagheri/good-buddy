@@ -20,6 +20,9 @@ server you configure and does not require a Good Buddy cloud service.
 
 - **Chat with your project in context.** Ask questions about your codebase,
   explore how things work, or get help planning an implementation.
+- **Ask about images.** Attach PNG, JPEG, or WebP files, or paste a screenshot
+  into the chat composer. Image understanding depends on whether your selected
+  model supports vision; text-only models may reject image requests.
 - **Make changes with the assistant.** Ask it to add a feature, update existing
   behavior, or fix a bug. Good Buddy can inspect files, propose edits, and run
   project commands. Review proposed file changes in a diff and approve them

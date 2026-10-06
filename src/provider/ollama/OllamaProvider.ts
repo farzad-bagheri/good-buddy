@@ -71,6 +71,7 @@ export class OllamaProvider implements GoodBuddyProvider {
   ): Promise<ChatResponseMetadata> {
     const body = JSON.stringify({
       ...options,
+      messages: this.messagesWithImages(options),
       stream: false,
       think: options.think ?? false,
     });
@@ -97,6 +98,7 @@ export class OllamaProvider implements GoodBuddyProvider {
   ): Promise<string> {
     const body = JSON.stringify({
       ...options,
+      messages: this.messagesWithImages(options),
       stream: true,
       think: options.think ?? false,
     });
@@ -166,5 +168,15 @@ export class OllamaProvider implements GoodBuddyProvider {
       fullResponse += processStreamLine(remaining, extractText, onChunk);
     }
     return fullResponse;
+  }
+
+  private messagesWithImages(
+    options: ChatOptions,
+  ): Array<{ role: string; content: string; images?: string[] }> {
+    return options.messages.map(({ role, content, images }) => ({
+      role,
+      content,
+      ...(images?.length && { images: images.map((image) => image.data) }),
+    }));
   }
 }

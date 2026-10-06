@@ -90,6 +90,45 @@ describe("OpenAICompatibleProvider", () => {
     ).resolves.toEqual({ content: "partial", finishReason: "length" });
   });
 
+  it("encodes image attachments using OpenAI-compatible image content parts", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () =>
+        JSON.stringify({ choices: [{ message: { content: "A screenshot" } }] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new OpenAICompatibleProvider().chatWithMetadata({
+      model: "vision-model",
+      messages: [
+        {
+          role: "user",
+          content: "Describe this.",
+          images: [
+            {
+              name: "clip.png",
+              mimeType: "image/png",
+              data: "aGVsbG8=",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).messages).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Describe this." },
+          {
+            type: "image_url",
+            image_url: { url: "data:image/png;base64,aGVsbG8=" },
+          },
+        ],
+      },
+    ]);
+  });
+
   it("lists model IDs in Good Buddy's provider model shape", async () => {
     vi.stubGlobal(
       "fetch",

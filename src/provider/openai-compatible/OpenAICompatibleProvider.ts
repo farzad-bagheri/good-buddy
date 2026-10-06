@@ -80,9 +80,9 @@ export class OpenAICompatibleProvider implements GoodBuddyProvider {
   ): Promise<ChatResponse> {
     const body = {
       model: options.model,
-      messages: options.messages.map(({ role, content }) => ({
-        role,
-        content,
+      messages: options.messages.map((message) => ({
+        role: message.role,
+        content: this.messageContent(message.content, message.images),
       })),
       stream: false,
       ...(options.format !== undefined && {
@@ -111,9 +111,9 @@ export class OpenAICompatibleProvider implements GoodBuddyProvider {
   ): Promise<string> {
     const body = {
       model: options.model,
-      messages: options.messages.map(({ role, content }) => ({
-        role,
-        content,
+      messages: options.messages.map((message) => ({
+        role: message.role,
+        content: this.messageContent(message.content, message.images),
       })),
       stream: true,
       ...(options.format !== undefined && {
@@ -207,6 +207,22 @@ export class OpenAICompatibleProvider implements GoodBuddyProvider {
         schema: format,
       },
     };
+  }
+
+  private messageContent(
+    content: string,
+    images: ChatOptions["messages"][number]["images"],
+  ): string | Record<string, unknown>[] {
+    if (!images?.length) return content;
+    return [
+      { type: "text", text: content },
+      ...images.map((image) => ({
+        type: "image_url",
+        image_url: {
+          url: `data:${image.mimeType};base64,${image.data}`,
+        },
+      })),
+    ];
   }
 
   private async parseResponse<T>(

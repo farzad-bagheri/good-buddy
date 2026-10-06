@@ -20,6 +20,45 @@ function createProvider(chat: GoodBuddyProvider["chat"]) {
 }
 
 describe("ChatAgent", () => {
+  it("preserves image attachments in the provider conversation", async () => {
+    const chat = vi.fn().mockResolvedValue(
+      JSON.stringify({
+        type: "final",
+        response: "It is a screenshot.",
+        tool: null,
+        autoApprove: false,
+        arguments: {},
+        title: "Describe screenshot",
+        suggestions: [],
+        files: [],
+      }),
+    );
+    const agent = new ChatAgent(
+      createProvider(chat as GoodBuddyProvider["chat"]),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [], execute: vi.fn() } as never,
+      { onToolStatus: vi.fn(), onModelStatus: vi.fn() },
+    );
+    const image = {
+      name: "screenshot.png",
+      mimeType: "image/png" as const,
+      data: "aGVsbG8=",
+    };
+
+    await agent.run(
+      [{ role: "user", content: "Describe this.", images: [image] }],
+      { model: "vision-model" } as unknown as ProviderModel,
+      new AbortController().signal,
+    );
+
+    expect(chat.mock.calls[0][0].messages.at(-1)).toEqual({
+      role: "user",
+      content: "Describe this.",
+      images: [image],
+    });
+  });
+
   it("executes structured tool calls and returns the final Markdown and title", async () => {
     const toolResponse = JSON.stringify({
       type: "tool_call",

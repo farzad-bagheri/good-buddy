@@ -53,7 +53,11 @@ export class ChatAgent {
         requestTitle,
         isRetry,
       ),
-      ...history.map(({ role, content }) => ({ role, content })),
+      ...history.map(({ role, content, images }) => ({
+        role,
+        content,
+        images,
+      })),
     ];
     let title: string | undefined;
     let responseRetries = 0;

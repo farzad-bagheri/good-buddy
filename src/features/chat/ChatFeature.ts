@@ -186,10 +186,13 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       send: (text) => this.handleSend(text),
       retry: (historyIndex) => this.handleRetry(historyIndex),
       attachFiles: () => this.viewState.pickAttachments(),
+      addImage: (name, mimeType, data) =>
+        this.viewState.addImageAttachment(name, mimeType, data),
       removeAttachment: (index) => {
         this.viewState.attachments.removeAt(index);
         this.viewState.postAttachments();
       },
+      removeImage: (id) => this.viewState.removeImageAttachment(id),
       selectModel: (model) => this.viewState.selectModel(model),
       selectCompletionModel: (model) =>
         this.viewState.selectCompletionModel(model),
@@ -255,7 +258,17 @@ export class ChatFeature implements vscode.WebviewViewProvider {
   }
 
   private async resumeChat(id: string): Promise<void> {
-    const chat = await this.session.get(id);
+    let chat: Awaited<ReturnType<ChatSession["get"]>>;
+    try {
+      chat = await this.session.get(id);
+    } catch (error) {
+      const message = formatError(error);
+      this.output.appendLine(`Good Buddy chat: failed to resume chat: ${message}`);
+      void vscode.window.showErrorMessage(
+        `Good Buddy could not restore the conversation and its attachments: ${message}`,
+      );
+      return;
+    }
     if (!chat) return;
 
     this.activeController?.abort();
@@ -265,7 +278,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     this.viewState.attachments.clear();
     await this.viewState.selectModel(chat.model);
     this.viewState.postAttachments();
-    await this.postHistory();
+    this.postHistory();
     await this.postChatList();
   }
 
@@ -363,7 +376,8 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     if (
       (!replayMessage &&
         !userMessage.trim() &&
-        this.viewState.attachments.all.length === 0) ||
+      this.viewState.attachments.all.length === 0 &&
+      this.viewState.attachments.images.length === 0) ||
       !this.view
     ) {
       return;
@@ -382,12 +396,23 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     const attachmentBlock = replayMessage
       ? ""
       : this.viewState.attachments.formatForPrompt(activeDocument);
+    const images = replayMessage
+      ? replayMessage.images
+      : this.viewState.attachments.images.map(
+          ({ name, mimeType, data }) => ({ name, mimeType, data }),
+        );
     const userContent =
       replayMessage?.content ?? `${userMessage}${attachmentBlock}`.trim();
+    const attachedNames = replayMessage
+      ? []
+      : [
+          ...this.viewState.attachments.names(activeDocument),
+          ...this.viewState.attachments.images.map(({ name }) => name),
+        ];
     const attachmentLabel = replayMessage
       ? ""
-      : this.viewState.attachments.all.length
-        ? `\n\n>Attached: ${this.viewState.attachments.names(activeDocument).join(", ")}`
+      : attachedNames.length
+        ? `\n\n>Attached: ${attachedNames.join(", ")}`
         : activeDocument
           ? `\n\n>Open file: ${activeDocument.name}`
           : "";
@@ -404,6 +429,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       role: "user",
       content: userContent,
       displayContent,
+      ...(images?.length && { images }),
     });
     this.view.webview.postMessage({
       type: "vsc:userMessage",
@@ -481,9 +507,12 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       // If an error occurs and the request was not aborted, notify the webview of the error.
       if (!controller.signal.aborted) {
         if (this.session.currentId === id) {
+          const imageHint = images?.length
+            ? " The selected model or server may not support image input; try a vision-capable chat model."
+            : "";
           this.view?.webview.postMessage({
             type: "vsc:assistantError",
-            text: formatError(err),
+            text: `${formatError(err)}${imageHint}`,
           });
           await this.session.persist(id, createdAt, conversation, modelName);
         }

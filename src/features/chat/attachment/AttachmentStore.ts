@@ -1,5 +1,11 @@
 import * as vscode from "vscode";
-import { MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES } from "../constants";
+import { randomUUID } from "node:crypto";
+import type { ChatImage } from "@/provider";
+import {
+  MAX_ATTACHMENTS,
+  MAX_ATTACHMENT_BYTES,
+  MAX_IMAGE_ATTACHMENT_BYTES,
+} from "../constants";
 
 export interface ChatAttachmentBase {
   name: string;
@@ -10,11 +16,22 @@ export interface ChatAttachment extends ChatAttachmentBase {
   content: string;
 }
 
+export interface ChatImageAttachment extends ChatImage {
+  id: string;
+}
+
+const IMAGE_MIME_TYPES = new Set<ChatImage["mimeType"]>([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+]);
+
 /**
  * Stores and manages chat attachments for the Good Buddy chat application.
  */
 export class AttachmentStore {
   private items: ChatAttachment[] = [];
+  private imageItems: ChatImageAttachment[] = [];
 
   get all(): readonly ChatAttachment[] {
     return this.items;
@@ -24,14 +41,79 @@ export class AttachmentStore {
     return this.items.map(({ name, path }) => ({ name, path }));
   }
 
+  get images(): readonly ChatImageAttachment[] {
+    return this.imageItems;
+  }
+
   clear(): void {
     this.items = [];
+    this.imageItems = [];
   }
 
   removeAt(index: number): void {
     if (index >= 0 && index < this.items.length) {
       this.items.splice(index, 1);
     }
+  }
+
+  removeImage(id: string): void {
+    this.imageItems = this.imageItems.filter((image) => image.id !== id);
+  }
+
+  addImage(name: string, mimeType: string, data: Uint8Array): void {
+    const room = MAX_ATTACHMENTS - this.items.length - this.imageItems.length;
+    if (room <= 0) {
+      vscode.window.showWarningMessage(
+        `Good Buddy supports up to ${MAX_ATTACHMENTS} attachments per message.`,
+      );
+      return;
+    }
+    if (!isImageMimeType(mimeType)) {
+      vscode.window.showWarningMessage(
+        `Good Buddy supports PNG, JPEG, and WebP images; skipped ${name}.`,
+      );
+      return;
+    }
+    if (data.byteLength === 0 || data.byteLength > MAX_IMAGE_ATTACHMENT_BYTES) {
+      vscode.window.showWarningMessage(
+        `Good Buddy skipped ${name}: images must be smaller than 5 MB.`,
+      );
+      return;
+    }
+
+    this.imageItems.push({
+      id: randomUUID(),
+      name,
+      mimeType,
+      data: Buffer.from(data).toString("base64"),
+    });
+  }
+
+  addImageBase64(name: string, mimeType: string, base64: string): void {
+    if (base64.length > Math.ceil((MAX_IMAGE_ATTACHMENT_BYTES * 4) / 3)) {
+      vscode.window.showWarningMessage(
+        `Good Buddy skipped ${name}: images must be smaller than 5 MB.`,
+      );
+      return;
+    }
+    if (
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+        base64,
+      )
+    ) {
+      vscode.window.showWarningMessage(
+        `Good Buddy skipped ${name}: invalid image data.`,
+      );
+      return;
+    }
+    const bytes = Buffer.from(base64, "base64");
+    if (bytes.toString("base64") !== base64) {
+      vscode.window.showWarningMessage(
+        `Good Buddy skipped ${name}: invalid image data.`,
+      );
+      return;
+    }
+    this.addImage(name, mimeType, bytes);
   }
 
   /**
@@ -46,9 +128,14 @@ export class AttachmentStore {
     });
     if (!selected) return;
 
-    const room = MAX_ATTACHMENTS - this.items.length;
+    const room = MAX_ATTACHMENTS - this.items.length - this.imageItems.length;
     for (const uri of selected.slice(0, room)) {
       const bytes = await vscode.workspace.fs.readFile(uri);
+      const imageType = imageMimeType(uri.path);
+      if (imageType) {
+        this.addImage(uri.path.split("/").pop() ?? "image", imageType, bytes);
+        continue;
+      }
 
       const attachment = {
         name: uri.path.split("/").pop() ?? "file",
@@ -125,4 +212,22 @@ export class AttachmentStore {
     const unique = !this.items.some((item) => item.path === attachment.path);
     return nonBinary && withinSizeLimit && notEmpty && unique;
   }
+}
+
+function imageMimeType(filePath: string): ChatImage["mimeType"] | undefined {
+  switch (filePath.split(".").pop()?.toLowerCase()) {
+    case "png":
+      return "image/png";
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "webp":
+      return "image/webp";
+    default:
+      return undefined;
+  }
+}
+
+function isImageMimeType(value: string): value is ChatImage["mimeType"] {
+  return IMAGE_MIME_TYPES.has(value as ChatImage["mimeType"]);
 }
