@@ -69,7 +69,7 @@ export class AttachmentStore {
 
   activeDocumentAttachment(): ChatAttachment | undefined {
     const document = vscode.window.activeTextEditor?.document;
-    if (!document) return undefined;
+    if (!document || document.uri.scheme !== "file") return undefined;
 
     const content = document.getText();
 

@@ -425,6 +425,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         conversation,
         selectedModel,
         controller.signal,
+        replayMessage !== undefined,
       );
       assistantText = result.response;
       const chatTitle = result.title ?? this.session.currentTitle;

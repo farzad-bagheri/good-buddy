@@ -6,6 +6,11 @@ import * as vscode from "vscode";
 import { AttachmentStore } from "./attachment";
 import { findMissingModels, getModelSetupStatus } from "./utils";
 
+/**
+ * Manages the state of the chat view, including model selections, attachments,
+ * and provider status. It communicates with the webview to keep it updated
+ * with the current state.
+ */
 export class ChatViewState {
   readonly attachments = new AttachmentStore();
   private modelListRequest = 0;

@@ -5,7 +5,11 @@ const vscodeState = vi.hoisted(() => ({
   selected: [] as Array<{ path: string }>,
   files: new Map<string, Uint8Array>(),
   activeDocument: undefined as
-    | { uri: { path: string }; fileName: string; getText(): string }
+    | {
+        uri: { path: string; scheme: string };
+        fileName: string;
+        getText(): string;
+      }
     | undefined,
 }));
 
@@ -39,7 +43,7 @@ describe("AttachmentStore", () => {
   it("uses a basename for name and a workspace-relative path", () => {
     const store = new AttachmentStore();
     vscodeState.activeDocument = {
-      uri: { path: "/workspace/src/test/foo.tsx" },
+      uri: { path: "/workspace/src/test/foo.tsx", scheme: "file" },
       fileName: "D:\\workspace\\src\\test\\foo.tsx",
       getText: () => "current buffer",
     };
@@ -50,6 +54,20 @@ describe("AttachmentStore", () => {
       content: "current buffer",
     });
   });
+
+  it.each(["output", "extension-output"])(
+    "ignores active documents with the %s URI scheme",
+    (scheme) => {
+      const store = new AttachmentStore();
+      vscodeState.activeDocument = {
+        uri: { path: "/Good Buddy", scheme },
+        fileName: "Good Buddy",
+        getText: () => "output channel content",
+      };
+
+      expect(store.activeDocumentAttachment()).toBeUndefined();
+    },
+  );
 
   it("includes a default attachment with manually selected files", async () => {
     const store = new AttachmentStore();

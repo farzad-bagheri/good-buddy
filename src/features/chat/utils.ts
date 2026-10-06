@@ -69,6 +69,7 @@ export function agentInstructions(
   projectContext: string,
   tools: readonly ToolDefinition[],
   requestTitle: boolean,
+  isRetry = false,
 ): ChatMessage {
   const toolInstructions = tools
     .map((tool) => `- ${tool.id}: ${tool.description}`)
@@ -83,6 +84,7 @@ Every reply must be exactly one JSON object matching one of these contracts, wit
 Use type "final" when answering the user. The "response" value is Markdown and should contain the complete user-facing answer: finish every sentence and list, and do not end with an unfinished introduction or colon.
 Use type "tool_call" only when a listed tool is needed. For write_file, replace_in_file, run_command, and delete_file, always set autoApprove to false. The user must approve writes and commands through their confirmation UI; delete_file always requires its own explicit modal confirmation and moves only one file to the OS trash. A chat message such as "okay" does not execute or approve a pending operation.
 ${requestTitle ? 'On this first response, include a short descriptive title in "title". On later responses, set title to null.' : "Set title to null."}
+${isRetry ? "This is a retry of the user's original request. Prior tool results are not included, and earlier side effects may or may not have completed. Inspect the current workspace state before acting or claiming completion. For requested files, use read_file to verify whether each file exists and whether its content meets the request; read_file distinguishes a missing file from an existing empty file. Create missing files and update existing files as needed. Do not assume a file was created because a previous response said so. In your final response, describe files verified as already correct as existing; say you created or updated a file only if a write tool result in this retry starts with 'Wrote '." : ""}
 Set "suggestions" to up to 2 short, specific follow-up replies the user could send next (each under 60 characters), or [] if none. Always set it to [] on tool_call replies.
 Set "files" for up to 5 workspace files mentioned in a final response, each with its name and workspace-relative path (like { "name": "index.ts", "path": "src/index.ts" }). Always set it to [] on tool_call replies.
 Available tools:

@@ -278,6 +278,37 @@ describe("assistant response envelope", () => {
     );
     expect(prompt).toContain('"suggestions":[],"files":[]');
   });
+
+  it("instructs retries to verify file state instead of assuming prior writes", () => {
+    const prompt = agentInstructions(
+      {
+        caption: "Test model",
+        name: "test",
+        model: "test",
+        details: {
+          format: "",
+          family: "",
+          parameter_size: "",
+          quantization_level: "",
+          context_length: 0,
+          embedding_length: 0,
+        },
+        capabilities: [],
+      } satisfies ProviderModel,
+      "Workspace root: test",
+      tools,
+      false,
+      true,
+    ).content;
+
+    expect(prompt).toContain("This is a retry of the user's original request");
+    expect(prompt).toContain(
+      "read_file distinguishes a missing file from an existing empty file",
+    );
+    expect(prompt).toContain(
+      "Do not assume a file was created because a previous response said so",
+    );
+  });
 });
 
 describe("findRetryUserIndex", () => {

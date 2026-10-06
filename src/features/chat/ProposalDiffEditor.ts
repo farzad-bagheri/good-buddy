@@ -2,6 +2,11 @@ import * as vscode from "vscode";
 
 const PROPOSAL_SCHEME = "good-buddy-proposal";
 
+/**
+ * A custom diff editor for displaying proposed changes to files.
+ * It manages the lifecycle of proposal documents and ensures cleanup
+ * when proposals are completed or documents are closed.
+ */
 export class ProposalDiffEditor implements vscode.Disposable {
   private readonly contents = new Map<string, string>();
   private readonly openDocuments = new Map<string, Set<string>>();
@@ -9,9 +14,11 @@ export class ProposalDiffEditor implements vscode.Disposable {
   private readonly subscriptions: vscode.Disposable[];
 
   constructor() {
+    // Register content provider and event listeners for managing proposal documents.
     this.subscriptions = [
       vscode.workspace.registerTextDocumentContentProvider(PROPOSAL_SCHEME, {
-        provideTextDocumentContent: (uri) => this.contents.get(uri.toString()) ?? "",
+        provideTextDocumentContent: (uri) =>
+          this.contents.get(uri.toString()) ?? "",
       }),
       vscode.workspace.onDidOpenTextDocument((document) => {
         const proposalId = this.proposalIdForDocument(document.uri);
@@ -90,6 +97,7 @@ export class ProposalDiffEditor implements vscode.Disposable {
   }
 
   private cleanup(id: string): void {
+    // Only clean up if the proposal is completed and no documents are open for it.
     if (
       !this.completedProposals.has(id) ||
       (this.openDocuments.get(id)?.size ?? 0) > 0
@@ -97,11 +105,13 @@ export class ProposalDiffEditor implements vscode.Disposable {
       return;
     }
 
+    // Remove all contents associated with this proposal.
     for (const uri of this.contents.keys()) {
       if (this.proposalIdForDocument(vscode.Uri.parse(uri)) === id) {
         this.contents.delete(uri);
       }
     }
+
     this.openDocuments.delete(id);
     this.completedProposals.delete(id);
   }

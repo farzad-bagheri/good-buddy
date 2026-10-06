@@ -37,6 +37,7 @@ export class ChatAgent {
     history: ChatMessage[],
     providerModel: ProviderModel | null,
     signal: AbortSignal,
+    isRetry = false,
   ): Promise<ChatAgentResult> {
     if (!providerModel) {
       throw new Error("No model selected");
@@ -50,6 +51,7 @@ export class ChatAgent {
         await this.workspaceTools.projectContext(),
         availableTools,
         requestTitle,
+        isRetry,
       ),
       ...history.map(({ role, content }) => ({ role, content })),
     ];

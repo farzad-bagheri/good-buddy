@@ -446,8 +446,21 @@ export class WorkspaceTools {
    */
   private async readFile(root: string, relativePath: string): Promise<string> {
     const uri = workspaceFile(root, relativePath);
-    const content = await this.readContent(uri);
-    return truncate(content);
+    const document = this.openDocument(uri);
+    if (document) return truncate(document.getText());
+
+    try {
+      const content = await vscode.workspace.fs.readFile(uri);
+      return truncate(Buffer.from(content).toString("utf8"));
+    } catch (error) {
+      if (
+        error instanceof vscode.FileSystemError &&
+        error.code === "FileNotFound"
+      ) {
+        return `File not found: ${relativePath}.`;
+      }
+      throw error;
+    }
   }
 
   /**

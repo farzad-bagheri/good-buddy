@@ -30,6 +30,10 @@ const vscodeState = vi.hoisted(() => ({
 }));
 
 vi.mock("vscode", () => {
+  class FileSystemError extends Error {
+    code = "FileNotFound";
+  }
+
   class WorkspaceEdit {
     change?: {
       uri: { fsPath: string; toString(): string };
@@ -79,9 +83,7 @@ vi.mock("vscode", () => {
     Range,
     Position,
     WorkspaceEdit,
-    FileSystemError: class extends Error {
-      code = "FileNotFound";
-    },
+    FileSystemError,
     workspace: {
       get workspaceFolders() {
         return [{ uri: { fsPath: vscodeState.root } }];
@@ -102,9 +104,7 @@ vi.mock("vscode", () => {
         readFile: async (file: { fsPath: string }) => {
           const content = vscodeState.files.get(file.fsPath);
           if (content === undefined) {
-            throw Object.assign(new Error("File not found"), {
-              code: "FileNotFound",
-            });
+            throw new FileSystemError("File not found");
           }
           return Buffer.from(content, "utf8");
         },
@@ -198,6 +198,29 @@ describe("WorkspaceTools writes", () => {
     vscodeState.warningCalls = 0;
     vscodeState.diagnostics = [];
     vscodeState.references = [];
+  });
+
+  it("distinguishes missing files from existing empty files when reading", async () => {
+    const readFileTool = new WorkspaceTools()
+      .createTools(async () => "", async () => "")
+      .find((tool) => tool.id === "read_file");
+    if (!readFileTool) throw new Error("read_file tool was not registered");
+
+    vscodeState.files.set("D:\\workspace\\empty.txt", "");
+    await expect(
+      readFileTool.execute({
+        tool: "read_file",
+        autoApprove: false,
+        arguments: { path: "missing.txt" },
+      }),
+    ).resolves.toBe("File not found: missing.txt.");
+    await expect(
+      readFileTool.execute({
+        tool: "read_file",
+        autoApprove: false,
+        arguments: { path: "empty.txt" },
+      }),
+    ).resolves.toBe("");
   });
 
   it("updates and saves an open editor document", async () => {
