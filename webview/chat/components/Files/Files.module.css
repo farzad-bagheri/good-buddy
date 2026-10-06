@@ -7,9 +7,8 @@
 .file {
   text-align: left;
   padding: 8px;
-  border: 1px solid var(--vscode-editorWidget-border);
+  border: none;
   color: var(--vscode-textLink-foreground);
-  background: transparent;
   cursor: pointer;
 }
 

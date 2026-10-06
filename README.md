@@ -1,6 +1,7 @@
 # Good Buddy, an alternative to GitHub Copilot
+![icon](./media/icon.png)
 
-**Your coding assistant, powered by the model server you choose.**
+**Your coding assistant, powered by the model server you choose. Compatible with OpenAI-compatible servers.**
 
 Good Buddy brings AI chat, code explanations, inline completions, and hands-on
 project tools into VS Code. Use [LM Studio](https://lmstudio.ai/),
