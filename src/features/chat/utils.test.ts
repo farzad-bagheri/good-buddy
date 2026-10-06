@@ -44,7 +44,7 @@ describe("assistant response envelope", () => {
     });
   });
 
-  it("accepts only tool calls matching registered tools", () => {
+  it("accepts registered tool calls and ignores suggestions and files", () => {
     const valid = parseAssistantEnvelope(
       JSON.stringify({
         type: "tool_call",
@@ -53,13 +53,30 @@ describe("assistant response envelope", () => {
         autoApprove: false,
         arguments: { path: "src/index.ts" },
         title: "Review the entry point",
-        suggestions: [],
-        files: [],
+        suggestions: ["This field is ignored for tool calls"],
+        files: [{ invalid: true }],
       }),
       tools,
       true,
     );
     expect(valid).toMatchObject({
+      type: "tool_call",
+      tool: { tool: "read_file", arguments: { path: "src/index.ts" } },
+    });
+
+    const withoutUnusedFields = parseAssistantEnvelope(
+      JSON.stringify({
+        type: "tool_call",
+        response: "",
+        tool: "read_file",
+        autoApprove: false,
+        arguments: { path: "src/index.ts" },
+        title: "Review the entry point",
+      }),
+      tools,
+      true,
+    );
+    expect(withoutUnusedFields).toMatchObject({
       type: "tool_call",
       tool: { tool: "read_file", arguments: { path: "src/index.ts" } },
     });

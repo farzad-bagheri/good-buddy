@@ -181,42 +181,41 @@ export function parseAssistantEnvelope(
         : "Title must be null after the first response.",
     );
   }
-  if (
-    !Array.isArray(value.suggestions) ||
-    value.suggestions.length > 2 ||
-    value.suggestions.some(
-      (suggestion) =>
-        typeof suggestion !== "string" ||
-        !suggestion.trim() ||
-        suggestion.length >= 60,
-    )
-  ) {
-    throw new Error(
-      "Suggestions must be an array of up to two non-empty strings under 60 characters.",
-    );
-  }
-
-  if (
-    !Array.isArray(value.files) ||
-    value.files.length > 5 ||
-    value.files.some(
-      (file) =>
-        !isRecord(file) ||
-        typeof file.name !== "string" ||
-        !file.name.trim() ||
-        typeof file.path !== "string" ||
-        !file.path.trim(),
-    )
-  ) {
-    throw new Error(
-      "Files must be an array of up to five objects with name and path strings.",
-    );
-  }
-
   const title = typeof value.title === "string" ? value.title : undefined;
   if (value.type === "final") {
     if (value.tool !== null) {
       throw new Error("A final response must set tool to null.");
+    }
+    if (
+      !Array.isArray(value.suggestions) ||
+      value.suggestions.length > 2 ||
+      value.suggestions.some(
+        (suggestion) =>
+          typeof suggestion !== "string" ||
+          !suggestion.trim() ||
+          suggestion.length >= 60,
+      )
+    ) {
+      throw new Error(
+        "Suggestions must be an array of up to two non-empty strings under 60 characters.",
+      );
+    }
+
+    if (
+      !Array.isArray(value.files) ||
+      value.files.length > 5 ||
+      value.files.some(
+        (file) =>
+          !isRecord(file) ||
+          typeof file.name !== "string" ||
+          !file.name.trim() ||
+          typeof file.path !== "string" ||
+          !file.path.trim(),
+      )
+    ) {
+      throw new Error(
+        "Files must be an array of up to five objects with name and path strings.",
+      );
     }
 
     return {
@@ -231,14 +230,8 @@ export function parseAssistantEnvelope(
   if (typeof value.tool !== "string") {
     throw new Error("A tool call must include a tool name.");
   }
-  if (
-    value.response !== "" ||
-    value.suggestions.length > 0 ||
-    value.files.length > 0
-  ) {
-    throw new Error(
-      "Tool calls must have an empty response, suggestions array, and files array.",
-    );
+  if (value.response !== "") {
+    throw new Error("A tool call must have an empty response.");
   }
   const tool = tools.find(({ id }) => id === value.tool);
   if (!tool) throw new Error(`Unknown tool '${value.tool}'.`);
