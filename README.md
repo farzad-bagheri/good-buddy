@@ -30,6 +30,10 @@ server you configure and does not require a Good Buddy cloud service.
 - **Review Git changes.** Choose **Review changes** in the chat composer to
   review staged and unstaged diffs plus small text untracked files. This is
   read-only; Good Buddy does not stage files or change your repository.
+- **Reuse prompt templates.** Choose **Prompts** in the chat composer to insert
+  a starter prompt for explaining code, writing tests, finding a bug, or
+  improving code. You can also start a Git review from this menu. Inserted
+  prompts are editable and are not sent until you choose Send.
 - **Make changes with the assistant.** Ask it to add a feature, update existing
   behavior, or fix a bug. Good Buddy can inspect files, propose edits, and run
   project commands. Review proposed file changes in a diff and approve them

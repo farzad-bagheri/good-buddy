@@ -279,6 +279,45 @@ describe("assistant response envelope", () => {
     expect(prompt).toContain('"suggestions":[],"files":[]');
   });
 
+  it("explains the host environment available to run_command", () => {
+    const prompt = agentInstructions(
+      {
+        caption: "Test model",
+        name: "test",
+        model: "test",
+        details: {
+          format: "",
+          family: "",
+          parameter_size: "",
+          quantization_level: "",
+          context_length: 0,
+          embedding_length: 0,
+        },
+        capabilities: [],
+      } satisfies ProviderModel,
+      "Workspace root: test",
+      [
+        ...tools,
+        {
+          id: "run_command",
+          description: "Run a command on the extension host",
+          execute: async () => "",
+        },
+      ],
+      false,
+    ).content;
+
+    expect(prompt).toContain(
+      "For requests to check installed software or host environment, use run_command",
+    );
+    expect(prompt).toContain(
+      "do not claim the host OS or shell is inaccessible or sandboxed to workspace files",
+    );
+    expect(prompt).toContain(
+      "this is the extension host's environment, which may differ from the user's local machine",
+    );
+  });
+
   it("instructs retries to verify file state instead of assuming prior writes", () => {
     const prompt = agentInstructions(
       {

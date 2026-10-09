@@ -92,6 +92,7 @@ vi.mock("vscode", () => {
         return vscodeState.documents;
       },
       fs: {
+        readDirectory: async () => [],
         stat: async (file: { fsPath: string }) => {
           const content = vscodeState.files.get(file.fsPath);
           if (content === undefined) throw new Error("File not found");
@@ -198,6 +199,26 @@ describe("WorkspaceTools writes", () => {
     vscodeState.warningCalls = 0;
     vscodeState.diagnostics = [];
     vscodeState.references = [];
+  });
+
+  it("includes the extension host OS and command shell in project context", async () => {
+    const context = await new WorkspaceTools().projectContext();
+    const platform =
+      process.platform === "win32"
+        ? "Windows"
+        : process.platform === "darwin"
+          ? "macOS"
+          : process.platform === "linux"
+            ? "Linux"
+            : process.platform;
+
+    expect(context).toContain(`Execution environment: ${platform}`);
+    expect(context).toContain(`(${process.platform}); run_command shell:`);
+    if (process.platform === "win32") {
+      expect(context).toContain("Use Windows command syntax");
+    } else {
+      expect(context).toContain("Use POSIX shell syntax");
+    }
   });
 
   it("distinguishes missing files from existing empty files when reading", async () => {

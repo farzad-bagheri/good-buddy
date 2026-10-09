@@ -6,12 +6,14 @@ export interface AttachmentProps {
   path: string;
   onRemove?: () => void;
   removeTitle?: string;
+  disabled?: boolean;
 }
 export function Attachment({
   name,
   path,
   onRemove,
   removeTitle = "Remove attachment",
+  disabled = false,
 }: AttachmentProps) {
   return (
     <div className={styles.item}>
@@ -24,6 +26,7 @@ export function Attachment({
           iconName="remove-icon"
           title={removeTitle}
           className={styles.remove}
+          disabled={disabled}
           onClick={onRemove}
           aria-label="Remove attachment"
         />

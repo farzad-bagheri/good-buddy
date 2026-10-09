@@ -104,7 +104,6 @@ export function App() {
           });
           break;
         case "vsc:assistantStart": {
-          setThinking(false);
           const id = createItemId();
           assistantId.current = id;
           setItems((current) =>
@@ -151,7 +150,10 @@ export function App() {
           appendItem({ kind: "message", role: "error", text: message.text });
           break;
         case "vsc:modelStatus":
-          setThinking(message.waiting);
+          if (message.waiting) setThinking(true);
+          break;
+        case "vsc:requestDone":
+          setThinking(false);
           break;
         case "vsc:toolStatus":
           appendItem({
@@ -326,8 +328,10 @@ export function App() {
           <Composer
             attachments={attachments}
             text={text}
+            busy={thinking}
             onTextChange={setText}
             onSend={() => setThinking(true)}
+            onCancel={() => vscode.postMessage({ type: "wv:cancel" })}
           />
         </>
       )}

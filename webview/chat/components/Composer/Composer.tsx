@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { insertPromptTemplate, PROMPT_TEMPLATES } from "../../prompts";
 import type { AttachmentState } from "../../types";
 import { vscode } from "../../vscode";
 import { IconButton } from "../IconButton";
@@ -8,19 +9,44 @@ import styles from "./Composer.module.css";
 interface ComposerProps {
   attachments: AttachmentState;
   text: string;
+  busy: boolean;
   onTextChange: (text: string) => void;
   onSend: () => void;
+  onCancel: () => void;
 }
 
 export function Composer({
   attachments,
   text,
+  busy,
   onTextChange,
   onSend,
+  onCancel,
 }: ComposerProps) {
   const [attachmentError, setAttachmentError] = useState("");
   const [pendingImages, setPendingImages] = useState(0);
+  const [promptsOpen, setPromptsOpen] = useState(false);
+  const [cancelPending, setCancelPending] = useState(false);
   const pendingImagesRef = useRef(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!busy) setCancelPending(false);
+    if (busy) setPromptsOpen(false);
+  }, [busy]);
+
+  const insertTemplate = (prompt: string) => {
+    onTextChange(insertPromptTemplate(text, prompt));
+    setPromptsOpen(false);
+    textareaRef.current?.focus();
+  };
+
+  const reviewChanges = () => {
+    if (busy) return;
+    setPromptsOpen(false);
+    onSend();
+    vscode.postMessage({ type: "wv:reviewChanges" });
+  };
 
   const handleRemoveAttachment = (index: number) => () => {
     vscode.postMessage({ type: "wv:removeAttachment", index });
@@ -54,7 +80,9 @@ export function Composer({
       const bytes = new Uint8Array(await file.arrayBuffer());
       let binary = "";
       for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-        binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+        binary += String.fromCharCode(
+          ...bytes.subarray(offset, offset + 0x8000),
+        );
       }
       vscode.postMessage({
         type: "wv:addImage",
@@ -78,6 +106,7 @@ export function Composer({
   };
 
   const handleSend = () => {
+    if (busy) return;
     if (pendingImagesRef.current > 0) {
       setAttachmentError("Wait for pasted images to finish attaching.");
       return;
@@ -107,6 +136,7 @@ export function Composer({
             name={attachments.activeDocument.name}
             path={attachments.activeDocument.path}
             removeTitle="Exclude open file from the next message"
+            disabled={busy}
             onRemove={() =>
               vscode.postMessage({ type: "wv:excludeActiveDocument" })
             }
@@ -117,6 +147,7 @@ export function Composer({
             key={`${item.name}-${index}`}
             name={item.name}
             path={item.path}
+            disabled={busy}
             onRemove={handleRemoveAttachment(index)}
           />
         ))}
@@ -125,6 +156,7 @@ export function Composer({
             key={image.id}
             name={image.name}
             path={`Image · ${image.name}`}
+            disabled={busy}
             onRemove={() =>
               vscode.postMessage({ type: "wv:removeImage", id: image.id })
             }
@@ -137,10 +169,63 @@ export function Composer({
         </div>
       )}
 
-      <div className={styles.composer}>
+      <div
+        className={styles.composer}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setPromptsOpen(false);
+        }}
+      >
+        <div className={styles.controls}>
+          {" "}
+          <div className={styles.promptPicker}>
+            <button
+              type="button"
+              className={styles.promptButton}
+              title="Insert a reusable prompt into the composer"
+              aria-haspopup="true"
+              aria-expanded={promptsOpen}
+              aria-controls="good-buddy-prompt-menu"
+              disabled={busy}
+              onClick={() => setPromptsOpen((open) => !open)}
+            >
+              Prompts
+            </button>
+            {promptsOpen && (
+              <div
+                className={styles.promptMenu}
+                id="good-buddy-prompt-menu"
+                role="group"
+                aria-label="Prompt templates"
+              >
+                {PROMPT_TEMPLATES.map((template) => (
+                  <IconButton
+                    type="button"
+                    key={template.id}
+                    caption={template.label}
+                    iconName={template.icon}
+                    className={styles.promptMenuItem}
+                    disabled={busy}
+                    onClick={() => insertTemplate(template.prompt)}
+                  />
+                ))}
+                <IconButton
+                  type="button"
+                  iconName="git-icon"
+                  caption="Review changes"
+                  className={styles.promptMenuItem}
+                  title="Ask Good Buddy to review staged, unstaged, and untracked Git changes"
+                  disabled={busy}
+                  onClick={reviewChanges}
+                />
+              </div>
+            )}
+          </div>
+        </div>
         <textarea
+          ref={textareaRef}
+          disabled={busy}
           rows={2}
-          placeholder="Ask Good Buddy... (Enter to send, Shift+Enter for new line)"
+          placeholder="Ask Good Buddy, attach files or paste an image... (Enter to send, Shift+Enter for new line)"
           value={text}
           onChange={(event) => onTextChange(event.target.value)}
           onKeyDown={handleKeyDown}
@@ -151,32 +236,42 @@ export function Composer({
           <IconButton
             iconName="add-icon"
             title="Attach text or image files; paste an image to attach it"
+            disabled={busy}
             onClick={() => vscode.postMessage({ type: "wv:attachFiles" })}
           />
           <IconButton
             iconName="selection-icon"
             title="Attach the selected code from the active editor"
-            onClick={() =>
-              vscode.postMessage({ type: "wv:attachSelection" })
-            }
+            disabled={busy}
+            onClick={() => vscode.postMessage({ type: "wv:attachSelection" })}
           />
-          <IconButton
-            iconName="git-icon"
-            title="Ask Good Buddy to review staged, unstaged, and untracked Git changes"
-            onClick={() => {
-              onSend();
-              vscode.postMessage({ type: "wv:reviewChanges" });
-            }}
-          />
-          <IconButton
-            iconName="send-icon"
-            title={
-              pendingImages > 0
-                ? "Wait for pasted images to finish attaching"
-                : "Send message"
-            }
-            onClick={handleSend}
-          />
+          {busy ? (
+            <IconButton
+              caption={cancelPending ? "Stopping..." : "Stop"}
+              className={styles.stopButton}
+              title={
+                cancelPending
+                  ? "Waiting for Good Buddy to stop"
+                  : "Cancel the current request"
+              }
+              disabled={cancelPending}
+              onClick={() => {
+                setCancelPending(true);
+                onCancel();
+              }}
+            />
+          ) : (
+            <IconButton
+              iconName="send-icon"
+              title={
+                pendingImages > 0
+                  ? "Wait for pasted images to finish attaching"
+                  : "Send message"
+              }
+              disabled={pendingImages > 0}
+              onClick={handleSend}
+            />
+          )}
         </div>
       </div>
     </footer>

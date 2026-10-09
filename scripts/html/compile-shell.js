@@ -5,20 +5,24 @@ import { fileURLToPath } from "node:url";
 const dir = path.dirname(fileURLToPath(import.meta.url));
 
 const iconNames = [
-  "app",
-  "send",
-  "back",
-  "copy",
-  "delete",
-  "remove",
   "add",
+  "app",
+  "back",
   "check",
+  "copy",
+  "debug",
+  "delete",
+  "explain",
+  "git",
   "history",
+  "improve",
+  "models",
   "new-chat",
+  "remove",
   "retry",
   "selection",
-  "models",
-  "git"
+  "send",
+  "tests",
 ];
 const iconClasses = iconNames
   .map(

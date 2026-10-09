@@ -142,7 +142,7 @@ export class WorkspaceTools {
       {
         id: "run_command",
         description:
-          "Run a command in the workspace after user approval, unless auto-approved.",
+          "Run a shell command on the machine running the VS Code extension host, with the workspace root as the working directory. The command can inspect software and environment available to that host; it is not restricted to workspace files. User approval is required.",
         execute: executeCommand,
       },
     ];
@@ -526,12 +526,28 @@ export class WorkspaceTools {
   }
 
   /**
-   * Retrieves the project context, including the workspace root and a project tree up to depth 3.
-   * @returns A string representing the project context, including the workspace root and a project tree up to depth 3.
+   * Retrieves project context and the extension host environment.
+   * @returns The workspace root, host OS, command shell, and project tree.
    */
   async projectContext(): Promise<string> {
     const root = this.workspaceRoot();
-    return `Workspace root: ${root}\nProject tree (depth 3):\n${await this.listProject(root)}`;
+    const platform =
+      process.platform === "win32"
+        ? "Windows"
+        : process.platform === "darwin"
+          ? "macOS"
+          : process.platform === "linux"
+            ? "Linux"
+            : process.platform;
+    const shell =
+      process.platform === "win32"
+        ? (process.env.ComSpec ?? "cmd.exe")
+        : "/bin/sh";
+    const commandGuidance =
+      process.platform === "win32"
+        ? "Use Windows command syntax; do not assume PowerShell, bash, or Unix utilities are available."
+        : "Use POSIX shell syntax and check whether non-standard utilities are installed before relying on them.";
+    return `Workspace root: ${root}\nExecution environment: ${platform} (${process.platform}); run_command shell: ${shell}. ${commandGuidance}\nProject tree (depth 3):\n${await this.listProject(root)}`;
   }
 
   /**

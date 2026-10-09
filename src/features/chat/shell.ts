@@ -11,14 +11,14 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
     <link rel="stylesheet" href="${styleUri}" />
     <style nonce="${nonce}">
       
+    .add-icon {
+        mask-image: url("${iconUri("add")}");
+        -webkit-mask-image: url("${iconUri("add")}");
+      }
+
     .app-icon {
         mask-image: url("${iconUri("app")}");
         -webkit-mask-image: url("${iconUri("app")}");
-      }
-
-    .send-icon {
-        mask-image: url("${iconUri("send")}");
-        -webkit-mask-image: url("${iconUri("send")}");
       }
 
     .back-icon {
@@ -26,9 +26,19 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
         -webkit-mask-image: url("${iconUri("back")}");
       }
 
+    .check-icon {
+        mask-image: url("${iconUri("check")}");
+        -webkit-mask-image: url("${iconUri("check")}");
+      }
+
     .copy-icon {
         mask-image: url("${iconUri("copy")}");
         -webkit-mask-image: url("${iconUri("copy")}");
+      }
+
+    .debug-icon {
+        mask-image: url("${iconUri("debug")}");
+        -webkit-mask-image: url("${iconUri("debug")}");
       }
 
     .delete-icon {
@@ -36,19 +46,14 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
         -webkit-mask-image: url("${iconUri("delete")}");
       }
 
-    .remove-icon {
-        mask-image: url("${iconUri("remove")}");
-        -webkit-mask-image: url("${iconUri("remove")}");
+    .explain-icon {
+        mask-image: url("${iconUri("explain")}");
+        -webkit-mask-image: url("${iconUri("explain")}");
       }
 
-    .add-icon {
-        mask-image: url("${iconUri("add")}");
-        -webkit-mask-image: url("${iconUri("add")}");
-      }
-
-    .check-icon {
-        mask-image: url("${iconUri("check")}");
-        -webkit-mask-image: url("${iconUri("check")}");
+    .git-icon {
+        mask-image: url("${iconUri("git")}");
+        -webkit-mask-image: url("${iconUri("git")}");
       }
 
     .history-icon {
@@ -56,9 +61,24 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
         -webkit-mask-image: url("${iconUri("history")}");
       }
 
+    .improve-icon {
+        mask-image: url("${iconUri("improve")}");
+        -webkit-mask-image: url("${iconUri("improve")}");
+      }
+
+    .models-icon {
+        mask-image: url("${iconUri("models")}");
+        -webkit-mask-image: url("${iconUri("models")}");
+      }
+
     .new-chat-icon {
         mask-image: url("${iconUri("new-chat")}");
         -webkit-mask-image: url("${iconUri("new-chat")}");
+      }
+
+    .remove-icon {
+        mask-image: url("${iconUri("remove")}");
+        -webkit-mask-image: url("${iconUri("remove")}");
       }
 
     .retry-icon {
@@ -71,14 +91,14 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
         -webkit-mask-image: url("${iconUri("selection")}");
       }
 
-    .models-icon {
-        mask-image: url("${iconUri("models")}");
-        -webkit-mask-image: url("${iconUri("models")}");
+    .send-icon {
+        mask-image: url("${iconUri("send")}");
+        -webkit-mask-image: url("${iconUri("send")}");
       }
 
-    .git-icon {
-        mask-image: url("${iconUri("git")}");
-        -webkit-mask-image: url("${iconUri("git")}");
+    .tests-icon {
+        mask-image: url("${iconUri("tests")}");
+        -webkit-mask-image: url("${iconUri("tests")}");
       }
     </style>
   </head>

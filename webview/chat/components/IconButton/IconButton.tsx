@@ -6,6 +6,7 @@ export interface IconButtonProps {
   caption?: string;
   title?: string;
   iconName?: string;
+  iconPosition?: "left" | "right";
   disabled?: boolean;
   onClick: () => void;
 }
@@ -16,6 +17,7 @@ export function IconButton({
   caption,
   title,
   iconName,
+  iconPosition = "left",
   disabled = false,
   onClick,
 }: IconButtonProps) {
@@ -29,10 +31,16 @@ export function IconButton({
       className={`${styles["icon-button"]} ${className ?? ""}`}
     >
       <div className={styles["icon-button-container"]}>
+        {iconName && iconPosition === "left" && (
+          <span
+            className={`${styles["icon"]} ${iconName}`}
+            aria-hidden="true"
+          />
+        )}
         {caption && (
           <span className={styles["control-caption"]}>{caption}</span>
         )}
-        {iconName && (
+        {iconName && iconPosition === "right" && (
           <span
             className={`${styles["icon"]} ${iconName}`}
             aria-hidden="true"

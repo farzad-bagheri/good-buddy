@@ -25,6 +25,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private activeController?: AbortController;
   private reviewingChanges = false;
+  private gitReviewCancelled = false;
   private readonly resources: Resources;
   private readonly session: ChatSession;
   private readonly viewState: ChatViewState;
@@ -214,7 +215,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       listChats: () => this.postChatList(),
       resumeChat: (id) => this.resumeChat(id),
       deleteChat: (id) => this.confirmDeleteChat(id),
-      cancel: () => this.activeController?.abort(),
+      cancel: () => this.cancelActiveRequest(),
       reviewWrite: (id, approved) => this.writeApprovals.review(id, approved),
       reviewCommand: (id, approved) =>
         this.commandApprovals.executeOrReject(id, approved),
@@ -333,8 +334,10 @@ export class ChatFeature implements vscode.WebviewViewProvider {
   private async handleGitReview(): Promise<void> {
     if (this.activeController || this.reviewingChanges || !this.view) return;
     this.reviewingChanges = true;
+    this.gitReviewCancelled = false;
     try {
       const changes = await this.workspaceTools.getGitChanges();
+      if (this.gitReviewCancelled) return;
       if (!changes) {
         void vscode.window.showInformationMessage(
           "Good Buddy: there are no staged, unstaged, or untracked changes to review.",
@@ -360,11 +363,19 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       );
     } finally {
       this.reviewingChanges = false;
-      this.view?.webview.postMessage({
-        type: "vsc:modelStatus",
-        waiting: false,
-      });
+      this.gitReviewCancelled = false;
+      this.view?.webview.postMessage({ type: "vsc:requestDone" });
     }
+  }
+
+  private cancelActiveRequest(): void {
+    if (this.activeController) {
+      this.activeController.abort();
+      this.writeApprovals.rejectAll("Request cancelled by the user.");
+      this.commandApprovals.rejectAll("Request cancelled by the user.");
+      return;
+    }
+    if (this.reviewingChanges) this.gitReviewCancelled = true;
   }
 
   private async openFileInVsCode(filePath: string): Promise<void> {
@@ -435,8 +446,20 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     this.writeApprovals.rejectAll(
       "Write cancelled because a new chat request was sent.",
     );
+    this.commandApprovals.rejectAll(
+      "Command cancelled because a new chat request was sent.",
+    );
+    const controller = new AbortController();
+    this.activeController = controller;
     const modelName = this.viewState.getSelectedModel();
     const selectedModel = await this.viewState.modelDetails(modelName);
+    if (controller.signal.aborted || this.activeController !== controller) {
+      if (this.activeController === controller) {
+        this.activeController = undefined;
+        this.view?.webview.postMessage({ type: "vsc:requestDone" });
+      }
+      return;
+    }
     const includeAttachments = options.includeAttachments ?? true;
     const activeDocument = replayMessage
       ? undefined
@@ -498,9 +521,6 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     });
 
     // Prepare to run the agent and generate the assistant's response.
-    const controller = new AbortController();
-    this.activeController = controller;
-
     let assistantText = "";
     try {
       if (controller.signal.aborted || this.session.currentId !== id) return;
@@ -588,8 +608,10 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         }
       }
     } finally {
-      if (this.activeController === controller)
+      if (this.activeController === controller) {
         this.activeController = undefined;
+        this.view?.webview.postMessage({ type: "vsc:requestDone" });
+      }
     }
   }
 
