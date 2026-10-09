@@ -103,6 +103,51 @@ export class ChatViewState {
     this.postAttachments();
   }
 
+  attachSelection(): void {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || editor.document.uri.scheme !== "file") {
+      void vscode.window.showInformationMessage(
+        "Good Buddy: open a file and select code to attach it.",
+      );
+      return;
+    }
+    if (editor.selection.isEmpty) {
+      void vscode.window.showInformationMessage(
+        "Good Buddy: select code in the editor before attaching it.",
+      );
+      return;
+    }
+
+    const { document, selection } = editor;
+    const startLine = selection.start.line + 1;
+    const endLine =
+      selection.end.line + (selection.end.character === 0 ? 0 : 1);
+    const relativePath = vscode.workspace.asRelativePath(document.uri);
+    const basename = document.uri.path.split("/").pop() || document.fileName;
+    const lineLabel =
+      startLine === endLine
+        ? `line ${startLine}`
+        : `lines ${startLine}-${endLine}`;
+    const contextPath = `${relativePath} (selection, ${lineLabel})`;
+    this.attachments.addSelection(
+      `${basename} (selection, ${lineLabel})`,
+      contextPath,
+      relativePath,
+      document.getText(selection),
+    );
+    this.postAttachments();
+  }
+
+  excludeActiveDocument(): void {
+    const document = vscode.window.activeTextEditor?.document;
+    if (!document || document.uri.scheme !== "file") return;
+
+    this.attachments.excludeActiveDocument(
+      vscode.workspace.asRelativePath(document.uri),
+    );
+    this.postAttachments();
+  }
+
   addImageAttachment(name: string, mimeType: string, data: string): void {
     this.attachments.addImageBase64(name, mimeType, data);
     this.postAttachments();

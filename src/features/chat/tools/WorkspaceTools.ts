@@ -1,4 +1,4 @@
-import { exec } from "child_process";
+import { exec, execFile } from "child_process";
 import * as path from "path";
 import * as vscode from "vscode";
 import {
@@ -25,11 +25,23 @@ export interface WriteProposal {
   diff: string;
 }
 
+const MAX_GIT_REVIEW_CHARS = 10_000;
+const MAX_GIT_STATUS_CHARS = 1_500;
+const MAX_GIT_DIFF_SECTION_CHARS = 3_500;
+const MAX_UNTRACKED_REVIEW_CHARS = 1_200;
+const MAX_UNTRACKED_REVIEW_FILES = 12;
+const MAX_UNTRACKED_REVIEW_FILE_BYTES = 8 * 1024;
+const MAX_GIT_BUFFER_BYTES = 2 * 1024 * 1024;
+
+type GitExecutor = (root: string, args: string[]) => Promise<string>;
+
 /**
  * Provides a set of tools for interacting with the workspace, including listing project files,
  * reading and writing files, and running commands.
  */
 export class WorkspaceTools {
+  constructor(private readonly executeGit: GitExecutor = runGitCommand) {}
+
   /**
    * Creates a set of tools for interacting with the workspace.
    * @param executeWrite A function to execute write operations in the workspace.
@@ -584,6 +596,119 @@ export class WorkspaceTools {
     return this.readContent(workspaceFile(this.workspaceRoot(), relativePath));
   }
 
+  async getGitChanges(): Promise<string | undefined> {
+    const root = this.workspaceRoot();
+    const runGit = (args: string[]) => this.executeGit(root, args);
+    const [status, unstaged, staged, untrackedPaths] = await Promise.all([
+      runGit(["status", "--short", "--branch", "--untracked-files=all"]),
+      runGit([
+        "diff",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=1",
+        "--",
+      ]),
+      runGit([
+        "diff",
+        "--cached",
+        "--no-ext-diff",
+        "--no-color",
+        "--no-renames",
+        "--unified=1",
+        "--",
+      ]),
+      runGit(["ls-files", "--others", "--exclude-standard", "-z"]),
+    ]);
+    const untracked = await this.readUntrackedChanges(
+      root,
+      untrackedPaths.split("\0").filter(Boolean),
+    );
+
+    if (!unstaged.trim() && !staged.trim() && untracked.length === 0) {
+      return undefined;
+    }
+
+    const heading =
+      "Review this read-only Git snapshot. Status codes follow `git status --short` (left column is the index, right column is the working tree).";
+    const instructions =
+      "Review for concrete bugs, regressions, security issues, and missing tests. Report only actionable findings, ordered by severity, and cite file paths and line numbers from the diff when possible. If you find no issues, say so. Do not modify files or run commands.";
+    const sections = [
+      {
+        title: "Git status",
+        content: status.trim() || "(no status output)",
+        limit: MAX_GIT_STATUS_CHARS,
+      },
+      {
+        title: "Unstaged changes",
+        content: unstaged.trim() || "(none)",
+        limit: MAX_GIT_DIFF_SECTION_CHARS,
+      },
+      {
+        title: "Staged changes",
+        content: staged.trim() || "(none)",
+        limit: MAX_GIT_DIFF_SECTION_CHARS,
+      },
+      {
+        title: "Untracked files",
+        content: untracked.join("\n\n") || "(none)",
+        limit: MAX_UNTRACKED_REVIEW_CHARS,
+      },
+    ];
+    let remaining =
+      MAX_GIT_REVIEW_CHARS - heading.length - instructions.length - 4;
+    const formattedSections: string[] = [];
+    for (const section of sections) {
+      const label = `${section.title}:\n`;
+      const available = Math.min(section.limit, remaining - label.length - 2);
+      if (available <= 0) break;
+      const content = truncateAtLineBoundary(section.content, available);
+      formattedSections.push(`${label}${content}`);
+      remaining -= label.length + content.length + 2;
+    }
+    return `${heading}\n\n${formattedSections.join("\n\n")}\n\n${instructions}`;
+  }
+
+  private async readUntrackedChanges(
+    root: string,
+    paths: string[],
+  ): Promise<string[]> {
+    const contents: string[] = [];
+    for (const relativePath of paths.slice(0, MAX_UNTRACKED_REVIEW_FILES)) {
+      const uri = workspaceFile(root, relativePath);
+      const stat = await vscode.workspace.fs.stat(uri);
+      if (
+        stat.type !== vscode.FileType.File ||
+        stat.size > MAX_UNTRACKED_REVIEW_FILE_BYTES
+      ) {
+        contents.push(
+          `Untracked file: ${relativePath}\n[Skipped: not a regular file or larger than 8 KB.]`,
+        );
+        continue;
+      }
+      const bytes = Buffer.from(await vscode.workspace.fs.readFile(uri));
+      if (bytes.includes(0)) {
+        contents.push(`Untracked file: ${relativePath}\n[Skipped: binary file.]`);
+        continue;
+      }
+      const numberedContent = bytes
+        .toString("utf8")
+        .split(/\r?\n/)
+        .map((line, index) => `${index + 1}: ${line}`)
+        .join("\n");
+      contents.push(
+        `Untracked file: ${relativePath}\n\`\`\`\n${numberedContent}\n\`\`\``,
+      );
+    }
+
+    if (paths.length > MAX_UNTRACKED_REVIEW_FILES) {
+      contents.push(
+        `[${paths.length - MAX_UNTRACKED_REVIEW_FILES} additional untracked files omitted.]`,
+      );
+    }
+    return contents;
+  }
+
   private async readContent(uri: vscode.Uri): Promise<string> {
     return this.openDocument(uri)?.getText() ?? (await readTextIfExists(uri));
   }
@@ -631,6 +756,7 @@ export class WorkspaceTools {
             // A closed webview should not interrupt command execution.
           }
         }
+
         if (visible.length < text.length) {
           outputTruncated = true;
           onOutput("\n[Output truncated]");
@@ -669,4 +795,41 @@ export class WorkspaceTools {
       child.stderr?.on("data", forwardOutput);
     });
   }
+}
+
+function runGitCommand(root: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      "git",
+      ["-C", root, "--no-pager", ...args],
+      {
+        timeout: TOOL_TIMEOUT,
+        maxBuffer: MAX_GIT_BUFFER_BYTES,
+        windowsHide: true,
+        encoding: "utf8",
+        env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(
+            new Error(
+              `Could not read Git changes: ${stderr.trim() || error.message}`,
+            ),
+          );
+          return;
+        }
+        resolve(stdout);
+      },
+    );
+  });
+}
+
+function truncateAtLineBoundary(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+
+  const note = "\n[Section truncated at a line boundary; more changes were omitted.]";
+  const excerpt = value.slice(0, Math.max(0, maxChars - note.length));
+  const lineEnd = excerpt.lastIndexOf("\n");
+  const completeLines = lineEnd < 0 ? excerpt : excerpt.slice(0, lineEnd);
+  return `${completeLines}${note}`;
 }

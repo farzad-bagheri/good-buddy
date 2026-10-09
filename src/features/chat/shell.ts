@@ -66,9 +66,19 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
         -webkit-mask-image: url("${iconUri("retry")}");
       }
 
+    .selection-icon {
+        mask-image: url("${iconUri("selection")}");
+        -webkit-mask-image: url("${iconUri("selection")}");
+      }
+
     .models-icon {
         mask-image: url("${iconUri("models")}");
         -webkit-mask-image: url("${iconUri("models")}");
+      }
+
+    .git-icon {
+        mask-image: url("${iconUri("git")}");
+        -webkit-mask-image: url("${iconUri("git")}");
       }
     </style>
   </head>

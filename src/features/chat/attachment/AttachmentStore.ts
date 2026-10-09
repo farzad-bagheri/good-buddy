@@ -14,6 +14,8 @@ export interface ChatAttachmentBase {
 
 export interface ChatAttachment extends ChatAttachmentBase {
   content: string;
+  kind?: "selection";
+  sourcePath?: string;
 }
 
 export interface ChatImageAttachment extends ChatImage {
@@ -32,6 +34,7 @@ const IMAGE_MIME_TYPES = new Set<ChatImage["mimeType"]>([
 export class AttachmentStore {
   private items: ChatAttachment[] = [];
   private imageItems: ChatImageAttachment[] = [];
+  private excludedActiveDocumentPath?: string;
 
   get all(): readonly ChatAttachment[] {
     return this.items;
@@ -48,6 +51,11 @@ export class AttachmentStore {
   clear(): void {
     this.items = [];
     this.imageItems = [];
+    this.excludedActiveDocumentPath = undefined;
+  }
+
+  excludeActiveDocument(path: string): void {
+    this.excludedActiveDocumentPath = path;
   }
 
   removeAt(index: number): void {
@@ -87,6 +95,35 @@ export class AttachmentStore {
       mimeType,
       data: Buffer.from(data).toString("base64"),
     });
+  }
+
+  addSelection(
+    name: string,
+    path: string,
+    sourcePath: string,
+    content: string,
+  ): void {
+    const attachment: ChatAttachment = {
+      name,
+      path,
+      sourcePath,
+      content,
+      kind: "selection",
+    };
+    if (!this.isValidAttachment(attachment)) {
+      vscode.window.showWarningMessage(
+        `Good Buddy skipped ${name}: selected code is empty, too large, or already attached.`,
+      );
+      return;
+    }
+    const room = MAX_ATTACHMENTS - this.items.length - this.imageItems.length;
+    if (room <= 0) {
+      vscode.window.showWarningMessage(
+        `Good Buddy supports up to ${MAX_ATTACHMENTS} attachments per message.`,
+      );
+      return;
+    }
+    this.items.push(attachment);
   }
 
   addImageBase64(name: string, mimeType: string, base64: string): void {
@@ -166,7 +203,19 @@ export class AttachmentStore {
       content,
     };
 
+    if (this.excludedActiveDocumentPath === candidateAttachment.path) {
+      return undefined;
+    }
     if (!this.isValidAttachment(candidateAttachment)) {
+      return undefined;
+    }
+    if (
+      this.items.some(
+        (attachment) =>
+          attachment.kind === "selection" &&
+          attachment.sourcePath === candidateAttachment.path,
+      )
+    ) {
       return undefined;
     }
 
@@ -174,13 +223,13 @@ export class AttachmentStore {
   }
 
   /**
-   * Formats all attached files for inclusion in a chat prompt.
+   * Formats all attached context for inclusion in a chat prompt.
    */
   formatForPrompt(defaultAttachment?: ChatAttachment): string {
     return this.withDefault(defaultAttachment)
       .map(
         (attachment) =>
-          `\n\nAttached file: ${attachment.path}\n\`\`\`\n${attachment.content}\n\`\`\``,
+          `\n\nAttached ${attachment.kind === "selection" ? "selection" : "file"}: ${attachment.path}\n\`\`\`\n${attachment.content}\n\`\`\``,
       )
       .join("");
   }

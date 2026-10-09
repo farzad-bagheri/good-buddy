@@ -106,6 +106,10 @@ export function Composer({
           <Attachment
             name={attachments.activeDocument.name}
             path={attachments.activeDocument.path}
+            removeTitle="Exclude open file from the next message"
+            onRemove={() =>
+              vscode.postMessage({ type: "wv:excludeActiveDocument" })
+            }
           />
         )}
         {attachments.attached.map((item, index) => (
@@ -148,6 +152,21 @@ export function Composer({
             iconName="add-icon"
             title="Attach text or image files; paste an image to attach it"
             onClick={() => vscode.postMessage({ type: "wv:attachFiles" })}
+          />
+          <IconButton
+            iconName="selection-icon"
+            title="Attach the selected code from the active editor"
+            onClick={() =>
+              vscode.postMessage({ type: "wv:attachSelection" })
+            }
+          />
+          <IconButton
+            iconName="git-icon"
+            title="Ask Good Buddy to review staged, unstaged, and untracked Git changes"
+            onClick={() => {
+              onSend();
+              vscode.postMessage({ type: "wv:reviewChanges" });
+            }}
           />
           <IconButton
             iconName="send-icon"

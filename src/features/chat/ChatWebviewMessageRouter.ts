@@ -11,8 +11,11 @@ export interface ChatWebviewMessageHandlers {
   openSettings(): Promise<void>;
   openFile(filePath: string): Promise<void>;
   send(text: string): Promise<void>;
+  reviewChanges(): Promise<void>;
   retry(historyIndex: number): Promise<void>;
   attachFiles(): Promise<void>;
+  attachSelection(): void;
+  excludeActiveDocument(): void;
   addImage(name: string, mimeType: string, data: string): void;
   removeAttachment(index: number): void;
   removeImage(id: string): void;
@@ -46,10 +49,16 @@ export class ChatWebviewMessageRouter {
           return this.handlers.openFile(String(message.filePath ?? ""));
         case "wv:send":
           return this.handlers.send(String(message.text ?? ""));
+        case "wv:reviewChanges":
+          return this.handlers.reviewChanges();
         case "wv:retry":
           return this.handlers.retry(Number(message.historyIndex));
         case "wv:attachFiles":
           return this.handlers.attachFiles();
+        case "wv:attachSelection":
+          return this.handlers.attachSelection();
+        case "wv:excludeActiveDocument":
+          return this.handlers.excludeActiveDocument();
         case "wv:addImage":
           return this.handlers.addImage(
             String(message.name ?? ""),

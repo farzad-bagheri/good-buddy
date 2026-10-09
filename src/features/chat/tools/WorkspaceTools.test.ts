@@ -413,4 +413,70 @@ describe("WorkspaceTools writes", () => {
     expect(vscodeState.fileDeleteCalls).toBe(0);
     expect(vscodeState.files.has("D:\\workspace\\notes.txt")).toBe(true);
   });
+
+  it("returns no review input when the repository has no changes", async () => {
+    const tools = new WorkspaceTools(async (_root, args) => {
+      if (args[0] === "status") return "## main";
+      return "";
+    });
+
+    await expect(tools.getGitChanges()).resolves.toBeUndefined();
+  });
+
+  it("collects staged, unstaged, and untracked text changes read-only", async () => {
+    const calls: string[][] = [];
+    const tools = new WorkspaceTools(async (_root, args) => {
+      calls.push(args);
+      if (args[0] === "status") {
+        return "## main\n M tracked.ts\nA  staged.ts\n?? new.ts";
+      }
+      if (args[0] === "diff" && args.includes("--cached")) {
+        return "diff --git a/staged.ts b/staged.ts\n+staged change";
+      }
+      if (args[0] === "diff") {
+        return "diff --git a/tracked.ts b/tracked.ts\n+unstaged change";
+      }
+      if (args[0] === "ls-files") return "new.ts\0";
+      throw new Error(`Unexpected Git command: ${args.join(" ")}`);
+    });
+    vscodeState.files.set("D:\\workspace\\new.ts", "const added = true;");
+
+    const result = await tools.getGitChanges();
+
+    expect(result).toContain("unstaged change");
+    expect(result).toContain("staged change");
+    expect(result).toContain("Untracked file: new.ts");
+    expect(result).toContain("1: const added = true;");
+    expect(calls).toHaveLength(4);
+    expect(
+      calls
+        .filter((args) => args[0] === "diff")
+        .every((args) => args.includes("--unified=1")),
+    ).toBe(true);
+    expect(
+      calls.every((args) =>
+        !args.some((arg) => ["add", "reset", "checkout"].includes(arg)),
+      ),
+    ).toBe(true);
+  });
+
+  it("bounds large Git review snapshots and truncates only at line boundaries", async () => {
+    const largeDiff = Array.from(
+      { length: 6_000 },
+      (_, index) => `+line-${index}`,
+    ).join("\n");
+    const tools = new WorkspaceTools(async (_root, args) => {
+      if (args[0] === "status") return "## main\n M large.ts";
+      if (args[0] === "diff") return `diff --git a/large.ts b/large.ts\n${largeDiff}`;
+      return "";
+    });
+
+    const result = await tools.getGitChanges();
+
+    expect(result?.length).toBeLessThanOrEqual(10_000);
+    expect(result).toContain(" M large.ts");
+    expect(result).toContain("[Section truncated at a line boundary");
+    expect(result).toContain("Report only actionable findings");
+    expect(result).not.toContain("+line-5000");
+  });
 });

@@ -5,8 +5,14 @@ export interface AttachmentProps {
   name: string;
   path: string;
   onRemove?: () => void;
+  removeTitle?: string;
 }
-export function Attachment({ name, path, onRemove }: AttachmentProps) {
+export function Attachment({
+  name,
+  path,
+  onRemove,
+  removeTitle = "Remove attachment",
+}: AttachmentProps) {
   return (
     <div className={styles.item}>
       <span className={styles.name} title={path}>
@@ -16,7 +22,7 @@ export function Attachment({ name, path, onRemove }: AttachmentProps) {
       {onRemove && (
         <IconButton
           iconName="remove-icon"
-          title="Remove attachment"
+          title={removeTitle}
           className={styles.remove}
           onClick={onRemove}
           aria-label="Remove attachment"

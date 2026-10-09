@@ -24,6 +24,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
 
   private view?: vscode.WebviewView;
   private activeController?: AbortController;
+  private reviewingChanges = false;
   private readonly resources: Resources;
   private readonly session: ChatSession;
   private readonly viewState: ChatViewState;
@@ -184,8 +185,11 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       },
       openFile: (filePath) => this.openFileInVsCode(filePath),
       send: (text) => this.handleSend(text),
+      reviewChanges: () => this.handleGitReview(),
       retry: (historyIndex) => this.handleRetry(historyIndex),
       attachFiles: () => this.viewState.pickAttachments(),
+      attachSelection: () => this.viewState.attachSelection(),
+      excludeActiveDocument: () => this.viewState.excludeActiveDocument(),
       addImage: (name, mimeType, data) =>
         this.viewState.addImageAttachment(name, mimeType, data),
       removeAttachment: (index) => {
@@ -326,6 +330,43 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     await this.handleSend(userMessage.content, userMessage);
   }
 
+  private async handleGitReview(): Promise<void> {
+    if (this.activeController || this.reviewingChanges || !this.view) return;
+    this.reviewingChanges = true;
+    try {
+      const changes = await this.workspaceTools.getGitChanges();
+      if (!changes) {
+        void vscode.window.showInformationMessage(
+          "Good Buddy: there are no staged, unstaged, or untracked changes to review.",
+        );
+        return;
+      }
+      await this.handleSend(
+        "Review my current Git changes. Focus on concrete, actionable findings.\n\n" +
+          changes,
+        undefined,
+        {
+          includeActiveDocument: false,
+          includeAttachments: false,
+          clearAttachments: false,
+          displayContent: "Review my current Git changes.",
+        },
+      );
+    } catch (error) {
+      const message = formatError(error);
+      this.output.appendLine(`[git review error] ${message}`);
+      void vscode.window.showErrorMessage(
+        `Good Buddy could not collect Git changes: ${message}`,
+      );
+    } finally {
+      this.reviewingChanges = false;
+      this.view?.webview.postMessage({
+        type: "vsc:modelStatus",
+        waiting: false,
+      });
+    }
+  }
+
   private async openFileInVsCode(filePath: string): Promise<void> {
     try {
       const requestedPath = filePath.trim();
@@ -371,6 +412,12 @@ export class ChatFeature implements vscode.WebviewViewProvider {
   private async handleSend(
     userMessage: string,
     replayMessage?: ChatMessage,
+    options: {
+      includeActiveDocument?: boolean;
+      includeAttachments?: boolean;
+      clearAttachments?: boolean;
+      displayContent?: string;
+    } = {},
   ): Promise<void> {
     // Return early if a new message is empty and has no attachments, or the webview is unavailable.
     if (
@@ -390,24 +437,35 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     );
     const modelName = this.viewState.getSelectedModel();
     const selectedModel = await this.viewState.modelDetails(modelName);
+    const includeAttachments = options.includeAttachments ?? true;
     const activeDocument = replayMessage
       ? undefined
-      : this.viewState.attachments.activeDocumentAttachment();
+      : options.includeActiveDocument !== false
+        ? this.viewState.attachments.activeDocumentAttachment()
+        : undefined;
     const attachmentBlock = replayMessage
       ? ""
-      : this.viewState.attachments.formatForPrompt(activeDocument);
+      : includeAttachments
+        ? this.viewState.attachments.formatForPrompt(activeDocument)
+        : "";
     const images = replayMessage
       ? replayMessage.images
-      : this.viewState.attachments.images.map(
-          ({ name, mimeType, data }) => ({ name, mimeType, data }),
-        );
+      : includeAttachments
+        ? this.viewState.attachments.images.map(
+            ({ name, mimeType, data }) => ({ name, mimeType, data }),
+          )
+        : undefined;
     const userContent =
       replayMessage?.content ?? `${userMessage}${attachmentBlock}`.trim();
     const attachedNames = replayMessage
       ? []
       : [
-          ...this.viewState.attachments.names(activeDocument),
-          ...this.viewState.attachments.images.map(({ name }) => name),
+          ...(includeAttachments
+            ? this.viewState.attachments.names(activeDocument)
+            : []),
+          ...(includeAttachments
+            ? this.viewState.attachments.images.map(({ name }) => name)
+            : []),
         ];
     const attachmentLabel = replayMessage
       ? ""
@@ -418,8 +476,9 @@ export class ChatFeature implements vscode.WebviewViewProvider {
           : "";
     const displayContent =
       replayMessage?.displayContent ??
+      options.displayContent ??
       `${userMessage}${attachmentLabel}`.trim();
-    if (!replayMessage) {
+    if (!replayMessage && options.clearAttachments !== false) {
       this.viewState.attachments.clear();
       this.viewState.postAttachments();
     }

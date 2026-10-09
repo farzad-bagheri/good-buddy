@@ -4,6 +4,7 @@ import { AttachmentStore } from "./AttachmentStore";
 const vscodeState = vi.hoisted(() => ({
   selected: [] as Array<{ path: string }>,
   files: new Map<string, Uint8Array>(),
+  showWarningMessage: vi.fn(),
   activeDocument: undefined as
     | {
         uri: { path: string; scheme: string };
@@ -11,15 +12,25 @@ const vscodeState = vi.hoisted(() => ({
         getText(): string;
       }
     | undefined,
+  editorSelection: undefined as
+    | {
+        isEmpty: boolean;
+        start: { line: number };
+        end: { line: number; character: number };
+      }
+    | undefined,
 }));
 
 vi.mock("vscode", () => ({
   window: {
     showOpenDialog: async () => vscodeState.selected,
-    showWarningMessage: vi.fn(),
+    showWarningMessage: vscodeState.showWarningMessage,
     get activeTextEditor() {
       return vscodeState.activeDocument
-        ? { document: vscodeState.activeDocument }
+        ? {
+            document: vscodeState.activeDocument,
+            selection: vscodeState.editorSelection,
+          }
         : undefined;
     },
   },
@@ -38,6 +49,8 @@ describe("AttachmentStore", () => {
     vscodeState.selected = [];
     vscodeState.files.clear();
     vscodeState.activeDocument = undefined;
+    vscodeState.editorSelection = undefined;
+    vscodeState.showWarningMessage.mockClear();
   });
 
   it("uses a basename for name and a workspace-relative path", () => {
@@ -139,5 +152,99 @@ describe("AttachmentStore", () => {
     expect(
       store.formatForPrompt(activeDocument).match(/Attached file:/g),
     ).toHaveLength(1);
+  });
+
+  it("adds selected code as a removable text attachment", () => {
+    const store = new AttachmentStore();
+    store.addSelection(
+      "current.ts (selection, lines 3-5)",
+      "src/current.ts (selection, lines 3-5)",
+      "src/current.ts",
+      "const answer = 42;",
+    );
+
+    expect(store.all).toEqual([
+      {
+        name: "current.ts (selection, lines 3-5)",
+        path: "src/current.ts (selection, lines 3-5)",
+        content: "const answer = 42;",
+        sourcePath: "src/current.ts",
+        kind: "selection",
+      },
+    ]);
+    expect(store.formatForPrompt()).toContain(
+      "Attached selection: src/current.ts (selection, lines 3-5)\n```\nconst answer = 42;\n```",
+    );
+  });
+
+  it("does not add empty, oversized, or duplicate selection attachments", () => {
+    const store = new AttachmentStore();
+    store.addSelection(
+      "empty",
+      "src/current.ts (selection, line 1)",
+      "src/current.ts",
+      "",
+    );
+    store.addSelection(
+      "oversized",
+      "src/current.ts (selection, lines 1-2)",
+      "src/current.ts",
+      "x".repeat(10 * 1024 + 1),
+    );
+    store.addSelection(
+      "selection",
+      "src/current.ts (selection, lines 1-2)",
+      "src/current.ts",
+      "selected code",
+    );
+    store.addSelection(
+      "duplicate",
+      "src/current.ts (selection, lines 1-2)",
+      "src/current.ts",
+      "selected code again",
+    );
+
+    expect(store.all).toHaveLength(1);
+    expect(vscodeState.showWarningMessage).toHaveBeenCalledTimes(3);
+  });
+
+  it("uses a selection instead of implicitly attaching the whole active file", () => {
+    const store = new AttachmentStore();
+    vscodeState.activeDocument = {
+      uri: { path: "/workspace/src/current.ts", scheme: "file" },
+      fileName: "D:\\workspace\\src\\current.ts",
+      getText: () => "whole file",
+    };
+    store.addSelection(
+      "current.ts (selection, line 1)",
+      "src/current.ts (selection, line 1)",
+      "src/current.ts",
+      "selected code",
+    );
+
+    const activeDocument = store.activeDocumentAttachment();
+    expect(activeDocument).toBeUndefined();
+    expect(store.names(activeDocument)).toEqual([
+      "current.ts (selection, line 1)",
+    ]);
+    expect(store.formatForPrompt(activeDocument)).not.toContain("whole file");
+    expect(store.formatForPrompt(activeDocument)).toContain("selected code");
+  });
+
+  it("can exclude the active file from the next message", () => {
+    const store = new AttachmentStore();
+    vscodeState.activeDocument = {
+      uri: { path: "/workspace/src/current.ts", scheme: "file" },
+      fileName: "D:\\workspace\\src\\current.ts",
+      getText: () => "whole file",
+    };
+
+    store.excludeActiveDocument("src/current.ts");
+
+    expect(store.activeDocumentAttachment()).toBeUndefined();
+    store.clear();
+    expect(store.activeDocumentAttachment()).toMatchObject({
+      path: "src/current.ts",
+    });
   });
 });
