@@ -5,6 +5,7 @@ import { WorkspaceTools } from "./WorkspaceTools";
 const vscodeState = vi.hoisted(() => ({
   root: "",
   files: new Map<string, string>(),
+  directories: new Map<string, Array<[string, number]>>(),
   documents: [] as Array<{
     uri: { fsPath: string; toString(): string };
     value: string;
@@ -92,10 +93,13 @@ vi.mock("vscode", () => {
         return vscodeState.documents;
       },
       fs: {
-        readDirectory: async () => [],
+        readDirectory: async (folder: { fsPath: string }) =>
+          vscodeState.directories.get(folder.fsPath) ?? [],
         stat: async (file: { fsPath: string }) => {
           const content = vscodeState.files.get(file.fsPath);
-          if (content === undefined) throw new Error("File not found");
+          if (content === undefined) {
+            throw new FileSystemError("File not found");
+          }
           return {
             type: 1,
             size: Buffer.byteLength(content),
@@ -190,6 +194,7 @@ describe("WorkspaceTools writes", () => {
   beforeEach(() => {
     vscodeState.root = "D:\\workspace";
     vscodeState.files.clear();
+    vscodeState.directories.clear();
     vscodeState.documents.length = 0;
     vscodeState.editCalls = 0;
     vscodeState.fileWriteCalls = 0;
@@ -221,6 +226,30 @@ describe("WorkspaceTools writes", () => {
     }
   });
 
+  it("omits Python virtual environments and caches from project context", async () => {
+    vscodeState.directories.set("D:\\workspace", [
+      ["pyproject.toml", 1],
+      [".venv", 2],
+      ["venv", 2],
+      ["env", 2],
+      ["ENV", 2],
+      [".tox", 2],
+      ["__pycache__", 2],
+      [".pytest_cache", 2],
+      [".mypy_cache", 2],
+      ["src", 2],
+    ]);
+    vscodeState.directories.set("D:\\workspace\\src", [["main.py", 1]]);
+
+    const context = await new WorkspaceTools().projectContext();
+
+    expect(context).toContain("pyproject.toml");
+    expect(context).toContain("src/main.py");
+    expect(context).not.toMatch(
+      /(?:^|\n)(?:\.venv|venv|env|ENV|\.tox|__pycache__|\.pytest_cache|\.mypy_cache)(?:\/|$)/m,
+    );
+  });
+
   it("distinguishes missing files from existing empty files when reading", async () => {
     const readFileTool = new WorkspaceTools()
       .createTools(async () => "", async () => "")
@@ -242,6 +271,30 @@ describe("WorkspaceTools writes", () => {
         arguments: { path: "empty.txt" },
       }),
     ).resolves.toBe("");
+  });
+
+  it("checks workspace file existence without changing files", async () => {
+    const fileExists = new WorkspaceTools()
+      .createTools(async () => "", async () => "")
+      .find((tool) => tool.id === "file_exists");
+    if (!fileExists) throw new Error("file_exists tool was not registered");
+
+    vscodeState.files.set("D:\\workspace\\present.txt", "");
+    await expect(
+      fileExists.execute({
+        tool: "file_exists",
+        autoApprove: false,
+        arguments: { path: "present.txt" },
+      }),
+    ).resolves.toBe("File exists: present.txt.");
+    await expect(
+      fileExists.execute({
+        tool: "file_exists",
+        autoApprove: false,
+        arguments: { path: "missing.txt" },
+      }),
+    ).resolves.toBe("File does not exist: missing.txt.");
+    expect(vscodeState.fileWriteCalls).toBe(0);
   });
 
   it("updates and saves an open editor document", async () => {

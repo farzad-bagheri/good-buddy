@@ -9,5 +9,20 @@ export const MAX_RESPONSE_RETRIES = 2;
 export const MAX_SEARCH_FILE_BYTES = 512 * 1024;
 export const MAX_SEARCH_FILES = 500;
 export const MAX_SEARCH_RESULTS = 50;
-export const SEARCH_EXCLUDES = "**/{node_modules,.git,out,dist}/**";
+export const IGNORED_PROJECT_DIRECTORIES: readonly string[] = [
+  "node_modules",
+  ".git",
+  "out",
+  "dist",
+  ".env",
+  ".venv",
+  "venv",
+  "env",
+  "ENV",
+  ".tox",
+  "__pycache__",
+  ".pytest_cache",
+  ".mypy_cache",
+];
+export const SEARCH_EXCLUDES = `**/{${IGNORED_PROJECT_DIRECTORIES.join(",")}}/**`;
 export const TOOL_TIMEOUT = 60_000;

@@ -2,6 +2,7 @@ export type ToolName =
   | "list_project"
   | "search_files"
   | "search_file_contents"
+  | "file_exists"
   | "read_file"
   | "get_diagnostics"
   | "find_references"

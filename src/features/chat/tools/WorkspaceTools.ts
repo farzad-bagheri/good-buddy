@@ -9,6 +9,7 @@ import {
   MAX_SEARCH_RESULTS,
   MAX_SEARCH_FILES,
   MAX_SEARCH_FILE_BYTES,
+  IGNORED_PROJECT_DIRECTORIES,
   SEARCH_EXCLUDES,
 } from "../constants";
 import type { ToolCall, ToolDefinition } from "../types";
@@ -87,6 +88,16 @@ export class WorkspaceTools {
             call.arguments.caseSensitive === true,
             this.optionalContextLines(call.arguments.contextLines),
             this.optionalLimit(call.arguments.limit),
+          ),
+      },
+      {
+        id: "file_exists",
+        description:
+          "Check whether a workspace-relative file exists. Required argument: path. Use the result to verify existence; this tool does not create or modify files.",
+        execute: async (call) =>
+          this.fileExists(
+            this.workspaceRoot(),
+            requiredString(call.arguments.path, "path"),
           ),
       },
       {
@@ -172,7 +183,7 @@ export class WorkspaceTools {
       for (const [name, type] of await vscode.workspace.fs.readDirectory(
         folder,
       )) {
-        if (["node_modules", ".git", "out", "dist"].includes(name)) continue;
+        if (IGNORED_PROJECT_DIRECTORIES.includes(name)) continue;
 
         const childRelative = relative ? `${relative}/${name}` : name;
         entries.push(
@@ -470,6 +481,24 @@ export class WorkspaceTools {
         error.code === "FileNotFound"
       ) {
         return `File not found: ${relativePath}.`;
+      }
+      throw error;
+    }
+  }
+
+  private async fileExists(root: string, relativePath: string): Promise<string> {
+    const uri = workspaceFile(root, relativePath);
+    try {
+      const stat = await vscode.workspace.fs.stat(uri);
+      return stat.type & vscode.FileType.Directory
+        ? `A directory exists at ${relativePath}, not a file.`
+        : `File exists: ${relativePath}.`;
+    } catch (error) {
+      if (
+        error instanceof vscode.FileSystemError &&
+        error.code === "FileNotFound"
+      ) {
+        return `File does not exist: ${relativePath}.`;
       }
       throw error;
     }

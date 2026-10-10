@@ -12,6 +12,11 @@ import {
 
 const tools: ToolDefinition[] = [
   {
+    id: "file_exists",
+    description: "Check whether a workspace file exists",
+    execute: async () => "File exists",
+  },
+  {
     id: "read_file",
     description: "Read a workspace file",
     execute: async () => "contents",
@@ -213,7 +218,7 @@ describe("assistant response envelope", () => {
     expect(assistantResponseFormat(tools)).toMatchObject({
       type: "object",
       properties: {
-        tool: { enum: [null, "read_file"] },
+        tool: { enum: [null, "file_exists", "read_file"] },
       },
       required: expect.arrayContaining(["suggestions", "files", "title"]),
     });
@@ -275,6 +280,12 @@ describe("assistant response envelope", () => {
     );
     expect(prompt).toContain(
       "If replace_in_file fails because oldText does not match exactly once",
+    );
+    expect(prompt).toContain(
+      "Before saying a requested file already exists, call file_exists",
+    );
+    expect(prompt).toContain(
+      'Only say you created or updated a file after a write tool returns a result beginning with "Wrote "',
     );
     expect(prompt).toContain('"suggestions":[],"files":[]');
   });
