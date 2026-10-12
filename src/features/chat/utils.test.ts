@@ -103,6 +103,37 @@ describe("assistant response envelope", () => {
     ).toThrow("Unknown tool 'unknown'.");
   });
 
+  it("accepts namespaced tools registered by an external tool provider", () => {
+    const externalTool: ToolDefinition = {
+      id: "mcp__docs__search",
+      description: "Search documentation",
+      inputSchema: {
+        type: "object",
+        properties: { query: { type: "string" } },
+        required: ["query"],
+      },
+      execute: async () => "Found documentation",
+    };
+    const response = JSON.stringify({
+      type: "tool_call",
+      response: "",
+      tool: externalTool.id,
+      autoApprove: false,
+      arguments: { query: "MCP tools" },
+      title: null,
+    });
+
+    expect(
+      parseAssistantEnvelope(response, [...tools, externalTool]),
+    ).toMatchObject({
+      type: "tool_call",
+      tool: {
+        tool: "mcp__docs__search",
+        arguments: { query: "MCP tools" },
+      },
+    });
+  });
+
   it("accepts null titles after the initial response", () => {
     expect(
       parseAssistantEnvelope(
@@ -288,6 +319,42 @@ describe("assistant response envelope", () => {
       'Only say you created or updated a file after a write tool returns a result beginning with "Wrote "',
     );
     expect(prompt).toContain('"suggestions":[],"files":[]');
+  });
+
+  it("includes external tool argument schemas in the agent instructions", () => {
+    const prompt = agentInstructions(
+      {
+        caption: "Test model",
+        name: "test",
+        model: "test",
+        details: {
+          format: "",
+          family: "",
+          parameter_size: "",
+          quantization_level: "",
+          context_length: 0,
+          embedding_length: 0,
+        },
+        capabilities: [],
+      } satisfies ProviderModel,
+      "Workspace root: test",
+      [
+        {
+          id: "mcp__docs__search",
+          description: "Search documentation",
+          inputSchema: {
+            type: "object",
+            properties: { query: { type: "string" } },
+          },
+          execute: async () => "",
+        },
+      ],
+      false,
+    );
+
+    expect(prompt.content).toContain(
+      'Arguments schema: {"type":"object","properties":{"query":{"type":"string"}}}',
+    );
   });
 
   it("explains the host environment available to run_command", () => {

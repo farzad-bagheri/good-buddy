@@ -1,24 +1,14 @@
-export type ToolName =
-  | "list_project"
-  | "search_files"
-  | "search_file_contents"
-  | "file_exists"
-  | "read_file"
-  | "get_diagnostics"
-  | "find_references"
-  | "write_file"
-  | "replace_in_file"
-  | "delete_file"
-  | "run_command";
-
 export interface ToolCall {
-  tool: ToolName;
+  tool: string;
   autoApprove: boolean;
   arguments: Record<string, unknown>;
 }
 
 export interface ToolDefinition {
-  id: ToolName;
+  /** Unique identifier used in assistant responses (for MCP, namespace by server). */
+  id: string;
   description: string;
+  /** JSON Schema describing the arguments accepted by this tool. */
+  inputSchema?: Record<string, unknown>;
   execute(call: ToolCall): Promise<string>;
 }

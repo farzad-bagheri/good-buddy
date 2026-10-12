@@ -14,7 +14,7 @@
     "copilot alternative",
     "private ai"
   ],
-  "version": "0.0.8",
+  "version": "0.0.9",
   "publisher": "dabanli",
   "license": "MIT",
   "type": "module",
@@ -105,6 +105,36 @@
           "scope": "machine",
           "description": "Optional API key sent as a Bearer token to the OpenAI-compatible API."
         },
+        "goodBuddy.mcpServers": {
+          "type": "object",
+          "default": {},
+          "scope": "machine",
+          "description": "Local stdio MCP servers. Only configure commands you trust; each MCP tool call asks for confirmation.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string",
+                "description": "Executable used to start the MCP server."
+              },
+              "args": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Arguments passed to the server executable."
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": { "type": "string" },
+                "description": "Environment variables passed to the server process."
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Optional working directory for the server process."
+              }
+            },
+            "required": ["command"]
+          }
+        },
         "goodBuddy.completionModel": {
           "type": "string",
           "default": "",
@@ -167,6 +197,7 @@
     "vitest": "^5.0.1"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "marked": "^18.0.14"
   },
   "packageManager": "pnpm@11.21.0"

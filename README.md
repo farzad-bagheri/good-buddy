@@ -184,6 +184,51 @@ or run a command. Good Buddy provides workspace tools to:
 - Move a selected workspace file to the OS trash only after its own explicit
   confirmation.
 
+Chat tools are registered by identifier and may include a JSON Schema for their
+arguments. The internal registry supports adding and removing tools at runtime.
+
+### MCP servers (stdio)
+
+Good Buddy can connect to local MCP servers over stdio. Configure servers in
+VS Code User Settings under `goodBuddy.mcpServers`. On Windows, with Node.js
+and `npx` available on the extension host:
+
+```json
+"goodBuddy.mcpServers": {
+  "filesystem": {
+    "command": "cmd.exe",
+    "args": [
+      "/d",
+      "/c",
+      "npx -y @modelcontextprotocol/server-filesystem C:/path/to/project"
+    ]
+  },
+  "issue-tracker": {
+    "command": "node",
+    "args": ["C:/path/to/mcp-server.js"],
+    "env": {
+      "API_TOKEN": "${env:ISSUE_TRACKER_TOKEN}"
+    }
+  }
+}
+```
+
+On macOS or Linux, set the filesystem server's command to `npx` and its
+arguments to `["-y", "@modelcontextprotocol/server-filesystem", "/path/to/project"]`.
+Use the path format for the extension host, which may be remote. Only configure
+server commands you trust: they run as child processes with the extension host
+user's permissions. Good Buddy asks for confirmation before every MCP tool call.
+The confirmation dialog shows the tool description and arguments. Environment
+values may reference extension-host variables as `${env:NAME}`; missing variables
+are reported in the output channel. Avoid putting raw credentials directly in
+the settings file.
+Connection status, discovered tools, server stderr, and errors are written to
+the **Good Buddy** output channel. Changing this setting restarts the configured
+MCP servers. If a server exits unexpectedly, its tools are removed and the
+output channel explains how to reconnect by changing the setting. Tool-list
+change notifications refresh the available tools without restarting the server.
+Remote HTTP transports are not supported yet.
+
 Each request starts with the opened workspace path and a compact project tree.
 Tool paths are scoped to the workspace, command output is capped, and each
 agent request is limited to five tool calls. Good Buddy proposes and assists

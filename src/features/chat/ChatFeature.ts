@@ -15,7 +15,7 @@ import { ChatWebviewMessageRouter } from "./ChatWebviewMessageRouter";
 import { ProposalDiffEditor } from "./ProposalDiffEditor";
 import { shellHtml } from "./shell";
 import { ChatHistoryStore } from "./storage/ChatHistoryStore";
-import { ToolRegistry } from "./tools";
+import { McpToolManager, ToolRegistry } from "./tools";
 import { WorkspaceTools } from "./tools/WorkspaceTools";
 import { findRetryUserIndex, formatError } from "./utils";
 
@@ -131,6 +131,40 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       (call) => this.commandApprovals.executeOrPropose(call),
     );
     this.tools = new ToolRegistry(registeredTools);
+    const mcpTools = new McpToolManager(
+      this.tools,
+      output,
+      async (server, tool, arguments_) => {
+        const serializedArguments = JSON.stringify(arguments_);
+        const displayedArguments =
+          serializedArguments.length > 800
+            ? `${serializedArguments.slice(0, 800)}…`
+            : serializedArguments;
+        return (
+          (await vscode.window.showWarningMessage(
+            `Allow MCP server "${server}" to run "${tool.name}"?\n${tool.description}\nArguments: ${displayedArguments}`,
+            { modal: true },
+            "Run Tool",
+          )) === "Run Tool"
+        );
+      },
+      undefined,
+      String(context.extension.packageJSON.version),
+    );
+    context.subscriptions.push(
+      mcpTools,
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (!event.affectsConfiguration("goodBuddy.mcpServers")) return;
+        void mcpTools.configure(
+          vscode.workspace
+            .getConfiguration("goodBuddy")
+            .get<unknown>("mcpServers", {}),
+        );
+      }),
+    );
+    void mcpTools.configure(
+      vscode.workspace.getConfiguration("goodBuddy").get<unknown>("mcpServers", {}),
+    );
 
     // Initialize the chat agent with the provider, output channel, workspace tools, tool registry, and event handlers.
     this.agent = new ChatAgent(

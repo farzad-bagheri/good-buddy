@@ -1,23 +1,34 @@
-import type { ToolCall, ToolDefinition, ToolName } from "../types";
+import type { ToolCall, ToolDefinition } from "../types";
 
 /**
  * Manages the registration and execution of chat tools.
  */
 export class ToolRegistry {
-  private readonly toolsById: ReadonlyMap<ToolName, ToolDefinition>;
+  private readonly toolsById = new Map<string, ToolDefinition>();
 
   constructor(tools: readonly ToolDefinition[]) {
-    this.toolsById = new Map(tools.map((tool) => [tool.id, tool]));
+    for (const tool of tools) this.register(tool);
   }
 
   list(): readonly ToolDefinition[] {
     return [...this.toolsById.values()];
   }
 
-  get(id: ToolName): ToolDefinition {
+  get(id: string): ToolDefinition {
     const tool = this.toolsById.get(id);
     if (!tool) throw new Error(`Unknown tool: ${id}`);
     return tool;
+  }
+
+  register(tool: ToolDefinition): void {
+    if (this.toolsById.has(tool.id)) {
+      throw new Error(`Tool already registered: ${tool.id}`);
+    }
+    this.toolsById.set(tool.id, tool);
+  }
+
+  unregister(id: string): boolean {
+    return this.toolsById.delete(id);
   }
 
   /**

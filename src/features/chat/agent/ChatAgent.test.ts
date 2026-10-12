@@ -347,11 +347,106 @@ describe("ChatAgent", () => {
     expect(
       chatWithMetadata.mock.calls[1][0].messages.at(-1)?.content,
     ).toContain(
-      "The provider reached its output limit. Return a shorter, complete response.",
+      "The provider reached its output token limit.",
     );
+    expect(
+      chatWithMetadata.mock.calls[1][0].messages.some(
+        ({ content }) => content === '{"type":"final","response":"Partial answer',
+      ),
+    ).toBe(false);
     expect(chatWithMetadata.mock.calls[1][0].format).toMatchObject({
       properties: { title: { type: "string" } },
     });
+  });
+
+  it("explains the output token limit when concise retries are still truncated", async () => {
+    const chatWithMetadata = vi
+      .fn<GoodBuddyProvider["chatWithMetadata"]>()
+      .mockResolvedValue({
+        content: '{"type":"final","response":"Partial answer',
+        finishReason: "length",
+      });
+    const provider = {
+      ...createProvider(async () => ""),
+      chatWithMetadata:
+        chatWithMetadata as GoodBuddyProvider["chatWithMetadata"],
+    };
+    const agent = new ChatAgent(
+      provider,
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [], execute: vi.fn() } as never,
+      {
+        onToolStatus: vi.fn(),
+        onModelStatus: vi.fn(),
+      },
+    );
+
+    await expect(
+      agent.run(
+        [{ role: "user", content: "List the files" }],
+        { model: "qwen3:8b" } as unknown as ProviderModel,
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({
+      response: expect.stringContaining("output token limit"),
+    });
+    expect(chatWithMetadata).toHaveBeenCalledTimes(3);
+    expect(
+      chatWithMetadata.mock.calls[2][0].messages.filter(
+        ({ role }) => role === "assistant",
+      ),
+    ).toEqual([]);
+  });
+
+  it("bounds large tool results before sending them back to the model", async () => {
+    const toolResponse = JSON.stringify({
+      type: "tool_call",
+      response: "",
+      tool: "read_file",
+      autoApprove: false,
+      arguments: { path: "large.txt" },
+      title: "Summarize a file",
+      suggestions: [],
+      files: [],
+    });
+    const finalResponse = JSON.stringify({
+      type: "final",
+      response: "The file is large.",
+      tool: null,
+      autoApprove: false,
+      arguments: {},
+      title: null,
+      suggestions: [],
+      files: [],
+    });
+    const chat = vi.fn().mockResolvedValueOnce(toolResponse).mockResolvedValueOnce(finalResponse);
+    const agent = new ChatAgent(
+      createProvider(chat as GoodBuddyProvider["chat"]),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      {
+        list: () => [{ id: "read_file" } as ToolDefinition],
+        execute: vi.fn().mockResolvedValue("x".repeat(7_000)),
+      } as never,
+      {
+        onToolStatus: vi.fn(),
+        onModelStatus: vi.fn(),
+      },
+    );
+
+    await agent.run(
+      [{ role: "user", content: "Summarize the file" }],
+      { model: "qwen3:8b" } as unknown as ProviderModel,
+      new AbortController().signal,
+    );
+
+    expect(chat.mock.calls[1][0].messages.at(-1)?.content).toContain(
+      "[Tool result truncated to 6000 characters.]",
+    );
+    expect(chat.mock.calls[1][0].messages.at(-1)?.content).not.toContain(
+      "x".repeat(6_001),
+    );
   });
 
   it("stops after the bounded number of invalid response retries", async () => {

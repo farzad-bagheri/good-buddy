@@ -1,5 +1,9 @@
 import { ChatMessage, GoodBuddyProvider, ProviderModel } from "@/provider";
-import { MAX_CHAT_STEPS, MAX_RESPONSE_RETRIES } from "../constants";
+import {
+  MAX_AGENT_TOOL_RESULT_LENGTH,
+  MAX_CHAT_STEPS,
+  MAX_RESPONSE_RETRIES,
+} from "../constants";
 import { ToolRegistry, WorkspaceTools } from "../tools";
 import { ToolCall } from "../types";
 import {
@@ -88,9 +92,11 @@ export class ChatAgent {
 
       let envelope: AssistantEnvelope | undefined;
       let invalidReason: string | undefined;
+      let outputLimitReached = false;
       if (finishReason === "length") {
+        outputLimitReached = true;
         invalidReason =
-          "The provider reached its output limit. Return a shorter, complete response.";
+          "The provider reached its output token limit. Reply concisely with no more than five bullet points, and set suggestions and files to empty arrays.";
       } else {
         try {
           envelope = parseAssistantEnvelope(
@@ -107,19 +113,20 @@ export class ChatAgent {
         this.output.appendLine(`[invalid assistant response] ${invalidReason}`);
         if (responseRetries >= MAX_RESPONSE_RETRIES) {
           return {
-            response:
-              "I couldn't get a valid response after asking the model to correct its format. Please try again.",
+            response: outputLimitReached
+              ? "The model stopped mid-response because it reached its output token limit. Try asking for a shorter answer or increase the response token limit in your model server."
+              : "I couldn't get a valid response after asking the model to correct its format. Please try again.",
             title,
           };
         }
         responseRetries++;
-        messages.push(
-          { role: "assistant", content: response },
-          {
-            role: "system",
-            content: `Your previous response could not be used: ${invalidReason} Follow the required response schema and return one complete JSON object only.`,
-          },
-        );
+        if (!outputLimitReached) {
+          messages.push({ role: "assistant", content: response });
+        }
+        messages.push({
+          role: "system",
+          content: `Your previous response could not be used: ${invalidReason} Follow the required response schema and return one complete JSON object only.`,
+        });
         continue;
       }
 
@@ -145,6 +152,9 @@ export class ChatAgent {
         result = await this.tools.execute(toolCall);
       } catch (error) {
         result = `Tool error: ${formatError(error)}`;
+      }
+      if (result.length > MAX_AGENT_TOOL_RESULT_LENGTH) {
+        result = `${result.slice(0, MAX_AGENT_TOOL_RESULT_LENGTH)}\n[Tool result truncated to ${MAX_AGENT_TOOL_RESULT_LENGTH} characters.]`;
       }
 
       // Append the agent's response and the tool result to the message history for the next iteration.
