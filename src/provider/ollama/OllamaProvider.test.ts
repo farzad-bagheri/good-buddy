@@ -83,6 +83,40 @@ describe("OllamaProvider", () => {
     ).resolves.toEqual({ content: "partial", finishReason: "length" });
   });
 
+  it("streams chat content and completion metadata", async () => {
+    const encoder = new TextEncoder();
+    const response = JSON.stringify({
+      message: { content: "answer" },
+      done: false,
+    });
+    const finalResponse = JSON.stringify({
+      message: { content: "" },
+      done_reason: "stop",
+      done: true,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        body: (async function* () {
+          yield encoder.encode(`${response}\n${finalResponse}\n`);
+        })(),
+      }),
+    );
+    const onChunk = vi.fn();
+
+    await expect(
+      new OllamaProvider().chatStreamWithMetadata(
+        {
+          model: "qwen3:8b",
+          messages: [{ role: "user", content: "Answer me" }],
+        },
+        onChunk,
+      ),
+    ).resolves.toEqual({ content: "answer", finishReason: "stop" });
+    expect(onChunk).toHaveBeenCalledWith("answer");
+  });
+
   it("sends image bytes in Ollama's native images field", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

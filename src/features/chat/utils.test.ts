@@ -4,6 +4,7 @@ import type { ToolDefinition } from "./types";
 import {
   agentInstructions,
   assistantResponseFormat,
+  extractJsonStringFieldPrefix,
   findMissingModels,
   getModelSetupStatus,
   findRetryUserIndex,
@@ -22,6 +23,26 @@ const tools: ToolDefinition[] = [
     execute: async () => "contents",
   },
 ];
+
+describe("extractJsonStringFieldPrefix", () => {
+  it("extracts a partially streamed top-level JSON string and decodes escapes", () => {
+    expect(
+      extractJsonStringFieldPrefix(
+        '{"type":"final","response":"First line\\nsecond \\"quoted',
+        "response",
+      ),
+    ).toBe('First line\nsecond "quoted');
+  });
+
+  it("ignores matching keys in nested objects and preceding string values", () => {
+    expect(
+      extractJsonStringFieldPrefix(
+        '{"title":"mentions \\"response\\":","meta":{"response":"hidden"},"response":"visible',
+        "response",
+      ),
+    ).toBe("visible");
+  });
+});
 
 describe("assistant response envelope", () => {
   it("preserves Markdown and a suggested title in final responses", () => {

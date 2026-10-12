@@ -18,6 +18,121 @@ export function formatError(error: unknown): string {
   return String(error);
 }
 
+export function extractJsonStringFieldPrefix(
+  json: string,
+  fieldName: string,
+): string | undefined {
+  let index = 0;
+  const skipWhitespace = () => {
+    while (/\s/.test(json[index] ?? "")) index++;
+  };
+  const readStringEnd = (start: number): number | undefined => {
+    let escaped = false;
+    for (let position = start + 1; position < json.length; position++) {
+      const character = json[position];
+      if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === '"') {
+        return position + 1;
+      }
+    }
+    return undefined;
+  };
+  const skipValue = (start: number): number | undefined => {
+    if (json[start] === '"') return readStringEnd(start);
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let position = start; position < json.length; position++) {
+      const character = json[position];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (character === "\\") escaped = true;
+        else if (character === '"') inString = false;
+        continue;
+      }
+      if (character === '"') inString = true;
+      else if (character === "{" || character === "[") depth++;
+      else if (character === "}" || character === "]") {
+        if (depth === 0) return position;
+        depth--;
+      } else if (character === "," && depth === 0) {
+        return position;
+      }
+    }
+    return undefined;
+  };
+
+  skipWhitespace();
+  if (json[index++] !== "{") return undefined;
+  while (index < json.length) {
+    skipWhitespace();
+    if (json[index] === ",") {
+      index++;
+      continue;
+    }
+    if (json[index] !== '"') return undefined;
+    const keyEnd = readStringEnd(index);
+    if (keyEnd === undefined) return undefined;
+    let key: unknown;
+    try {
+      key = JSON.parse(json.slice(index, keyEnd));
+    } catch {
+      return undefined;
+    }
+    index = keyEnd;
+    skipWhitespace();
+    if (json[index++] !== ":") return undefined;
+    skipWhitespace();
+
+    if (key === fieldName) {
+      if (json[index] !== '"') return undefined;
+      let value = "";
+      for (let position = index + 1; position < json.length; position++) {
+        const character = json[position];
+        if (character === '"') return value;
+        if (character !== "\\") {
+          value += character;
+          continue;
+        }
+
+        const escaped = json[++position];
+        if (escaped === undefined) break;
+        const simpleEscapes: Record<string, string> = {
+          '"': '"',
+          "\\": "\\",
+          "/": "/",
+          b: "\b",
+          f: "\f",
+          n: "\n",
+          r: "\r",
+          t: "\t",
+        };
+        if (escaped in simpleEscapes) {
+          value += simpleEscapes[escaped];
+        } else if (escaped === "u") {
+          const hex = json.slice(position + 1, position + 5);
+          if (!/^[\da-f]{4}$/i.test(hex)) break;
+          value += String.fromCharCode(parseInt(hex, 16));
+          position += 4;
+        } else {
+          break;
+        }
+      }
+      return value;
+    }
+
+    const valueEnd = skipValue(index);
+    if (valueEnd === undefined) return undefined;
+    index = valueEnd;
+    if (json[index] === ",") index++;
+    else if (json[index] === "}") return undefined;
+  }
+  return undefined;
+}
+
 export function findRetryUserIndex(
   history: readonly ChatMessage[],
   assistantIndex: number,

@@ -96,6 +96,15 @@ export class OllamaProvider implements GoodBuddyProvider {
     onChunk: (text: string) => void,
     signal?: AbortSignal,
   ): Promise<string> {
+    const result = await this.chatStreamWithMetadata(options, onChunk, signal);
+    return result.content;
+  }
+
+  async chatStreamWithMetadata(
+    options: ChatOptions,
+    onChunk: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<ChatResponseMetadata> {
     const body = JSON.stringify({
       ...options,
       messages: this.messagesWithImages(options),
@@ -138,7 +147,7 @@ export class OllamaProvider implements GoodBuddyProvider {
     body: string,
     onChunk: (text: string) => void,
     signal?: AbortSignal,
-  ): Promise<string> {
+  ): Promise<ChatResponseMetadata> {
     const response = await this.request.post(path, body, signal);
     if (!response || !response.body) {
       throw new Error("Ollama returned an empty streaming response body.");
@@ -150,24 +159,36 @@ export class OllamaProvider implements GoodBuddyProvider {
     // Initialize the full response text and a buffer for streaming chunks.
     let fullResponse = "";
     let buffer = "";
+    const decoder = new TextDecoder();
+    let finishReason: string | undefined;
+    const processLine = (line: string): string => {
+      const text = processStreamLine(line, extractText, onChunk);
+      const json = parseJsonResponse<ChatResponse>(line, path);
+      finishReason = json.done_reason ?? finishReason;
+      return text;
+    };
     for await (const chunk of response.body) {
-      buffer += Buffer.from(chunk).toString("utf8");
+      buffer += decoder.decode(chunk, { stream: true });
       let newlineIndex: number;
       // Process each complete line in the buffer.
       while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
         const line = buffer.slice(0, newlineIndex).trim();
         buffer = buffer.slice(newlineIndex + 1); // Remove the processed line from the buffer.
         if (line) {
-          fullResponse += processStreamLine(line, extractText, onChunk);
+          fullResponse += processLine(line);
         }
       }
     }
 
+    buffer += decoder.decode();
     const remaining = buffer.trim();
     if (remaining) {
-      fullResponse += processStreamLine(remaining, extractText, onChunk);
+      fullResponse += processLine(remaining);
     }
-    return fullResponse;
+    return {
+      content: stripThinking(fullResponse),
+      finishReason,
+    };
   }
 
   private messagesWithImages(

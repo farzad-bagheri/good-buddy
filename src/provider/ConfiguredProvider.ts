@@ -36,6 +36,18 @@ export class ConfiguredProvider implements GoodBuddyProvider {
     return this.createProvider().chatStream(options, onChunk, signal);
   }
 
+  async chatStreamWithMetadata(
+    options: ChatOptions,
+    onChunk: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<ChatResponse> {
+    return this.createProvider().chatStreamWithMetadata(
+      options,
+      onChunk,
+      signal,
+    );
+  }
+
   async listModels(): Promise<ProviderModel[]> {
     return this.createProvider().listModels();
   }

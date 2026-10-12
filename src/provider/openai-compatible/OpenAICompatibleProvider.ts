@@ -109,6 +109,15 @@ export class OpenAICompatibleProvider implements GoodBuddyProvider {
     onChunk: (text: string) => void,
     signal?: AbortSignal,
   ): Promise<string> {
+    const result = await this.chatStreamWithMetadata(options, onChunk, signal);
+    return result.content;
+  }
+
+  async chatStreamWithMetadata(
+    options: ChatOptions,
+    onChunk: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<ChatResponse> {
     const body = {
       model: options.model,
       messages: options.messages.map((message) => ({
@@ -134,6 +143,7 @@ export class OpenAICompatibleProvider implements GoodBuddyProvider {
     const decoder = new TextDecoder();
     let buffer = "";
     let fullResponse = "";
+    let finishReason: string | undefined;
     const processLine = (line: string) => {
       const trimmed = line.trim();
       if (!trimmed.startsWith("data:")) return;
@@ -144,6 +154,8 @@ export class OpenAICompatibleProvider implements GoodBuddyProvider {
         data,
         "streaming chat/completions",
       );
+      finishReason =
+        json.choices?.[0]?.finish_reason ?? finishReason;
       const text = json.choices?.[0]?.delta?.content ?? "";
       if (text) {
         fullResponse += text;
@@ -161,7 +173,7 @@ export class OpenAICompatibleProvider implements GoodBuddyProvider {
     }
     buffer += decoder.decode();
     if (buffer.trim()) processLine(buffer);
-    return fullResponse;
+    return { content: fullResponse, finishReason };
   }
 
   async listModels(): Promise<ProviderModel[]> {

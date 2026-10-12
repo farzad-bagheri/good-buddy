@@ -154,6 +154,7 @@ describe("OpenAICompatibleProvider", () => {
     const chunks = [
       'data: {"choices":[{"delta":{"content":"Hello "}}]}\n\n',
       'data: {"choices":[{"delta":{"content":"there"}}]}\n\n',
+      'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
       "data: [DONE]\n\n",
     ];
     vi.stubGlobal(
@@ -177,6 +178,32 @@ describe("OpenAICompatibleProvider", () => {
 
     expect(result).toBe("Hello there");
     expect(onChunk.mock.calls).toEqual([["Hello "], ["there"]]);
+  });
+
+  it("returns finish metadata while streaming", async () => {
+    const encoder = new TextEncoder();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        body: (async function* () {
+          yield encoder.encode(
+            'data: {"choices":[{"delta":{"content":"answer"},"finish_reason":null}]}\n\n' +
+              'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\n',
+          );
+        })(),
+      }),
+    );
+
+    await expect(
+      new OpenAICompatibleProvider().chatStreamWithMetadata(
+        {
+          model: "local-model",
+          messages: [{ role: "user", content: "Say hello" }],
+        },
+        vi.fn(),
+      ),
+    ).resolves.toEqual({ content: "answer", finishReason: "length" });
   });
 
   it("maps completion requests and common Ollama generation options", async () => {

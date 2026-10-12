@@ -53,6 +53,19 @@ export abstract class GoodBuddyProvider {
   ): Promise<string>;
 
   /**
+   * Streams chat tokens and returns provider completion metadata.
+   * @param options The options for the chat request.
+   * @param onChunk A callback function invoked with each incremental piece of text.
+   * @param signal An optional AbortSignal to cancel the request.
+   * @returns The response content and provider finish reason, when available.
+   */
+  abstract chatStreamWithMetadata(
+    options: ChatOptions,
+    onChunk: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<ChatResponse>;
+
+  /**
    * Lists the available models from the provider server.
    * @returns An array of model names.
    */

@@ -2,7 +2,7 @@ import { ProviderModel } from "../types";
 
 // Defensive: some models emit <think>...</think> reasoning even when not requested.
 export function stripThinking(text: string): string {
-  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").trimStart();
+  return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trimStart();
 }
 
 /**

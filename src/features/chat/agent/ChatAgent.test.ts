@@ -8,18 +8,90 @@ import type { ToolDefinition } from "../types";
 import { ChatAgent } from "./ChatAgent";
 
 function createProvider(chat: GoodBuddyProvider["chat"]) {
+  const chatWithMetadata: GoodBuddyProvider["chatWithMetadata"] = async (
+    options,
+    signal,
+  ) => ({ content: await chat(options, signal) });
+  const chatStream: GoodBuddyProvider["chatStream"] = async (
+    options,
+    onChunk,
+    signal,
+  ) => {
+    const result = await chatWithMetadata(options, signal);
+    onChunk(result.content);
+    return result.content;
+  };
+  const chatStreamWithMetadata: GoodBuddyProvider["chatStreamWithMetadata"] =
+    async (options, onChunk, signal) => {
+      const result = await chatWithMetadata(options, signal);
+      onChunk(result.content);
+      return result;
+    };
   return {
     chat,
-    chatWithMetadata: async (options: ChatOptions, signal?: AbortSignal) => ({
-      content: await chat(options, signal),
-    }),
+    chatWithMetadata,
     generate: vi.fn(),
-    chatStream: vi.fn(),
+    chatStream,
+    chatStreamWithMetadata,
     listModels: vi.fn(),
   };
 }
 
 describe("ChatAgent", () => {
+  it("streams only the user-facing response field from the structured output", async () => {
+    const response = JSON.stringify({
+      type: "final",
+      response: "A **streamed** answer.",
+      tool: null,
+      autoApprove: false,
+      arguments: {},
+      title: "Answer me",
+      suggestions: [],
+      files: [],
+    });
+    const valueStart =
+      response.indexOf('"response":"') + '"response":"'.length;
+    const streamChunks = [
+      response.slice(0, valueStart),
+      "A **str",
+      "eamed** answer.",
+      response.slice(valueStart + "A **streamed** answer.".length),
+    ];
+    const provider = {
+      ...createProvider(async () => response),
+      chatStreamWithMetadata: async (
+        _options: ChatOptions,
+        onChunk: (text: string) => void,
+      ) => {
+        for (const chunk of streamChunks) onChunk(chunk);
+        return { content: response };
+      },
+    };
+    const onAssistantResponse = vi.fn();
+    const agent = new ChatAgent(
+      provider,
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [], execute: vi.fn() } as never,
+      {
+        onToolStatus: vi.fn(),
+        onModelStatus: vi.fn(),
+        onAssistantResponse,
+      },
+    );
+
+    await agent.run(
+      [{ role: "user", content: "Answer me" }],
+      { model: "qwen3:8b" } as unknown as ProviderModel,
+      new AbortController().signal,
+    );
+
+    expect(onAssistantResponse.mock.calls.map(([text]) => text)).toEqual([
+      "A **str",
+      "A **streamed** answer.",
+    ]);
+  });
+
   it("preserves image attachments in the provider conversation", async () => {
     const chat = vi.fn().mockResolvedValue(
       JSON.stringify({
@@ -323,6 +395,15 @@ describe("ChatAgent", () => {
       ...createProvider(async () => ""),
       chatWithMetadata:
         chatWithMetadata as GoodBuddyProvider["chatWithMetadata"],
+      chatStreamWithMetadata: async (
+        options: ChatOptions,
+        onChunk: (text: string) => void,
+        signal?: AbortSignal,
+      ) => {
+        const result = await chatWithMetadata(options, signal);
+        onChunk(result.content);
+        return result;
+      },
     };
     const agent = new ChatAgent(
       provider,
@@ -370,6 +451,15 @@ describe("ChatAgent", () => {
       ...createProvider(async () => ""),
       chatWithMetadata:
         chatWithMetadata as GoodBuddyProvider["chatWithMetadata"],
+      chatStreamWithMetadata: async (
+        options: ChatOptions,
+        onChunk: (text: string) => void,
+        signal?: AbortSignal,
+      ) => {
+        const result = await chatWithMetadata(options, signal);
+        onChunk(result.content);
+        return result;
+      },
     };
     const agent = new ChatAgent(
       provider,

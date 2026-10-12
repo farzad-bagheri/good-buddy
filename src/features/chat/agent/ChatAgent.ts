@@ -1,4 +1,5 @@
 import { ChatMessage, GoodBuddyProvider, ProviderModel } from "@/provider";
+import { stripThinking } from "@/provider/ollama/utils";
 import {
   MAX_AGENT_TOOL_RESULT_LENGTH,
   MAX_CHAT_STEPS,
@@ -9,6 +10,7 @@ import { ToolCall } from "../types";
 import {
   agentInstructions,
   assistantResponseFormat,
+  extractJsonStringFieldPrefix,
   formatError,
   parseAssistantEnvelope,
   type AssistantEnvelope,
@@ -26,6 +28,8 @@ export interface ChatAgentEvents {
   onToolStatus(tool: ToolCall): void;
   /** Event triggered when the model's status changes (e.g., when it starts or stops processing a request). */
   onModelStatus(waiting: boolean, signal: AbortSignal): void;
+  /** Event triggered when the assistant's user-facing response changes while streaming. */
+  onAssistantResponse?(text: string, signal: AbortSignal): void;
 }
 
 export class ChatAgent {
@@ -70,19 +74,39 @@ export class ChatAgent {
     for (let step = 0; step < MAX_CHAT_STEPS; step++) {
       // Notify the webview that the model is processing a request.
       this.events.onModelStatus(true, signal);
-      let response: string;
+      let response = "";
       let finishReason: string | undefined;
+      let streamedResponse = "";
       try {
-        const result = await this.provider.chatWithMetadata(
+        const result = await this.provider.chatStreamWithMetadata(
           {
             model: providerModel.model,
             messages,
             format: assistantResponseFormat(availableTools, titleRequired),
           },
+          (chunk) => {
+            response += chunk;
+            const partialResponse = extractJsonStringFieldPrefix(
+              response,
+              "response",
+            );
+            if (partialResponse === undefined) return;
+            const visibleResponse = stripThinking(partialResponse);
+            if (visibleResponse === streamedResponse) return;
+            streamedResponse = visibleResponse;
+            this.events.onAssistantResponse?.(visibleResponse, signal);
+          },
           signal,
         );
         response = result.content;
         finishReason = result.finishReason;
+        const finalResponse = extractJsonStringFieldPrefix(
+          response,
+          "response",
+        );
+        if (finalResponse !== undefined) {
+          streamedResponse = stripThinking(finalResponse);
+        }
       } finally {
         this.events.onModelStatus(false, signal);
       }
@@ -111,6 +135,10 @@ export class ChatAgent {
 
       if (invalidReason) {
         this.output.appendLine(`[invalid assistant response] ${invalidReason}`);
+        if (streamedResponse) {
+          streamedResponse = "";
+          this.events.onAssistantResponse?.("", signal);
+        }
         if (responseRetries >= MAX_RESPONSE_RETRIES) {
           return {
             response: outputLimitReached
@@ -135,6 +163,9 @@ export class ChatAgent {
       if (!envelope) throw new Error("The assistant response was not parsed.");
       title ??= envelope.title;
       if (envelope.type === "final") {
+        if (streamedResponse !== envelope.response) {
+          this.events.onAssistantResponse?.(envelope.response, signal);
+        }
         return {
           response: envelope.response,
           title,

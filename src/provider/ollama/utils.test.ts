@@ -6,6 +6,7 @@ describe("stripThinking", () => {
   it("removes XML-style reasoning content from model output", () => {
     expect(stripThinking("<think>Hidden reasoning</think>hello")).toBe("hello");
     expect(stripThinking("hello")).toBe("hello");
+    expect(stripThinking("<think>Hidden reasoning")).toBe("");
   });
 });
 

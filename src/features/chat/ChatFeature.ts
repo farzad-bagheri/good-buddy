@@ -24,6 +24,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
 
   private view?: vscode.WebviewView;
   private activeController?: AbortController;
+  private assistantStreamSignal?: AbortSignal;
   private reviewingChanges = false;
   private gitReviewCancelled = false;
   private readonly resources: Resources;
@@ -181,6 +182,27 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         onModelStatus: (waiting, signal) => {
           if (this.activeController?.signal !== signal) return;
           this.view?.webview.postMessage({ type: "vsc:modelStatus", waiting });
+        },
+        onAssistantResponse: (text, signal) => {
+          if (
+            this.activeController?.signal !== signal ||
+            signal.aborted ||
+            !this.view
+          ) {
+            return;
+          }
+          if (this.assistantStreamSignal !== signal) {
+            this.assistantStreamSignal = signal;
+            this.view.webview.postMessage({
+              type: "vsc:assistantStart",
+              historyIndex: this.session.history.length,
+            });
+          }
+          this.view.webview.postMessage({
+            type: "vsc:assistantChunk",
+            text,
+            html: marked.parse(text),
+          });
         },
       },
     );
@@ -485,6 +507,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     );
     const controller = new AbortController();
     this.activeController = controller;
+    this.assistantStreamSignal = undefined;
     const modelName = this.viewState.getSelectedModel();
     const selectedModel = await this.viewState.modelDetails(modelName);
     if (controller.signal.aborted || this.activeController !== controller) {
@@ -592,11 +615,13 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         files: result.files,
       });
       const assistantHtml = marked.parse(assistantText);
-      // Notify the webview that the assistant has started generating its response.
-      this.view.webview.postMessage({
-        type: "vsc:assistantStart",
-        historyIndex: conversation.length - 1,
-      });
+      if (this.assistantStreamSignal !== controller.signal) {
+        this.assistantStreamSignal = controller.signal;
+        this.view.webview.postMessage({
+          type: "vsc:assistantStart",
+          historyIndex: conversation.length - 1,
+        });
+      }
       // Send the initial chunk of the assistant's response to the webview.
       this.view.webview.postMessage({
         type: "vsc:assistantChunk",
@@ -609,6 +634,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         suggestions: result.suggestions,
         files: result.files,
       });
+      this.assistantStreamSignal = undefined;
       void this.session.persist(
         id,
         createdAt,
@@ -627,6 +653,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
             type: "vsc:assistantError",
             text: `${formatError(err)}${imageHint}`,
           });
+          this.assistantStreamSignal = undefined;
           await this.session.persist(id, createdAt, conversation, modelName);
         }
       } else {
@@ -637,13 +664,15 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         if (this.session.currentId === id) {
           if (this.activeController === controller) {
             await this.session.persist(id, createdAt, conversation, modelName);
+            this.view?.webview.postMessage({ type: "vsc:assistantDone" });
+            this.assistantStreamSignal = undefined;
           }
-          this.view?.webview.postMessage({ type: "vsc:assistantDone" });
         }
       }
     } finally {
       if (this.activeController === controller) {
         this.activeController = undefined;
+        this.assistantStreamSignal = undefined;
         this.view?.webview.postMessage({ type: "vsc:requestDone" });
       }
     }
