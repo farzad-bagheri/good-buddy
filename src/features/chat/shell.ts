@@ -6,7 +6,7 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src ${cspSource}; style-src ${cspSource} 'nonce-${nonce}'; script-src ${cspSource} 'nonce-${nonce}';"
+      content="default-src 'none'; img-src ${cspSource} blob:; style-src ${cspSource} 'nonce-${nonce}'; script-src ${cspSource} 'nonce-${nonce}';"
     />
     <link rel="stylesheet" href="${styleUri}" />
     <style nonce="${nonce}">
@@ -99,6 +99,26 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
     .tests-icon {
         mask-image: url("${iconUri("tests")}");
         -webkit-mask-image: url("${iconUri("tests")}");
+      }
+
+    .svg-icon {
+        mask-image: url("${iconUri("svg")}");
+        -webkit-mask-image: url("${iconUri("svg")}");
+      }
+
+    .download-icon {
+        mask-image: url("${iconUri("download")}");
+        -webkit-mask-image: url("${iconUri("download")}");
+      }
+
+    .error-icon {
+        mask-image: url("${iconUri("error")}");
+        -webkit-mask-image: url("${iconUri("error")}");
+      }
+
+    .code-icon {
+        mask-image: url("${iconUri("code")}");
+        -webkit-mask-image: url("${iconUri("code")}");
       }
     </style>
   </head>

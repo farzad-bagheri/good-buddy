@@ -1,4 +1,10 @@
-import { ChatMessage, GoodBuddyProvider, ProviderModel } from "@/provider";
+import {
+  ChatMessage,
+  ResponseExtras,
+  GoodBuddyProvider,
+  ProviderModel,
+  createEmptyResponseExtras,
+} from "@/provider";
 import { stripThinking } from "@/provider/ollama/utils";
 import {
   MAX_AGENT_TOOL_RESULT_LENGTH,
@@ -19,8 +25,7 @@ import {
 export interface ChatAgentResult {
   response: string;
   title?: string;
-  suggestions?: string[];
-  files?: { name: string; path: string }[];
+  extras: ResponseExtras;
 }
 
 export interface ChatAgentEvents {
@@ -61,9 +66,17 @@ export class ChatAgent {
         requestTitle,
         isRetry,
       ),
-      ...history.map(({ role, content, images }) => ({
+      ...history.map(({ role, content, images, extras }) => ({
         role,
-        content,
+        content:
+          role === "assistant" && extras?.artifacts.length
+            ? `${content}\n\n${extras.artifacts
+                .map(
+                  (artifact) =>
+                    `[${artifact.type === "svg" ? "SVG" : "Code"} artifact: ${artifact.title} (${artifact.language})]\n${artifact.content}`,
+                )
+                .join("\n\n")}`
+            : content,
         images,
       })),
     ];
@@ -120,7 +133,7 @@ export class ChatAgent {
       if (finishReason === "length") {
         outputLimitReached = true;
         invalidReason =
-          "The provider reached its output token limit. Reply concisely with no more than five bullet points, and set suggestions and files to empty arrays.";
+          "The provider reached its output token limit. Reply concisely with no more than five bullet points, and set extras.suggestions, extras.files, and extras.artifacts to empty arrays.";
       } else {
         try {
           envelope = parseAssistantEnvelope(
@@ -145,6 +158,7 @@ export class ChatAgent {
               ? "The model stopped mid-response because it reached its output token limit. Try asking for a shorter answer or increase the response token limit in your model server."
               : "I couldn't get a valid response after asking the model to correct its format. Please try again.",
             title,
+              extras: createEmptyResponseExtras(),
           };
         }
         responseRetries++;
@@ -169,8 +183,7 @@ export class ChatAgent {
         return {
           response: envelope.response,
           title,
-          suggestions: envelope.suggestions,
-          files: envelope.files,
+          extras: envelope.extras,
         };
       }
       const toolCall = envelope.tool;
@@ -200,6 +213,7 @@ export class ChatAgent {
     return {
       response: `I stopped after ${MAX_CHAT_STEPS} assistant steps. Please narrow the request and try again.`,
       title,
+      extras: createEmptyResponseExtras(),
     };
   }
 }

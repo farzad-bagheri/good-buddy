@@ -152,20 +152,21 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       undefined,
       String(context.extension.packageJSON.version),
     );
+    const configureMcpServers = () => {
+      mcpTools.configure(
+        vscode.workspace
+          .getConfiguration("goodBuddy")
+          .get<unknown>("mcpServers", {}),
+      );
+    };
     context.subscriptions.push(
       mcpTools,
       vscode.workspace.onDidChangeConfiguration((event) => {
         if (!event.affectsConfiguration("goodBuddy.mcpServers")) return;
-        void mcpTools.configure(
-          vscode.workspace
-            .getConfiguration("goodBuddy")
-            .get<unknown>("mcpServers", {}),
-        );
+        configureMcpServers();
       }),
     );
-    void mcpTools.configure(
-      vscode.workspace.getConfiguration("goodBuddy").get<unknown>("mcpServers", {}),
-    );
+    configureMcpServers();
 
     // Initialize the chat agent with the provider, output channel, workspace tools, tool registry, and event handlers.
     this.agent = new ChatAgent(
@@ -284,13 +285,12 @@ export class ChatFeature implements vscode.WebviewViewProvider {
   private postHistory(thinking = false) {
     const messages = this.session.history.map(
       (
-        { role, content, displayContent, suggestions, files },
+        { role, content, displayContent, extras },
         historyIndex,
       ) => ({
         role,
         content: marked.parse(displayContent ?? content),
-        suggestions,
-        files,
+        extras,
         historyIndex,
       }),
     );
@@ -596,7 +596,11 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       }
       if (controller.signal.aborted || this.session.currentId !== id) {
         if (assistantText) {
-          conversation.push({ role: "assistant", content: assistantText });
+          conversation.push({
+            role: "assistant",
+            content: assistantText,
+            extras: result.extras,
+          });
           await this.session.persist(
             id,
             createdAt,
@@ -611,8 +615,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       conversation.push({
         role: "assistant",
         content: assistantText,
-        suggestions: result.suggestions,
-        files: result.files,
+        extras: result.extras,
       });
       const assistantHtml = marked.parse(assistantText);
       if (this.assistantStreamSignal !== controller.signal) {
@@ -631,8 +634,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       // Notify the webview that the assistant has finished generating its response.
       this.view.webview.postMessage({
         type: "vsc:assistantDone",
-        suggestions: result.suggestions,
-        files: result.files,
+        extras: result.extras,
       });
       this.assistantStreamSignal = undefined;
       void this.session.persist(

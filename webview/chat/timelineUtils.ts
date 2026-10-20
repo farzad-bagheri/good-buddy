@@ -1,4 +1,4 @@
-import type { NewTimelineItem, TimelineItem } from "./types";
+import type { NewTimelineItem, ResponseExtras, TimelineItem } from "./types";
 import { createItemId } from "./utils";
 
 type MessageTimelineItem = Extract<TimelineItem, { kind: "message" }>;
@@ -8,8 +8,7 @@ export interface HistoryMessage {
   content: string;
   html?: string;
   historyIndex?: number;
-  suggestions?: string[];
-  files?: { name: string; path: string }[];
+  extras?: ResponseExtras;
 }
 
 export function mapHistoryToTimelineItems(
@@ -22,8 +21,7 @@ export function mapHistoryToTimelineItems(
     text: message.content,
     html: message.html,
     historyIndex: message.historyIndex,
-    suggestions: message.suggestions,
-    files: message.files,
+    extras: message.extras,
   }));
 }
 
@@ -55,7 +53,10 @@ export function updateAssistantMessage(
   items: TimelineItem[],
   id: string,
   updates: Partial<
-    Pick<MessageTimelineItem, "text" | "html" | "suggestions" | "files">
+    Pick<
+      MessageTimelineItem,
+      "text" | "html" | "extras"
+    >
   >,
 ): TimelineItem[] {
   return items.map((item) =>

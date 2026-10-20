@@ -137,8 +137,7 @@ export function App() {
             const id = assistantId.current;
             setItems((current) =>
               updateAssistantMessage(current, id, {
-                suggestions: message.suggestions,
-                files: message.files,
+                extras: message.extras,
               }),
             );
           }
@@ -249,12 +248,12 @@ export function App() {
 
   const suggestions =
     !thinking && latestMessage?.role === "assistant"
-      ? latestMessage.suggestions
+      ? latestMessage.extras?.suggestions
       : undefined;
 
   const files =
     !thinking && latestMessage?.role === "assistant"
-      ? latestMessage.files
+      ? latestMessage.extras?.files
       : undefined;
 
   const hasConversation = items.some(

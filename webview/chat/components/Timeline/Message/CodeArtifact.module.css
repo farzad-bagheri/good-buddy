@@ -1,0 +1,74 @@
+.artifact {
+  margin: 12px 0;
+  overflow: hidden;
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 6px;
+  background: var(--vscode-textCodeBlock-background);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vscode-editorWidget-border);
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.label strong {
+  overflow: hidden;
+  color: var(--vscode-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label span {
+  flex: none;
+}
+
+.control {
+  flex: none;
+  padding: 4px 8px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 4px;
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  cursor: pointer;
+}
+
+.control:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.control:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
+.code {
+  max-height: 12em;
+  overflow: hidden;
+  margin: 0;
+  padding: 12px;
+  color: var(--vscode-textPreformat-foreground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+  line-height: 1.5;
+  white-space: pre;
+}

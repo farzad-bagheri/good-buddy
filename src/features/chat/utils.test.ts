@@ -55,8 +55,18 @@ describe("assistant response envelope", () => {
           tool: null,
           autoApprove: false,
           arguments: {},
-          suggestions: ["Show me the changes"],
-          files: [{ name: "index.ts", path: "src/index.ts" }],
+          extras: {
+            suggestions: ["Show me the changes"],
+            files: [{ name: "index.ts", path: "src/index.ts" }],
+            artifacts: [
+              {
+                type: "code",
+                title: "Example function",
+                language: "typescript",
+                content: "export const answer = 42;",
+              },
+            ],
+          },
         }),
         tools,
         true,
@@ -65,8 +75,18 @@ describe("assistant response envelope", () => {
       type: "final",
       response: "## Result\n\n**Done.**",
       title: "Summarize the result",
-      suggestions: ["Show me the changes"],
-      files: [{ name: "index.ts", path: "src/index.ts" }],
+      extras: {
+        suggestions: ["Show me the changes"],
+        files: [{ name: "index.ts", path: "src/index.ts" }],
+        artifacts: [
+          {
+            type: "code",
+            title: "Example function",
+            language: "typescript",
+            content: "export const answer = 42;",
+          },
+        ],
+      },
     });
   });
 
@@ -79,8 +99,7 @@ describe("assistant response envelope", () => {
         autoApprove: false,
         arguments: { path: "src/index.ts" },
         title: "Review the entry point",
-        suggestions: ["This field is ignored for tool calls"],
-        files: [{ invalid: true }],
+        extras: { invalid: true },
       }),
       tools,
       true,
@@ -116,8 +135,7 @@ describe("assistant response envelope", () => {
           autoApprove: false,
           arguments: {},
           title: null,
-          suggestions: [],
-          files: [],
+          extras: { suggestions: [], files: [], artifacts: [] },
         }),
         tools,
       ),
@@ -165,8 +183,7 @@ describe("assistant response envelope", () => {
           autoApprove: false,
           arguments: {},
           title: null,
-          suggestions: [],
-          files: [],
+          extras: { suggestions: [], files: [], artifacts: [] },
         }),
         tools,
       ),
@@ -174,12 +191,11 @@ describe("assistant response envelope", () => {
       type: "final",
       response: "Done",
       title: undefined,
-      suggestions: [],
-      files: [],
+      extras: { suggestions: [], files: [], artifacts: [] },
     });
   });
 
-  it("validates suggestion and file values", () => {
+  it("validates response extras", () => {
     const base = {
       type: "final",
       response: "Done",
@@ -187,33 +203,118 @@ describe("assistant response envelope", () => {
       autoApprove: false,
       arguments: {},
       title: null,
-      suggestions: [],
-      files: [],
+      extras: { suggestions: [], files: [], artifacts: [] },
     };
     const parse = (overrides: Record<string, unknown>) =>
       parseAssistantEnvelope(JSON.stringify({ ...base, ...overrides }), tools);
 
     expect(
       parse({
-        suggestions: ["A short follow-up", "Another one"],
-        files: [{ name: "index.ts", path: "src/index.ts" }],
+        extras: {
+          suggestions: ["A short follow-up", "Another one"],
+          files: [{ name: "index.ts", path: "src/index.ts" }],
+          artifacts: [
+            {
+              type: "code",
+              title: "Example",
+              language: "typescript",
+              content: "const answer = 42;",
+            },
+            {
+              type: "svg",
+              title: "Circle diagram",
+              language: "svg",
+              content:
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" /></svg>',
+            },
+          ],
+        },
       }),
     ).toMatchObject({
-      suggestions: ["A short follow-up", "Another one"],
-      files: [{ name: "index.ts", path: "src/index.ts" }],
+      extras: {
+        suggestions: ["A short follow-up", "Another one"],
+        files: [{ name: "index.ts", path: "src/index.ts" }],
+        artifacts: [
+          {
+            type: "code",
+            title: "Example",
+            language: "typescript",
+            content: "const answer = 42;",
+          },
+          {
+            type: "svg",
+            title: "Circle diagram",
+            language: "svg",
+            content:
+              '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" /></svg>',
+          },
+        ],
+      },
     });
-    expect(() => parse({ suggestions: [""] })).toThrow("Suggestions must be");
-    expect(() => parse({ suggestions: ["x".repeat(60)] })).toThrow(
-      "Suggestions must be",
-    );
-    expect(() => parse({ files: [{ name: " ", path: "src/index.ts" }] })).toThrow(
-      "Files must be",
-    );
-    expect(() => {
-      const withoutFiles: Record<string, unknown> = { ...base };
-      delete withoutFiles.files;
-      parseAssistantEnvelope(JSON.stringify(withoutFiles), tools);
-    }).toThrow("Files must be");
+    expect(() =>
+      parse({ extras: { suggestions: [""], files: [], artifacts: [] } }),
+    ).toThrow("Extras must contain valid");
+    expect(() =>
+      parse({
+        extras: { suggestions: ["x".repeat(60)], files: [], artifacts: [] },
+      }),
+    ).toThrow("Extras must contain valid");
+    expect(() =>
+      parse({
+        extras: {
+          suggestions: [],
+          files: [{ name: " ", path: "src/index.ts" }],
+          artifacts: [],
+        },
+      }),
+    ).toThrow("Extras must contain valid");
+    expect(() =>
+      parse({
+        extras: {
+          suggestions: [],
+          files: [],
+          artifacts: [
+            {
+              type: "html",
+              title: "Invalid",
+              language: "html",
+              content: "<h1>Hello</h1>",
+            },
+          ],
+        },
+      }),
+    ).toThrow("Extras must contain valid");
+    expect(() =>
+      parse({
+        extras: {
+          suggestions: [],
+          files: [],
+          artifacts: [
+            {
+              type: "svg",
+              title: "Invalid SVG language",
+              language: "xml",
+              content: "<svg />",
+            },
+          ],
+        },
+      }),
+    ).toThrow("Extras must contain valid");
+    expect(() =>
+      parse({
+        extras: {
+          suggestions: [],
+          files: [],
+          artifacts: [{ type: "code", title: "Empty" }],
+        },
+      }),
+    ).toThrow("Extras must contain valid");
+    expect(parse({})).toMatchObject({
+      extras: { suggestions: [], files: [], artifacts: [] },
+    });
+    expect(() =>
+      parse({ extras: { suggestions: [] } }),
+    ).toThrow("Extras must contain valid");
   });
 
   it("requires a non-empty title on the first response and null on later responses", () => {
@@ -223,8 +324,7 @@ describe("assistant response envelope", () => {
       tool: null,
       autoApprove: false,
       arguments: {},
-      suggestions: [],
-      files: [],
+      extras: { suggestions: [], files: [], artifacts: [] },
     };
     expect(() =>
       parseAssistantEnvelope(
@@ -271,8 +371,23 @@ describe("assistant response envelope", () => {
       type: "object",
       properties: {
         tool: { enum: [null, "file_exists", "read_file"] },
+        extras: {
+          required: ["suggestions", "files", "artifacts"],
+          properties: {
+            suggestions: { type: "array" },
+            files: { type: "array" },
+            artifacts: {
+              type: "array",
+              items: {
+                properties: {
+                  type: { enum: ["code", "svg"] },
+                },
+              },
+            },
+          },
+        },
       },
-      required: expect.arrayContaining(["suggestions", "files", "title"]),
+      required: expect.arrayContaining(["extras", "title"]),
     });
   });
 
@@ -326,6 +441,18 @@ describe("assistant response envelope", () => {
     );
     expect(prompt).toContain(
       "finish every sentence and list, and do not end with an unfinished introduction or colon",
+    );
+    expect(prompt).toContain(
+      'When the user asks you to write, generate, provide, or return code, put the complete requested code in an "extras.artifacts" item',
+    );
+    expect(prompt).toContain(
+      "do not put the same complete code in a Markdown fence",
+    );
+    expect(prompt).toContain(
+      'return it as an "extras.artifacts" item with type "svg", language "svg"',
+    );
+    expect(prompt).toContain(
+      "If the user asks to change workspace files, use the workspace tools and approval flow",
     );
     expect(prompt).toContain(
       "For structural or broad changes, read the existing file and use write_file",

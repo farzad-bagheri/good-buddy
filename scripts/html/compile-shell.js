@@ -23,6 +23,10 @@ const iconNames = [
   "selection",
   "send",
   "tests",
+  "svg",
+  "download",
+  "error",
+  "code",
 ];
 const iconClasses = iconNames
   .map(

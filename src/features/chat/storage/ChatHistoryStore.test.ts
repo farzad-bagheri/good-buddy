@@ -111,6 +111,89 @@ describe("ChatHistoryStore", () => {
     await expect(store.list()).resolves.toHaveLength(1);
   });
 
+  it("persists standalone code artifacts in assistant messages", async () => {
+    const store = new ChatHistoryStore({ path: "/extension" } as never);
+    const chat = createChat(
+      "7c89a311-9d47-4d44-90a4-dde41d47f5b0",
+      "2026-09-26T10:00:00.000Z",
+    );
+    chat.messages[1].extras = {
+      suggestions: [],
+      files: [],
+      artifacts: [
+        {
+          type: "code",
+          title: "Example function",
+          language: "typescript",
+          content: "export const answer = 42;",
+        },
+        {
+          type: "svg",
+          title: "Circle",
+          language: "svg",
+          content: '<svg viewBox="0 0 10 10"><circle r="4" /></svg>',
+        },
+      ],
+    };
+
+    await store.save(chat);
+
+    await expect(store.get(chat.id)).resolves.toEqual(chat);
+    await expect(store.list()).resolves.toHaveLength(1);
+  });
+
+  it("converts legacy response extras when loading saved chats", async () => {
+    const store = new ChatHistoryStore({ path: "/extension" } as never);
+    const chat = createChat(
+      "7c89a311-9d47-4d44-90a4-dde41d47f5b0",
+      "2026-09-26T10:00:00.000Z",
+    );
+    const legacyRecord = {
+      ...chat,
+      messages: [
+        chat.messages[0],
+        {
+          role: "assistant",
+          content: "Here is the code.",
+          suggestions: ["Explain it"],
+          files: [{ name: "App.tsx", path: "src/App.tsx" }],
+          artifacts: [
+            {
+              type: "code",
+              title: "Example",
+              language: "tsx",
+              content: "export function App() {}",
+            },
+          ],
+        },
+      ],
+    };
+    storageState.files.set(
+      `/extension/chats/${chat.id}.json`,
+      Buffer.from(JSON.stringify(legacyRecord), "utf8"),
+    );
+
+    await expect(store.get(chat.id)).resolves.toMatchObject({
+      messages: [
+        chat.messages[0],
+        {
+          extras: {
+            suggestions: ["Explain it"],
+            files: [{ name: "App.tsx", path: "src/App.tsx" }],
+            artifacts: [
+              {
+                type: "code",
+                title: "Example",
+                language: "tsx",
+                content: "export function App() {}",
+              },
+            ],
+          },
+        },
+      ],
+    });
+  });
+
   it("surfaces filesystem errors when deleting a chat", async () => {
     const store = new ChatHistoryStore({ path: "/extension" } as never);
     const chat = createChat(

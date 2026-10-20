@@ -131,6 +131,60 @@ describe("ChatAgent", () => {
     });
   });
 
+  it("includes previous artifact source in follow-up model context", async () => {
+    const chat = vi.fn().mockResolvedValue(
+      JSON.stringify({
+        type: "final",
+        response: "I can update that example.",
+        tool: null,
+        autoApprove: false,
+        arguments: {},
+        title: null,
+        suggestions: [],
+        files: [],
+        artifacts: [],
+      }),
+    );
+    const agent = new ChatAgent(
+      createProvider(chat as GoodBuddyProvider["chat"]),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [], execute: vi.fn() } as never,
+      { onToolStatus: vi.fn(), onModelStatus: vi.fn() },
+    );
+
+    await agent.run(
+      [
+        {
+          role: "assistant",
+          content: "Here is the example.",
+          extras: {
+            suggestions: [],
+            files: [],
+            artifacts: [
+              {
+                type: "code",
+                title: "Example function",
+                language: "typescript",
+                content: "export const answer = 42;",
+              },
+            ],
+          },
+        },
+        { role: "user", content: "Can you update it?" },
+      ],
+      { model: "qwen3:8b" } as unknown as ProviderModel,
+      new AbortController().signal,
+    );
+
+    expect(chat.mock.calls[0][0].messages).toContainEqual({
+      role: "assistant",
+      content:
+        "Here is the example.\n\n[Code artifact: Example function (typescript)]\nexport const answer = 42;",
+      images: undefined,
+    });
+  });
+
   it("executes structured tool calls and returns the final Markdown and title", async () => {
     const toolResponse = JSON.stringify({
       type: "tool_call",
@@ -149,8 +203,18 @@ describe("ChatAgent", () => {
       autoApprove: false,
       arguments: {},
       title: null,
-      suggestions: ["Show the relevant code"],
-      files: [{ name: "index.ts", path: "src/index.ts" }],
+      extras: {
+        suggestions: ["Show the relevant code"],
+        files: [{ name: "index.ts", path: "src/index.ts" }],
+        artifacts: [
+          {
+            type: "code",
+            title: "Example function",
+            language: "typescript",
+            content: "export const answer = 42;",
+          },
+        ],
+      },
     });
     const chat = vi
       .fn()
@@ -193,8 +257,18 @@ describe("ChatAgent", () => {
     ).resolves.toEqual({
       response: "## Findings\n\nNo issues found.",
       title: "Review the entry point",
-      suggestions: ["Show the relevant code"],
-      files: [{ name: "index.ts", path: "src/index.ts" }],
+      extras: {
+        suggestions: ["Show the relevant code"],
+        files: [{ name: "index.ts", path: "src/index.ts" }],
+        artifacts: [
+          {
+            type: "code",
+            title: "Example function",
+            language: "typescript",
+            content: "export const answer = 42;",
+          },
+        ],
+      },
     });
 
     expect(execute).toHaveBeenCalledWith({

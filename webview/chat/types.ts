@@ -34,8 +34,7 @@ export type TimelineItem =
       text: string;
       html?: string;
       historyIndex?: number;
-      suggestions?: string[];
-      files?: { name: string; path: string }[];
+      extras?: ResponseExtras;
     }
   | { id: string; kind: "toolStatus"; text: string }
   | {
@@ -54,7 +53,13 @@ export type TimelineItem =
       autoApproved: boolean;
       output: string;
       status?: string;
-    };
+    }
+
+export interface ResponseExtras {
+  suggestions: string[];
+  files: { name: string; path: string }[];
+  artifacts: Artifact[];
+}
 
 export type NewTimelineItem =
   | Omit<Extract<TimelineItem, { kind: "message" }>, "id">
@@ -87,3 +92,19 @@ export interface ProviderModel {
   };
   capabilities: ("completion" | "tools" | "thinking")[];
 }
+
+export interface CodeArtifact {
+  type: "code";
+  title: string;
+  language: string;
+  content: string;
+}
+
+export interface SvgArtifact {
+  type: "svg";
+  title: string;
+  language: "svg";
+  content: string;
+}
+
+export type Artifact = CodeArtifact | SvgArtifact;

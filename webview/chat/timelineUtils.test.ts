@@ -42,8 +42,18 @@ describe("timeline utilities", () => {
           role: "assistant",
           content: "<p>Answer</p>",
           historyIndex: 1,
-          suggestions: ["Tell me more"],
-          files: [{ name: "App.tsx", path: "webview/chat/App.tsx" }],
+          extras: {
+            suggestions: ["Tell me more"],
+            files: [{ name: "App.tsx", path: "webview/chat/App.tsx" }],
+            artifacts: [
+              {
+                type: "code",
+                title: "Example component",
+                language: "tsx",
+                content: "export function App() {}",
+              },
+            ],
+          },
         },
       ]),
     ).toMatchObject([
@@ -52,8 +62,18 @@ describe("timeline utilities", () => {
         role: "assistant",
         text: "<p>Answer</p>",
         historyIndex: 1,
-        suggestions: ["Tell me more"],
-        files: [{ name: "App.tsx", path: "webview/chat/App.tsx" }],
+        extras: {
+          suggestions: ["Tell me more"],
+          files: [{ name: "App.tsx", path: "webview/chat/App.tsx" }],
+          artifacts: [
+            {
+              type: "code",
+              title: "Example component",
+              language: "tsx",
+              content: "export function App() {}",
+            },
+          ],
+        },
       },
     ]);
   });
@@ -64,15 +84,34 @@ describe("timeline utilities", () => {
       assistantItem.id,
       {
         text: "Updated answer",
-        suggestions: ["Next"],
-        files: [{ name: "App.tsx", path: "webview/chat/App.tsx" }],
+        extras: {
+          suggestions: ["Next"],
+          files: [{ name: "App.tsx", path: "webview/chat/App.tsx" }],
+          artifacts: [
+            {
+              type: "code",
+              title: "Example component",
+              language: "tsx",
+              content: "export function App() {}",
+            },
+          ],
+        },
       },
     );
 
     expect(items[0]).toMatchObject({ text: "Updated answer" });
-    expect(items[0]).toMatchObject({ suggestions: ["Next"] });
     expect(items[0]).toMatchObject({
-      files: [{ name: "App.tsx", path: "webview/chat/App.tsx" }],
+      extras: {
+        suggestions: ["Next"],
+        files: [{ name: "App.tsx", path: "webview/chat/App.tsx" }],
+        artifacts: [
+          {
+            title: "Example component",
+            language: "tsx",
+            content: "export function App() {}",
+          },
+        ],
+      },
     });
     expect(items[1]).toBe(proposalItem);
   });

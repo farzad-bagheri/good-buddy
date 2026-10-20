@@ -1,4 +1,12 @@
-import { ChatImage, ChatMessage } from "@/provider";
+import {
+  ChatImage,
+  ChatMessage,
+  Artifact,
+  FileReference,
+  ResponseExtras,
+  createEmptyResponseExtras,
+  isResponseExtras,
+} from "@/provider";
 import * as vscode from "vscode";
 
 export interface StoredChat {
@@ -22,9 +30,15 @@ interface StoredImageReference {
 }
 
 interface StoredChatRecord extends Omit<StoredChat, "messages"> {
-  messages: (Omit<ChatMessage, "images"> & {
-    images?: StoredImageReference[];
-  })[];
+  messages: StoredChatMessage[];
+}
+
+interface StoredChatMessage extends Omit<ChatMessage, "images" | "extras"> {
+  images?: StoredImageReference[];
+  extras?: ResponseExtras;
+  suggestions?: string[];
+  files?: FileReference[];
+  artifacts?: Artifact[];
 }
 
 interface StoredImageData {
@@ -183,6 +197,8 @@ function isStoredChatRecord(value: unknown): value is StoredChatRecord {
         typeof message.content === "string" &&
         (message.displayContent === undefined ||
           typeof message.displayContent === "string") &&
+        (message.extras === undefined || isResponseExtras(message.extras)) &&
+        isValidLegacyExtras(message) &&
         (message.images === undefined ||
           (Array.isArray(message.images) &&
             message.images.every(
@@ -191,14 +207,6 @@ function isStoredChatRecord(value: unknown): value is StoredChatRecord {
                 typeof image.id === "string" &&
                 typeof image.name === "string" &&
                 isImageMimeType(image.mimeType),
-            ))) &&
-        (message.files === undefined ||
-          (Array.isArray(message.files) &&
-            message.files.every(
-              (file) =>
-                file &&
-                typeof file.name === "string" &&
-                typeof file.path === "string",
             ))),
     )
   );
@@ -224,9 +232,24 @@ function restoreImages(
   const dataById = new Map(imageData.map(({ id, data }) => [id, data]));
   const messages: ChatMessage[] = [];
   for (const message of record.messages) {
-    const { images, ...rest } = message;
+    const { images, suggestions, files, artifacts, extras, ...rest } = message;
+    const messageExtras =
+      extras ??
+      (suggestions !== undefined ||
+      files !== undefined ||
+      artifacts !== undefined
+        ? {
+            ...createEmptyResponseExtras(),
+            ...(suggestions !== undefined && { suggestions }),
+            ...(files !== undefined && { files }),
+            ...(artifacts !== undefined && { artifacts }),
+          }
+        : undefined);
     if (!images?.length) {
-      messages.push(rest);
+      messages.push({
+        ...rest,
+        ...(messageExtras && { extras: messageExtras }),
+      });
       continue;
     }
     const restored: ChatImage[] = [];
@@ -238,9 +261,31 @@ function restoreImages(
     messages.push({
       ...rest,
       images: restored,
+      ...(messageExtras && { extras: messageExtras }),
     });
   }
+
   return { ...record, messages };
+}
+
+function isValidLegacyExtras(
+  message: StoredChatRecord["messages"][number],
+): boolean {
+  if (
+    message.suggestions === undefined &&
+    message.files === undefined &&
+    message.artifacts === undefined
+  ) {
+    return true;
+  }
+  return isResponseExtras({
+    ...createEmptyResponseExtras(),
+    ...(message.suggestions !== undefined && {
+      suggestions: message.suggestions,
+    }),
+    ...(message.files !== undefined && { files: message.files }),
+    ...(message.artifacts !== undefined && { artifacts: message.artifacts }),
+  });
 }
 
 function isImageMimeType(value: unknown): value is ChatImage["mimeType"] {

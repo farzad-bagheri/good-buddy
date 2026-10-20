@@ -38,6 +38,10 @@ server you configure and does not require a Good Buddy cloud service.
   behavior, or fix a bug. Good Buddy can inspect files, propose edits, and run
   project commands. Review proposed file changes in a diff and approve them
   before they are applied; commands also require confirmation.
+- **Reuse standalone code outputs.** When a response includes a complete code
+  example intended for reuse, it can appear as a separate artifact with its own
+  **Copy code** action. SVG diagrams can be previewed or inspected as source.
+  Short snippets remain part of the Markdown explanation.
 - **Understand code faster.** Select code and ask Good Buddy to explain it.
 - **Get inline code completions.** Receive ghost-text suggestions as you type,
   using a model you select for completion.
@@ -190,19 +194,10 @@ arguments. The internal registry supports adding and removing tools at runtime.
 ### MCP servers (stdio)
 
 Good Buddy can connect to local MCP servers over stdio. Configure servers in
-VS Code User Settings under `goodBuddy.mcpServers`. On Windows, with Node.js
-and `npx` available on the extension host:
+VS Code User Settings under `goodBuddy.mcpServers`:
 
 ```json
 "goodBuddy.mcpServers": {
-  "filesystem": {
-    "command": "cmd.exe",
-    "args": [
-      "/d",
-      "/c",
-      "npx -y @modelcontextprotocol/server-filesystem C:/path/to/project"
-    ]
-  },
   "issue-tracker": {
     "command": "node",
     "args": ["C:/path/to/mcp-server.js"],
@@ -213,11 +208,12 @@ and `npx` available on the extension host:
 }
 ```
 
-On macOS or Linux, set the filesystem server's command to `npx` and its
-arguments to `["-y", "@modelcontextprotocol/server-filesystem", "/path/to/project"]`.
-Use the path format for the extension host, which may be remote. Only configure
-server commands you trust: they run as child processes with the extension host
-user's permissions. Good Buddy asks for confirmation before every MCP tool call.
+MCP server settings are passed through as configured, except environment
+variables written as `${env:NAME}`, which Good Buddy resolves from the
+extension-host environment. Use paths valid for the extension host, which may
+be remote. Only configure server commands you trust: they run as child
+processes with the extension host user's permissions. Good Buddy asks for
+confirmation before every MCP tool call.
 The confirmation dialog shows the tool description and arguments. Environment
 values may reference extension-host variables as `${env:NAME}`; missing variables
 are reported in the output channel. Avoid putting raw credentials directly in

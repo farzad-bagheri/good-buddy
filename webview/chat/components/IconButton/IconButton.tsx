@@ -8,6 +8,8 @@ export interface IconButtonProps {
   iconName?: string;
   iconPosition?: "left" | "right";
   disabled?: boolean;
+  id?: string;
+  role?: string;
   onClick: () => void;
 }
 
@@ -19,6 +21,8 @@ export function IconButton({
   iconName,
   iconPosition = "left",
   disabled = false,
+  id,
+  role,
   onClick,
 }: IconButtonProps) {
   return (
@@ -27,6 +31,8 @@ export function IconButton({
       title={title}
       aria-label={title}
       disabled={disabled}
+      id={id}
+      role={role}
       onClick={onClick}
       className={`${styles["icon-button"]} ${className ?? ""}`}
     >

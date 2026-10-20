@@ -26,7 +26,6 @@ export function ChatToolbar({
   return (
     <div className={styles.container}>
       <div className={styles.toolbar}>
-        {" "}
         <IconButton
           title="Configure provider and models"
           iconName="models-icon"

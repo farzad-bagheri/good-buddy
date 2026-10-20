@@ -2,6 +2,8 @@ import { useState } from "react";
 import { IconButton } from "../../../components/IconButton";
 import type { TimelineItem } from "../../../types";
 import { sanitizeHtml } from "../../../utils";
+import { CodeArtifact } from "./CodeArtifact";
+import { SvgArtifact } from "./SvgArtifact";
 import styles from "./Message.module.css";
 
 type MessageItem = Extract<TimelineItem, { kind: "message" }>;
@@ -29,6 +31,21 @@ export function Message({ item, onRetry, retryDisabled }: MessageProps) {
           __html: sanitizeHtml(item.html ?? item.text),
         }}
       />
+
+      {item.role === "assistant" &&
+        item.extras?.artifacts.map((artifact, index) =>
+          artifact.type === "svg" ? (
+            <SvgArtifact
+              key={`${artifact.title}-${index}`}
+              artifact={artifact}
+            />
+          ) : (
+            <CodeArtifact
+              key={`${artifact.title}-${index}`}
+              artifact={artifact}
+            />
+          ),
+        )}
 
       {item.role === "assistant" && historyIndex !== undefined && (
         <div className={styles["action"]}>
