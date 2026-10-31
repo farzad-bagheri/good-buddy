@@ -13,6 +13,7 @@ import {
   appendCommandProposal,
   appendTimelineItem,
   completeCommandProposal,
+  formatToolActivity,
   mapHistoryToTimelineItems,
   updateAssistantMessage,
   updateWriteProposal,
@@ -33,6 +34,8 @@ export function App() {
   const [selectedModel, setSelectedModel] = useState("");
   const [history, setHistory] = useState<ChatSummary[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyAllChats, setHistoryAllChats] = useState(false);
+  const [projectName, setProjectName] = useState<string | undefined>();
   const [setupOpen, setSetupOpen] = useState(false);
   const [provider, setProvider] = useState<ProviderStatusInfo>({
     status: "checking",
@@ -94,6 +97,8 @@ export function App() {
           break;
         case "vsc:chatList":
           setHistory(message.chats);
+          setHistoryAllChats(message.allChats === true);
+          setProjectName(message.projectName);
           break;
         case "vsc:userMessage":
           appendItem({
@@ -158,7 +163,10 @@ export function App() {
         case "vsc:toolStatus":
           appendItem({
             kind: "toolStatus",
-            text: `${message.tool.autoApprove ? "Used" : "Proposed"} ${message.tool.tool}...`,
+            text: formatToolActivity(
+              message.tool.tool,
+              message.tool.arguments,
+            ),
           });
           break;
         case "vsc:writeProposal":
@@ -224,7 +232,18 @@ export function App() {
   const toggleHistory = () => {
     const opening = !historyOpen;
     setHistoryOpen(opening);
-    if (opening) vscode.postMessage({ type: "wv:listChats" });
+    if (opening) {
+      vscode.postMessage({
+        type: "wv:listChats",
+        allChats: historyAllChats,
+      });
+    }
+  };
+
+  const toggleHistoryScope = () => {
+    const allChats = !historyAllChats;
+    setHistoryAllChats(allChats);
+    vscode.postMessage({ type: "wv:listChats", allChats });
   };
 
   const handleRetry = (historyIndex: number) => {
@@ -270,11 +289,14 @@ export function App() {
         models={models}
         selectedModel={selectedModel}
         historyOpen={historyOpen}
+        allChats={historyAllChats}
+        projectName={projectName}
         onModelChange={(model) => {
           setSelectedModel(model);
           vscode.postMessage({ type: "wv:selectModel", model });
         }}
         onToggleHistory={toggleHistory}
+        onToggleHistoryScope={toggleHistoryScope}
         onNewChat={() => {
           setHistoryOpen(false);
           vscode.postMessage({ type: "wv:newChat" });
@@ -288,6 +310,8 @@ export function App() {
       {historyOpen ? (
         <ChatHistory
           history={history}
+          allChats={historyAllChats}
+          projectName={projectName}
           onResume={(id) => vscode.postMessage({ type: "wv:resumeChat", id })}
           onDelete={(id) => vscode.postMessage({ type: "wv:deleteChat", id })}
         />

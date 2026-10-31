@@ -285,6 +285,40 @@ describe("ChatAgent", () => {
     });
   });
 
+  it("stops before a third identical read-only workspace call", async () => {
+    const read = (title: string | null) => JSON.stringify({
+      type: "tool_call",
+      response: "",
+      tool: "read_file",
+      autoApprove: false,
+      arguments: { path: "src/index.ts" },
+      title,
+      extras: { suggestions: [], files: [], artifacts: [] },
+    });
+    const chat = vi.fn()
+      .mockResolvedValueOnce(read("Add comments"))
+      .mockResolvedValueOnce(read(null))
+      .mockResolvedValueOnce(read(null));
+    const execute = vi.fn().mockResolvedValue("file contents");
+    const agent = new ChatAgent(
+      createProvider(chat as GoodBuddyProvider["chat"]),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [{ id: "read_file" } as ToolDefinition], execute } as never,
+      { onToolStatus: vi.fn(), onModelStatus: vi.fn() },
+    );
+
+    await expect(agent.run(
+      [{ role: "user", content: "Add comments to the active file" }],
+      { model: "qwen3:8b" } as unknown as ProviderModel,
+      new AbortController().signal,
+    )).resolves.toMatchObject({
+      response: expect.stringContaining("kept repeating"),
+      title: "Add comments",
+    });
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
   it("requires a title when retrying the first user message", async () => {
     const chat = vi.fn().mockResolvedValue(
       JSON.stringify({
@@ -367,7 +401,7 @@ describe("ChatAgent", () => {
     expect(chat.mock.calls[1][0].messages.slice(-2)).toEqual([
       { role: "assistant", content: "Here is my answer, outside the schema." },
       {
-        role: "system",
+        role: "user",
         content:
           "Your previous response could not be used: Response must be one valid JSON object. Follow the required response schema and return one complete JSON object only.",
       },

@@ -7,8 +7,11 @@ interface ChatHeaderProps {
   models: ProviderModel[];
   selectedModel: string;
   historyOpen: boolean;
+  allChats: boolean;
+  projectName?: string;
   onModelChange: (model: string) => void;
   onToggleHistory: () => void;
+  onToggleHistoryScope: () => void;
   onNewChat: () => void;
   onOpenSetup: () => void;
 }
@@ -17,8 +20,11 @@ export function ChatHeader({
   models,
   selectedModel,
   historyOpen,
+  allChats,
+  projectName,
   onModelChange,
   onToggleHistory,
+  onToggleHistoryScope,
   onNewChat,
   onOpenSetup,
 }: ChatHeaderProps) {
@@ -26,6 +32,9 @@ export function ChatHeader({
     <header className={styles["chat-header"]}>
       {historyOpen ? (
         <HistoryToolbar
+          allChats={allChats}
+          projectName={projectName}
+          onToggleScope={onToggleHistoryScope}
           onToggleHistory={onToggleHistory}
         />
       ) : (

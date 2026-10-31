@@ -22,7 +22,7 @@ export interface ChatWebviewMessageHandlers {
   selectModel(model: unknown): Promise<void>;
   selectCompletionModel(model: unknown): Promise<void>;
   newChat(): Promise<void>;
-  listChats(): Promise<void>;
+  listChats(allChats: boolean): Promise<void>;
   resumeChat(id: string): Promise<void>;
   deleteChat(id: string): Promise<void>;
   cancel(): void;
@@ -76,7 +76,7 @@ export class ChatWebviewMessageRouter {
         case "wv:newChat":
           return this.handlers.newChat();
         case "wv:listChats":
-          return this.handlers.listChats();
+          return this.handlers.listChats(message.allChats === true);
         case "wv:resumeChat":
           return this.handlers.resumeChat(String(message.id ?? ""));
         case "wv:deleteChat":

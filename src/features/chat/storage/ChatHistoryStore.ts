@@ -15,12 +15,14 @@ export interface StoredChat {
   createdAt: string;
   updatedAt: string;
   model: string;
+  projectUri?: string;
+  projectName?: string;
   messages: ChatMessage[];
 }
 
 export type ChatSummary = Pick<
   StoredChat,
-  "id" | "title" | "createdAt" | "updatedAt" | "model"
+  "id" | "title" | "createdAt" | "updatedAt" | "model" | "projectName"
 >;
 
 interface StoredImageReference {
@@ -53,7 +55,7 @@ export class ChatHistoryStore {
     this.directory = vscode.Uri.joinPath(storageUri, "chats");
   }
 
-  async list(): Promise<ChatSummary[]> {
+  async list(projectUri?: string, allProjects = false): Promise<ChatSummary[]> {
     await vscode.workspace.fs.createDirectory(this.directory);
     const entries = await vscode.workspace.fs.readDirectory(this.directory);
 
@@ -69,7 +71,10 @@ export class ChatHistoryStore {
             const chat: unknown = JSON.parse(
               Buffer.from(bytes).toString("utf8"),
             );
-            return isStoredChatRecord(chat) ? toSummary(chat) : undefined;
+            return isStoredChatRecord(chat) &&
+              (allProjects || chat.projectUri === projectUri)
+              ? toSummary(chat)
+              : undefined;
           } catch {
             return undefined;
           }
@@ -189,6 +194,8 @@ function isStoredChatRecord(value: unknown): value is StoredChatRecord {
     typeof chat.createdAt === "string" &&
     typeof chat.updatedAt === "string" &&
     typeof chat.model === "string" &&
+    (chat.projectUri === undefined || typeof chat.projectUri === "string") &&
+    (chat.projectName === undefined || typeof chat.projectName === "string") &&
     Array.isArray(chat.messages) &&
     chat.messages.every(
       (message) =>
@@ -316,6 +323,7 @@ function toSummary({
   createdAt,
   updatedAt,
   model,
+  projectName,
 }: StoredChatRecord): ChatSummary {
-  return { id, title, createdAt, updatedAt, model };
+  return { id, title, createdAt, updatedAt, model, projectName };
 }

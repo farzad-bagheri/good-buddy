@@ -49,6 +49,10 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerWebviewViewProvider(
       ChatFeature.viewType,
       chatFeature,
+      // The chat UI owns transient state such as an in-progress streamed
+      // assistant response. Retain it while another sidebar panel is active
+      // instead of recreating an empty webview when the user returns.
+      { webviewOptions: { retainContextWhenHidden: true } },
     ),
 
     vscode.commands.registerCommand("goodBuddy.showOutput", () => {

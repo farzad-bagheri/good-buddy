@@ -8,21 +8,39 @@ export class ChatSession {
   currentId?: string;
   currentCreatedAt?: string;
   currentTitle?: string;
+  currentProjectUri?: string;
+  currentProjectName?: string;
   private readonly deletedIds = new Set<string>();
 
   constructor(
     private readonly storage: ChatHistoryStore,
     private readonly output: vscode.OutputChannel,
     private readonly getSelectedModel: () => string,
+    private readonly getCurrentProject: () =>
+      | { uri: string; name: string }
+      | undefined,
     private readonly postChatList: () => Promise<void>,
   ) {}
 
-  ensureCurrent(): { id: string; createdAt: string } {
+  ensureCurrent(): {
+    id: string;
+    createdAt: string;
+    projectUri?: string;
+    projectName?: string;
+  } {
     if (!this.currentId || !this.currentCreatedAt) {
+      const project = this.getCurrentProject();
       this.currentId = randomUUID();
       this.currentCreatedAt = new Date().toISOString();
+      this.currentProjectUri = project?.uri;
+      this.currentProjectName = project?.name;
     }
-    return { id: this.currentId, createdAt: this.currentCreatedAt };
+    return {
+      id: this.currentId,
+      createdAt: this.currentCreatedAt,
+      projectUri: this.currentProjectUri,
+      projectName: this.currentProjectName,
+    };
   }
 
   setCurrent(chat: StoredChat): void {
@@ -30,6 +48,8 @@ export class ChatSession {
     this.currentId = chat.id;
     this.currentCreatedAt = chat.createdAt;
     this.currentTitle = chat.title;
+    this.currentProjectUri = chat.projectUri;
+    this.currentProjectName = chat.projectName;
     this.history = chat.messages;
   }
 
@@ -38,14 +58,16 @@ export class ChatSession {
     this.currentId = undefined;
     this.currentCreatedAt = undefined;
     this.currentTitle = undefined;
+    this.currentProjectUri = undefined;
+    this.currentProjectName = undefined;
   }
 
   async get(id: string): Promise<StoredChat | undefined> {
     return this.storage.get(id);
   }
 
-  async list() {
-    return this.storage.list();
+  async list(projectUri?: string, allProjects = false) {
+    return this.storage.list(projectUri, allProjects);
   }
 
   async delete(id: string): Promise<boolean> {
@@ -70,6 +92,9 @@ export class ChatSession {
       this.currentCreatedAt,
       this.history,
       this.getSelectedModel(),
+      undefined,
+      this.currentProjectUri,
+      this.currentProjectName,
     );
   }
 
@@ -79,6 +104,8 @@ export class ChatSession {
     messages: ChatMessage[],
     model: string,
     title?: string,
+    projectUri?: string,
+    projectName?: string,
   ): Promise<void> {
     if (this.deletedIds.has(id) || messages.length === 0) return;
 
@@ -97,6 +124,8 @@ export class ChatSession {
       createdAt,
       updatedAt: new Date().toISOString(),
       model,
+      projectUri,
+      projectName,
       messages: messages.map((message) => ({ ...message })),
     };
 

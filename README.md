@@ -69,6 +69,9 @@ Open **Good Buddy** from the Activity Bar to chat. Use the **Models** button in
 the chat toolbar to configure your provider and select chat and completion
 models. Select code and run **Good Buddy: Explain Selected Code** for a focused
 explanation. Inline completions appear as you type when enabled.
+Saved chats are grouped by the opened workspace. Open chat history to see chats
+for the current workspace, or switch to **All chats** to browse conversations
+from other workspaces and chats created without a workspace.
 
 ## Contributing
 

@@ -1,7 +1,9 @@
 export const MAX_ATTACHMENT_BYTES = 10 * 1024;
 export const MAX_ATTACHMENTS = 5;
 export const MAX_IMAGE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
-export const MAX_CHAT_STEPS = 50;
+// One tool call is issued per model turn. Keep this low enough that a model
+// selecting the same inspection tool repeatedly fails quickly and visibly.
+export const MAX_CHAT_STEPS = 12;
 export const MAX_AGENT_TOOL_RESULT_LENGTH = 6_000;
 export const MAX_LIST_PROJECT_DEPTH = 5;
 export const MAX_LIST_PROJECT_ITEMS = 250;

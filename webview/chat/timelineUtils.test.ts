@@ -5,6 +5,7 @@ import {
   appendCommandProposal,
   appendTimelineItem,
   completeCommandProposal,
+  formatToolActivity,
   mapHistoryToTimelineItems,
   updateAssistantMessage,
   updateWriteProposal,
@@ -36,6 +37,25 @@ const commandItem: TimelineItem = {
 };
 
 describe("timeline utilities", () => {
+  it("describes read-only tools as activity rather than proposals", () => {
+    expect(
+      formatToolActivity("read_file", { path: "src/app.ts" }),
+    ).toBe("Reading src/app.ts...");
+    expect(formatToolActivity("search_files")).toBe("Finding files...");
+  });
+
+  it("reserves approval language for operations that request approval", () => {
+    expect(
+      formatToolActivity("write_file", { path: "src/app.ts" }),
+    ).toBe("Preparing file write src/app.ts...");
+    expect(formatToolActivity("run_command")).toBe(
+      "Requesting command approval...",
+    );
+    expect(formatToolActivity("mcp:github.create_issue")).toBe(
+      "Requesting approval for github.create_issue...",
+    );
+  });
+
   it("maps host history into timeline messages", () => {
     expect(
       mapHistoryToTimelineItems([

@@ -27,6 +27,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
   private assistantStreamSignal?: AbortSignal;
   private reviewingChanges = false;
   private gitReviewCancelled = false;
+  private showAllChats = false;
   private readonly resources: Resources;
   private readonly session: ChatSession;
   private readonly viewState: ChatViewState;
@@ -59,7 +60,13 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       new ChatHistoryStore(context.globalStorageUri),
       output,
       () => this.viewState.getSelectedModel(),
+      () => this.getCurrentProject(),
       () => this.postChatList(),
+    );
+    context.subscriptions.push(
+      vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        void this.postChatList();
+      }),
     );
 
     // Initialize the proposal diff editor.
@@ -270,7 +277,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         await this.postHistory();
         await this.postChatList();
       },
-      listChats: () => this.postChatList(),
+      listChats: (allChats) => this.postChatList(allChats),
       resumeChat: (id) => this.resumeChat(id),
       deleteChat: (id) => this.confirmDeleteChat(id),
       cancel: () => this.cancelActiveRequest(),
@@ -308,17 +315,34 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     });
   }
 
-  private async postChatList(): Promise<void> {
+  private async postChatList(allChats = this.showAllChats): Promise<void> {
+    this.showAllChats = allChats;
     try {
+      const project = this.getCurrentProject();
       this.view?.webview.postMessage({
         type: "vsc:chatList",
-        chats: await this.session.list(),
+        chats: await this.session.list(project?.uri, allChats),
+        allChats,
+        projectName: project?.name,
       });
     } catch (err) {
       this.output.appendLine(
         `Good Buddy chat: failed to list saved chats: ${err}`,
       );
     }
+  }
+
+  private getCurrentProject():
+    | { uri: string; name: string }
+    | undefined {
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    if (folders.length === 0) return undefined;
+    return {
+      uri: JSON.stringify(
+        folders.map(({ uri }) => uri.toString()).sort(),
+      ),
+      name: folders.map(({ name }) => name).join(", "),
+    };
   }
 
   private async saveCurrentChat(): Promise<void> {
@@ -570,7 +594,8 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       this.viewState.postAttachments();
     }
     const conversation = this.session.history;
-    const { id, createdAt } = this.session.ensureCurrent();
+    const { id, createdAt, projectUri, projectName } =
+      this.session.ensureCurrent();
     conversation.push({
       role: "user",
       content: userContent,
@@ -614,6 +639,8 @@ export class ChatFeature implements vscode.WebviewViewProvider {
             conversation,
             modelName,
             chatTitle,
+            projectUri,
+            projectName,
           );
         }
         return;
@@ -650,6 +677,8 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         conversation,
         modelName,
         chatTitle,
+        projectUri,
+        projectName,
       );
     } catch (err) {
       // If an error occurs and the request was not aborted, notify the webview of the error.
@@ -663,7 +692,15 @@ export class ChatFeature implements vscode.WebviewViewProvider {
             text: `${formatError(err)}${imageHint}`,
           });
           this.assistantStreamSignal = undefined;
-          await this.session.persist(id, createdAt, conversation, modelName);
+          await this.session.persist(
+            id,
+            createdAt,
+            conversation,
+            modelName,
+            undefined,
+            projectUri,
+            projectName,
+          );
         }
       } else {
         // If the request was aborted, but some assistant text was generated, push it to the history.
@@ -672,7 +709,15 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         }
         if (this.session.currentId === id) {
           if (this.activeController === controller) {
-            await this.session.persist(id, createdAt, conversation, modelName);
+            await this.session.persist(
+              id,
+              createdAt,
+              conversation,
+              modelName,
+              undefined,
+              projectUri,
+              projectName,
+            );
             this.view?.webview.postMessage({ type: "vsc:assistantDone" });
             this.assistantStreamSignal = undefined;
           }

@@ -6,6 +6,7 @@ export interface ChatSummary {
   id: string;
   title: string;
   updatedAt: string;
+  projectName?: string;
 }
 
 export type ProviderStatus =

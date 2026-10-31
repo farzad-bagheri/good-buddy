@@ -11,6 +11,37 @@ export interface HistoryMessage {
   extras?: ResponseExtras;
 }
 
+export function formatToolActivity(
+  tool: string,
+  arguments_: Record<string, unknown> = {},
+): string {
+  const filePath =
+    typeof arguments_.path === "string" ? ` ${arguments_.path}` : "";
+  const activities: Record<string, string> = {
+    inspect_project: "Inspecting project...",
+    list_project: "Browsing project files...",
+    search_files: "Finding files...",
+    search_file_contents: "Searching file contents...",
+    file_exists: `Checking file${filePath}...`,
+    read_file: `Reading${filePath}...`,
+    get_diagnostics: "Checking diagnostics...",
+    find_references: `Finding references${filePath}...`,
+    write_file: `Preparing file write${filePath}...`,
+    replace_in_file: `Preparing file edit${filePath}...`,
+    delete_file: `Requesting confirmation to delete${filePath}...`,
+    run_command: "Requesting command approval...",
+    install_dependencies: "Requesting dependency install approval...",
+    run_project_checks: "Requesting project checks approval...",
+    run_package_script: "Requesting script approval...",
+  };
+  const activity = activities[tool];
+  if (activity) return activity;
+  if (tool.startsWith("mcp:")) {
+    return `Requesting approval for ${tool.slice("mcp:".length)}...`;
+  }
+  return `Running ${tool}...`;
+}
+
 export function mapHistoryToTimelineItems(
   messages: readonly HistoryMessage[],
 ): TimelineItem[] {

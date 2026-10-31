@@ -30,6 +30,7 @@
 }
 
 .date,
+.project,
 .empty {
   color: var(--vscode-descriptionForeground);
   font-size: 0.85em;

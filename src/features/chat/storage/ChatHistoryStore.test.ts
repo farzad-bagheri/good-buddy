@@ -71,6 +71,37 @@ describe("ChatHistoryStore", () => {
     expect(chats[0]).not.toHaveProperty("messages");
   });
 
+  it("filters history by project and includes legacy chats in all-project history", async () => {
+    const store = new ChatHistoryStore({ path: "/extension" } as never);
+    const projectChat = createChat(
+      "7c89a311-9d47-4d44-90a4-dde41d47f5b0",
+      "2026-09-26T10:00:00.000Z",
+    );
+    projectChat.projectUri = '["file:///project-a"]';
+    projectChat.projectName = "Project A";
+    const otherProjectChat = createChat(
+      "8c89a311-9d47-4d44-90a4-dde41d47f5b0",
+      "2026-09-25T10:00:00.000Z",
+    );
+    otherProjectChat.projectUri = '["file:///project-b"]';
+    const legacyChat = createChat(
+      "9c89a311-9d47-4d44-90a4-dde41d47f5b0",
+      "2026-09-24T10:00:00.000Z",
+    );
+
+    await store.save(projectChat);
+    await store.save(otherProjectChat);
+    await store.save(legacyChat);
+
+    await expect(store.list('["file:///project-a"]')).resolves.toMatchObject([
+      { id: projectChat.id, projectName: "Project A" },
+    ]);
+    await expect(store.list(undefined, true)).resolves.toHaveLength(3);
+    await expect(store.list()).resolves.toMatchObject([
+      { id: legacyChat.id },
+    ]);
+  });
+
   it("deletes a saved chat", async () => {
     const store = new ChatHistoryStore({ path: "/extension" } as never);
     const chat = createChat(

@@ -84,6 +84,7 @@ export class ChatAgent {
     let responseRetries = 0;
     let titleRequired = requestTitle;
     const completedWrites = new Set<string>();
+    const repeatedReadOnlyCalls = new Map<string, number>();
     let attemptedWorkspaceWrite = false;
 
     for (let step = 0; step < MAX_CHAT_STEPS; step++) {
@@ -168,7 +169,11 @@ export class ChatAgent {
           messages.push({ role: "assistant", content: response });
         }
         messages.push({
-          role: "system",
+          // Some chat templates (including Qwen's) only permit a system
+          // message at the start of a conversation. A correction is a normal
+          // follow-up turn, so send it as a user message after the rejected
+          // assistant output.
+          role: "user",
           content: `Your previous response could not be used: ${invalidReason} Follow the required response schema and return one complete JSON object only.`,
         });
         continue;
@@ -204,7 +209,9 @@ export class ChatAgent {
           responseRetries++;
           messages.push({ role: "assistant", content: response });
           messages.push({
-            role: "system",
+            // Keep the initial instructions as the conversation's only
+            // system message; Qwen rejects system messages mid-conversation.
+            role: "user",
             content: `${invalidFinalReason} Do not claim a workspace file was created, updated, saved, or written unless the corresponding tool result begins with 'Wrote '. Only include workspace file references that currently exist. State the actual result instead.`,
           });
           continue;
@@ -221,6 +228,23 @@ export class ChatAgent {
       // Approval is a host policy, never a model-controlled capability.
       const toolCall = { ...envelope.tool, autoApprove: false };
       responseRetries = 0;
+
+      const callSignature = readOnlyCallSignature(toolCall);
+      if (callSignature) {
+        const calls = repeatedReadOnlyCalls.get(callSignature) ?? 0;
+        if (calls >= 2) {
+          this.output.appendLine(
+            `[agent stopped] Repeated read-only tool call: ${toolCall.tool}`,
+          );
+          return {
+            response:
+              "I stopped because the model kept repeating the same read-only workspace operation. Please try again; no file changes were made.",
+            title,
+            extras: createEmptyResponseExtras(),
+          };
+        }
+        repeatedReadOnlyCalls.set(callSignature, calls + 1);
+      }
 
       // Notify the webview that a tool call is about to be executed.
       this.events.onToolStatus(toolCall);
@@ -263,6 +287,34 @@ export class ChatAgent {
       extras: createEmptyResponseExtras(),
     };
   }
+}
+
+const READ_ONLY_WORKSPACE_TOOLS = new Set([
+  "inspect_project",
+  "list_project",
+  "search_files",
+  "search_file_contents",
+  "file_exists",
+  "read_file",
+  "get_diagnostics",
+  "find_references",
+]);
+
+/** Stops exact duplicate workspace lookups from consuming the step budget. */
+function readOnlyCallSignature(call: ToolCall): string | undefined {
+  if (!READ_ONLY_WORKSPACE_TOOLS.has(call.tool)) return undefined;
+  return `${call.tool}:${stableJson(call.arguments)}`;
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function findUnsupportedWriteClaim(
