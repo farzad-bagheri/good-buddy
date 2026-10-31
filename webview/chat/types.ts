@@ -43,6 +43,7 @@ export type TimelineItem =
       proposalId: string;
       path: string;
       diff: string;
+      existed: boolean;
       status?: string;
     }
   | {
@@ -107,4 +108,11 @@ export interface SvgArtifact {
   content: string;
 }
 
-export type Artifact = CodeArtifact | SvgArtifact;
+export interface MermaidArtifact {
+  type: "mermaid";
+  title: string;
+  language: "mermaid";
+  content: string;
+}
+
+export type Artifact = CodeArtifact | SvgArtifact | MermaidArtifact;

@@ -37,6 +37,31 @@ describe("ToolRegistry", () => {
     expect(registry.list()).toHaveLength(1);
   });
 
+  it("validates required and unsupported arguments for tools with schemas", async () => {
+    const tool = {
+      ...createTool("read_file"),
+      inputSchema: {
+        type: "object",
+        properties: { path: { type: "string" } },
+        required: ["path"],
+        additionalProperties: false,
+      },
+    };
+    const registry = new ToolRegistry([tool]);
+
+    await expect(
+      registry.execute({ tool: "read_file", autoApprove: false, arguments: {} }),
+    ).rejects.toThrow("Tool argument 'path' is required.");
+    await expect(
+      registry.execute({
+        tool: "read_file",
+        autoApprove: false,
+        arguments: { path: "notes.txt", extra: true },
+      }),
+    ).rejects.toThrow("Tool argument 'extra' is not supported.");
+    expect(tool.execute).not.toHaveBeenCalled();
+  });
+
   it("unregisters tools when an external provider disconnects", () => {
     const tool = createTool("mcp__docs__search");
     const registry = new ToolRegistry([tool]);

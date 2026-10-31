@@ -15,7 +15,16 @@ export function WriteProposal({ item }: { item: WriteProposalItem }) {
 
   return (
     <section className={styles.proposal}>
-      <strong>Proposed change: {item.path}</strong>
+      <strong>
+        {item.status === "Applied"
+          ? item.existed
+            ? "Updated file:"
+            : "Created file:"
+          : item.status
+            ? "Change not applied:"
+            : "Draft ready — approve to apply; no file has been changed:"}{" "}
+        {item.path}
+      </strong>
       <pre>{item.diff}</pre>
       {item.status ? (
         <div>{item.status}</div>

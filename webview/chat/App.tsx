@@ -6,6 +6,7 @@ import { Files } from "./components/Files";
 import { ProviderNotice } from "./components/ProviderNotice";
 import { ProviderSetupDialog } from "./components/ProviderSetupDialog";
 import { Suggestions } from "./components/Suggestions";
+import { ThinkingIndicator } from "./components/ThinkingIndicator";
 import { Timeline } from "./components/Timeline";
 import {
   appendCommandOutput,
@@ -166,6 +167,7 @@ export function App() {
             proposalId: message.id,
             path: message.path,
             diff: message.diff,
+            existed: message.existed === true,
           });
           break;
         case "vsc:writeComplete":
@@ -309,7 +311,7 @@ export function App() {
               retryDisabled={thinking}
             />
 
-            {thinking && <div role="status">Thinking...</div>}
+            {thinking && <ThinkingIndicator />}
 
             {files && files.length > 0 && (
               <Files files={files} onOpen={handleOpenFile} />

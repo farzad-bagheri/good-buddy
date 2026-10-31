@@ -2,6 +2,8 @@ export interface ToolCall {
   tool: string;
   autoApprove: boolean;
   arguments: Record<string, unknown>;
+  /** Trusted host-only workspace root pinned when a project command is proposed. */
+  workspaceRoot?: string;
 }
 
 export interface ToolDefinition {

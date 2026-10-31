@@ -36,12 +36,16 @@ server you configure and does not require a Good Buddy cloud service.
   prompts are editable and are not sent until you choose Send.
 - **Make changes with the assistant.** Ask it to add a feature, update existing
   behavior, or fix a bug. Good Buddy can inspect files, propose edits, and run
-  project commands. Review proposed file changes in a diff and approve them
-  before they are applied; commands also require confirmation.
+  project commands. For project setup, it can inspect the detected ecosystem,
+  propose the dependency-install command, and run declared checks. Review
+  proposed file changes in a diff and approve them before they are applied;
+  commands also require confirmation.
 - **Reuse standalone code outputs.** When a response includes a complete code
   example intended for reuse, it can appear as a separate artifact with its own
-  **Copy code** action. SVG diagrams can be previewed or inspected as source.
-  Short snippets remain part of the Markdown explanation.
+  **Copy code** action. SVG and Mermaid diagrams have dedicated preview/source
+  cards, with copy and download actions. Mermaid previews include zoom in, zoom
+  out, and reset controls. Short snippets remain part of the Markdown
+  explanation.
 - **Understand code faster.** Select code and ask Good Buddy to explain it.
 - **Get inline code completions.** Receive ghost-text suggestions as you type,
   using a model you select for completion.
@@ -58,6 +62,8 @@ Try prompts like:
   in this project.”
 - “Find where this error is handled and explain the flow.”
 - “Update the parser to support trailing commas, then run the relevant tests.”
+- “Inspect this project, install its dependencies, and run its declared checks.”
+- “Create a Mermaid flowchart for the request-validation path.”
 
 Open **Good Buddy** from the Activity Bar to chat. Use the **Models** button in
 the chat toolbar to configure your provider and select chat and completion
@@ -183,8 +189,13 @@ or run a command. Good Buddy provides workspace tools to:
 - Read files and inspect VS Code diagnostics or symbol references.
 - Propose exact-section edits or complete file contents. Review each unified
   diff and choose **Approve** or **Reject**; approval verifies the file has not
-  changed since the proposal was created.
-- Run project commands after confirmation, with output shown in chat.
+  changed since the proposal was created and confirms the saved file content.
+- Detect Node.js, Python, Rust, Go, and .NET project manifests. Ask Good Buddy
+  to inspect the project before installing dependencies or checking a build.
+  It proposes the matching install or verification command for your approval.
+- Run project commands after confirmation, with readable output and failure
+  status shown in chat. Commands run on the VS Code extension host with the
+  workspace as their working directory.
 - Move a selected workspace file to the OS trash only after its own explicit
   confirmation.
 
@@ -229,5 +240,19 @@ Each request starts with the opened workspace path and a compact project tree.
 Tool paths are scoped to the workspace, command output is capped, and each
 agent request is limited to five tool calls. Good Buddy proposes and assists
 with changes; you remain in control of applying edits and running commands.
+
+### Diagram artifacts
+
+Ask for an SVG diagram or explicitly ask for Mermaid to receive a dedicated
+artifact instead of a long code block. SVG artifacts are previewed as
+self-contained vector images; unsafe external references are removed before
+preview, copy, or download. Mermaid artifacts render in the chat view with a
+theme-aware preview, **Preview**/**Source** tabs, copy/download actions, and
+zoom controls. Mermaid is loaded only when a Mermaid artifact is shown.
+
+Examples:
+
+- “Generate a self-contained SVG sequence diagram of the login flow.”
+- “Create a Mermaid flowchart of the build pipeline.”
 
 Use **Attach** in the chat footer to add up to five text files (80 KB each) to the next message. Selected filenames appear beneath the composer. Attachments are sent only with that next message and are then cleared; binary and oversized files are not attached.

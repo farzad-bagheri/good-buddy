@@ -23,6 +23,7 @@ const proposalItem: TimelineItem = {
   proposalId: "write-1",
   path: "src/example.ts",
   diff: "diff",
+  existed: false,
 };
 
 const commandItem: TimelineItem = {
@@ -158,6 +159,21 @@ describe("timeline utilities", () => {
     ).toMatchObject({ output: "passed", status: "Completed" });
   });
 
+  it("renders structured command results without exposing their JSON envelope", () => {
+    const result = JSON.stringify({
+      status: "failed",
+      command: "python missing.py",
+      cwd: "D:/workspace",
+      exitCode: 1,
+      output: "python: can't open file 'missing.py'",
+    });
+
+    expect(completeCommandProposal([commandItem], "run-1", result)[0]).toMatchObject({
+      output: "python: can't open file 'missing.py'",
+      status: "Command failed",
+    });
+  });
+
   it("creates command proposal timeline entries", () => {
     expect(
       appendCommandProposal([], "run-1", "npm test", true)[0],
@@ -167,6 +183,19 @@ describe("timeline utilities", () => {
       command: "npm test",
       autoApproved: true,
       output: "",
+      status: "Running command...",
+    });
+  });
+
+  it("updates a proposed command when it starts instead of duplicating it", () => {
+    const proposed = appendCommandProposal([], "run-1", "pnpm test", false);
+    const started = appendCommandProposal(proposed, "run-1", "pnpm test", true);
+
+    expect(started).toHaveLength(1);
+    expect(started[0]).toMatchObject({
+      kind: "commandProposal",
+      commandId: "run-1",
+      autoApproved: true,
       status: "Running command...",
     });
   });

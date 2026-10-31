@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src ${cspSource} blob:; style-src ${cspSource} 'nonce-${nonce}'; script-src ${cspSource} 'nonce-${nonce}';"
+      content="default-src 'none'; img-src ${cspSource} data: blob:; style-src ${cspSource} 'nonce-${nonce}'; script-src ${cspSource} 'nonce-${nonce}';"
     />
     <link rel="stylesheet" href="${styleUri}" />
     <style nonce="${nonce}">
       {{iconClasses}}
     </style>
   </head>
-  <body>
+  <body data-style-nonce="${nonce}">
     <div id="root"></div>
     <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
   </body>

@@ -6,6 +6,8 @@ interface PendingWrite {
   path: string;
   before: string;
   after: string;
+  existed: boolean;
+  root: string;
   /**
    * Resolves the pending write operation with the given result.
    * @param result The result of the write operation, either a success message or a denial message.
@@ -29,6 +31,7 @@ export interface WriteApprovalEvents {
     diff: string,
     before: string,
     after: string,
+    existed: boolean,
   ): void;
   complete(id: string, result: string): void;
 }
@@ -66,30 +69,37 @@ export class WriteApprovalManager {
         : undefined;
 
     // Determine the content of the file before the write operation.
-    const before =
-      edit?.before ?? (await this.workspaceTools.currentContent(path));
+    const snapshot = edit
+      ? { content: edit.before, exists: edit.proposal.existed, root: edit.proposal.root }
+      : await this.workspaceTools.currentSnapshot(path);
+    const before = snapshot.content;
 
     // Determine the content of the file after the write operation.
     const content = edit?.after ?? this.writeContent(toolCall);
 
-    // If the tool call is auto-approved, apply the write immediately. Otherwise, propose it for user approval.
-    if (toolCall.autoApprove) {
-      try {
-        return await this.workspaceTools.applyWrite(path, before, content);
-      } catch (error) {
-        return `Tool error: ${formatError(error)}`;
-      }
-    }
-
-    // Propose the write operation to the user if it is not auto-approved.
+    // Writes always require a user review; autoApprove is never trusted from a model.
     const proposal =
       edit?.proposal ?? (await this.workspaceTools.proposeWrite(path, content));
     const id = String(this.nextId++);
-    this.events.propose(id, proposal.path, proposal.diff, before, content);
+    this.events.propose(
+      id,
+      proposal.path,
+      proposal.diff,
+      before,
+      content,
+      snapshot.exists,
+    );
 
     // Return a promise that will be resolved once the user reviews the write operation.
     return new Promise((resolve) =>
-      this.pending.set(id, { path, before, after: content, resolve }),
+      this.pending.set(id, {
+        path,
+        before,
+        after: content,
+        existed: snapshot.exists,
+        root: snapshot.root,
+        resolve,
+      }),
     );
   }
 
@@ -116,6 +126,8 @@ export class WriteApprovalManager {
         pending.path,
         pending.before,
         pending.after,
+        pending.existed,
+        pending.root,
       );
       pending.resolve(result);
       this.events.complete(id, result);
@@ -139,7 +151,7 @@ export class WriteApprovalManager {
       toolCall.arguments.content === undefined
         ? toolCall.arguments.contents
         : toolCall.arguments.content;
-    if (typeof value !== "string" || !value) {
+    if (typeof value !== "string") {
       return toolArgument(toolCall, "content");
     }
     return value;

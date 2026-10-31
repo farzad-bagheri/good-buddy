@@ -27,6 +27,9 @@ const iconNames = [
   "download",
   "error",
   "code",
+  "zoom-in",
+  "zoom-out",
+  "zoom-reset",
 ];
 const iconClasses = iconNames
   .map(

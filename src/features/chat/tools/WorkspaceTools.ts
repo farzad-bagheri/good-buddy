@@ -24,6 +24,14 @@ import {
 export interface WriteProposal {
   path: string;
   diff: string;
+  root: string;
+  existed: boolean;
+}
+
+export interface WorkspaceContentSnapshot {
+  content: string;
+  exists: boolean;
+  root: string;
 }
 
 const MAX_GIT_REVIEW_CHARS = 10_000;
@@ -35,6 +43,14 @@ const MAX_UNTRACKED_REVIEW_FILE_BYTES = 8 * 1024;
 const MAX_GIT_BUFFER_BYTES = 2 * 1024 * 1024;
 
 type GitExecutor = (root: string, args: string[]) => Promise<string>;
+
+type ProjectInfo = {
+  ecosystem: "node" | "python" | "rust" | "go" | "dotnet" | "unknown";
+  manifest?: string;
+  packageManager?: "npm" | "pnpm" | "yarn";
+  lockfile?: string;
+  scripts: string[];
+};
 
 /**
  * Provides a set of tools for interacting with the workspace, including listing project files,
@@ -55,9 +71,24 @@ export class WorkspaceTools {
   ): ToolDefinition[] {
     return [
       {
+        id: "inspect_project",
+        description:
+          "Inspect the current project and return structured JSON with its ecosystem, package manager, scripts, dependency-install command, and available verification commands. Use this first for project setup, dependency, or validation work.",
+        inputSchema: emptyArgumentsSchema(),
+        execute: async () => this.inspectProject(this.workspaceRoot()),
+      },
+      {
         id: "list_project",
         description:
           "List files under a workspace folder. Optional arguments: path (relative subfolder, defaults to the workspace root) and depth (1-5, defaults to 3).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            path: { type: "string" },
+            depth: { type: "number" },
+          },
+          additionalProperties: false,
+        },
         execute: async (call) =>
           this.listProject(
             this.workspaceRoot(),
@@ -69,6 +100,7 @@ export class WorkspaceTools {
         id: "search_files",
         description:
           "Find workspace files using a glob pattern (for example **/*.ts or **/*Config*). Optional limit defaults to 50.",
+        inputSchema: objectSchema({ pattern: { type: "string" }, limit: { type: "number" } }, ["pattern"]),
         execute: async (call) =>
           this.searchFiles(
             this.workspaceRoot(),
@@ -80,6 +112,10 @@ export class WorkspaceTools {
         id: "search_file_contents",
         description:
           "Search text within workspace files. Required query; optional path glob, caseSensitive, contextLines (0-3), and limit (default 50).",
+        inputSchema: objectSchema({
+          query: { type: "string" }, path: { type: "string" },
+          caseSensitive: { type: "boolean" }, contextLines: { type: "number" }, limit: { type: "number" },
+        }, ["query"]),
         execute: async (call) =>
           this.searchFileContents(
             this.workspaceRoot(),
@@ -94,6 +130,7 @@ export class WorkspaceTools {
         id: "file_exists",
         description:
           "Check whether a workspace-relative file exists. Required argument: path. Use the result to verify existence; this tool does not create or modify files.",
+        inputSchema: objectSchema({ path: { type: "string" } }, ["path"]),
         execute: async (call) =>
           this.fileExists(
             this.workspaceRoot(),
@@ -103,6 +140,7 @@ export class WorkspaceTools {
       {
         id: "read_file",
         description: "Read a text file from the workspace.",
+        inputSchema: objectSchema({ path: { type: "string" } }, ["path"]),
         execute: async (call) =>
           this.readFile(
             this.workspaceRoot(),
@@ -113,6 +151,7 @@ export class WorkspaceTools {
         id: "get_diagnostics",
         description:
           "Get VS Code errors and warnings for the workspace or one workspace-relative file. Optional argument: path.",
+        inputSchema: objectSchema({ path: { type: "string" } }),
         execute: async (call) =>
           this.getDiagnostics(
             this.workspaceRoot(),
@@ -123,6 +162,7 @@ export class WorkspaceTools {
         id: "find_references",
         description:
           "Find symbol references at a workspace file position. Required arguments: path and 1-based line and character.",
+        inputSchema: objectSchema({ path: { type: "string" }, line: { type: "number" }, character: { type: "number" } }, ["path", "line", "character"]),
         execute: async (call) =>
           this.findReferences(
             this.workspaceRoot(),
@@ -135,18 +175,21 @@ export class WorkspaceTools {
         id: "write_file",
         description:
           "Propose complete file contents. Required arguments: path (workspace-relative string) and content (string; use the exact key 'content').",
+        inputSchema: objectSchema({ path: { type: "string" }, content: { type: "string" } }, ["path", "content"]),
         execute: executeWrite,
       },
       {
         id: "replace_in_file",
         description:
           "Propose a localized replacement in a workspace file. Required arguments: path (workspace-relative string), oldText (the exact, unique text copied from read_file), and newText (replacement text). Use only when the exact section is known and the change is small; for structural or broad changes, use write_file with the complete updated file instead.",
+        inputSchema: objectSchema({ path: { type: "string" }, oldText: { type: "string" }, newText: { type: "string" } }, ["path", "oldText", "newText"]),
         execute: executeWrite,
       },
       {
         id: "delete_file",
         description:
           "Move one workspace file to the OS trash after an explicit VS Code confirmation. Never auto-approve this operation.",
+        inputSchema: objectSchema({ path: { type: "string" } }, ["path"]),
         execute: async (call) =>
           this.deleteFile(requiredString(call.arguments.path, "path")),
       },
@@ -154,9 +197,128 @@ export class WorkspaceTools {
         id: "run_command",
         description:
           "Run a shell command on the machine running the VS Code extension host, with the workspace root as the working directory. The command can inspect software and environment available to that host; it is not restricted to workspace files. User approval is required.",
+        inputSchema: objectSchema({ command: { type: "string" } }, ["command"]),
         execute: executeCommand,
       },
+      {
+        id: "install_dependencies",
+        description:
+          "Install the current project's dependencies using the detected package manager. Run inspect_project first. Requires user approval.",
+        inputSchema: emptyArgumentsSchema(),
+        execute: async (call) => {
+          const root = this.workspaceRoot();
+          const command = await this.projectCommand(root, "install");
+          return command
+            ? executeCommand({ ...call, arguments: { command }, workspaceRoot: root })
+            : "No supported dependency manifest was found. Use inspect_project and choose an explicit command if appropriate.";
+        },
+      },
+      {
+        id: "run_project_checks",
+        description:
+          "Run the detected project's standard verification command. For Node projects this runs declared test, type-check, lint, and build scripts. Run inspect_project first. Requires user approval and returns the command result.",
+        inputSchema: emptyArgumentsSchema(),
+        execute: async (call) => {
+          const root = this.workspaceRoot();
+          const command = await this.projectCommand(root, "check");
+          return command
+            ? executeCommand({ ...call, arguments: { command }, workspaceRoot: root })
+            : "No declared verification scripts were found. Use inspect_project and run a focused command if appropriate.";
+        },
+      },
+      {
+        id: "run_package_script",
+        description:
+          "Run one script declared in the current Node package.json. Required argument: script. Use inspect_project to see valid scripts. Requires user approval.",
+        inputSchema: objectSchema({ script: { type: "string" } }, ["script"]),
+        execute: async (call) => {
+          const root = this.workspaceRoot();
+          const info = await this.projectInfo(root);
+          const script = requiredString(call.arguments.script, "script");
+          if (info.ecosystem !== "node" || !info.packageManager) {
+            return "This workspace is not a detected Node project with package scripts.";
+          }
+          if (!info.scripts.includes(script)) {
+            return `No package.json script named '${script}' was found. Use inspect_project to see available scripts.`;
+          }
+          return executeCommand({
+            ...call,
+            arguments: { command: scriptCommand(info.packageManager, script) },
+            workspaceRoot: root,
+          });
+        },
+      },
     ];
+  }
+
+  private async inspectProject(root: string): Promise<string> {
+    const projectInfo = await this.projectInfo(root);
+    return JSON.stringify({
+      root,
+      ...projectInfo,
+      installCommand: await this.projectCommand(root, "install"),
+      checkCommand: await this.projectCommand(root, "check"),
+    });
+  }
+
+  private async projectCommand(
+    root: string,
+    action: "install" | "check",
+  ): Promise<string | undefined> {
+    const info = await this.projectInfo(root);
+    if (action === "install") return installProjectCommand(info);
+    return checkProjectCommand(info);
+  }
+
+  private async projectInfo(root: string): Promise<ProjectInfo> {
+    const node = await this.nodeProjectInfo(root);
+    if (node) return node;
+    for (const [filename, ecosystem] of [
+      ["pyproject.toml", "python"],
+      ["requirements.txt", "python"],
+      ["Cargo.toml", "rust"],
+      ["go.mod", "go"],
+      ["*.sln", "dotnet"],
+    ] as const) {
+      if (filename.includes("*")) {
+        const matches = await vscode.workspace.findFiles(
+          new vscode.RelativePattern(vscode.Uri.file(root), filename),
+          undefined,
+          1,
+        );
+        if (matches.length) return { ecosystem, manifest: path.basename(matches[0].fsPath), scripts: [] };
+      } else if ((await this.contentSnapshot(workspaceFile(root, filename))).exists) {
+        return { ecosystem, manifest: filename, scripts: [] };
+      }
+    }
+    return { ecosystem: "unknown", scripts: [] };
+  }
+
+  private async nodeProjectInfo(root: string): Promise<ProjectInfo | undefined> {
+    const packageUri = workspaceFile(root, "package.json");
+    const snapshot = await this.contentSnapshot(packageUri);
+    if (!snapshot.exists) return undefined;
+    let manifest: unknown;
+    try {
+      manifest = JSON.parse(snapshot.content);
+    } catch {
+      return { ecosystem: "node", manifest: "package.json", scripts: [] };
+    }
+    const record = isRecord(manifest) ? manifest : {};
+    const scripts = isRecord(record.scripts) ? Object.keys(record.scripts) : [];
+    const lockfile = await this.detectLockfile(root);
+    const configured = typeof record.packageManager === "string" ? record.packageManager.split("@", 1)[0] : undefined;
+    const packageManager = configured === "npm" || configured === "pnpm" || configured === "yarn"
+      ? configured
+      : lockfile === "pnpm-lock.yaml" ? "pnpm" : lockfile === "yarn.lock" ? "yarn" : "npm";
+    return { ecosystem: "node", manifest: "package.json", packageManager, lockfile, scripts };
+  }
+
+  private async detectLockfile(root: string): Promise<string | undefined> {
+    for (const filename of ["pnpm-lock.yaml", "yarn.lock", "package-lock.json"]) {
+      if ((await this.contentSnapshot(workspaceFile(root, filename))).exists) return filename;
+    }
+    return undefined;
   }
 
   /**
@@ -516,10 +678,12 @@ export class WorkspaceTools {
   ): Promise<WriteProposal> {
     const root = this.workspaceRoot();
     const uri = workspaceFile(root, relativePath);
-    const current = await this.readContent(uri);
+    const snapshot = await this.contentSnapshot(uri);
     return {
       path: relativePath,
-      diff: createDiff(relativePath, current, content),
+      diff: createDiff(relativePath, snapshot.content, content),
+      root,
+      existed: snapshot.exists,
     };
   }
 
@@ -536,7 +700,8 @@ export class WorkspaceTools {
     oldText: string,
     newText: string,
   ): Promise<{ proposal: WriteProposal; before: string; after: string }> {
-    const before = await this.currentContent(relativePath);
+    const snapshot = await this.currentSnapshot(relativePath);
+    const before = snapshot.content;
     const occurrences = before.split(oldText).length - 1;
     if (occurrences !== 1) {
       throw new Error(
@@ -548,6 +713,8 @@ export class WorkspaceTools {
       proposal: {
         path: relativePath,
         diff: createDiff(relativePath, before, after),
+        root: snapshot.root,
+        existed: snapshot.exists,
       },
       before,
       after,
@@ -590,12 +757,17 @@ export class WorkspaceTools {
     relativePath: string,
     expectedContent: string,
     content: string,
+    expectedExists?: boolean,
+    root = this.workspaceRoot(),
   ): Promise<string> {
-    const root = this.workspaceRoot();
     const uri = workspaceFile(root, relativePath);
     const document = this.openDocument(uri);
-    const current = document?.getText() ?? (await readTextIfExists(uri));
-    if (current !== expectedContent) {
+    const snapshot = await this.contentSnapshot(uri, document);
+    const current = snapshot.content;
+    if (
+      current !== expectedContent ||
+      (expectedExists !== undefined && snapshot.exists !== expectedExists)
+    ) {
       return `Write cancelled: ${relativePath} changed after the proposal was created.`;
     }
 
@@ -623,10 +795,10 @@ export class WorkspaceTools {
     }
 
     const persisted = await readTextIfExists(uri);
-    if (document?.getText() !== content && document) {
-      throw new Error(`Editor verification failed for ${relativePath}.`);
-    }
-    if (persisted !== content) {
+    // The saved workspace file is the source of truth. VS Code may update an
+    // editor buffer asynchronously or apply its configured line endings after
+    // save, even though the approved edit has been persisted successfully.
+    if (!sameTextContent(persisted, content)) {
       throw new Error(`Write verification failed for ${relativePath}.`);
     }
     return `Wrote ${relativePath}.`;
@@ -637,8 +809,44 @@ export class WorkspaceTools {
    * @param relativePath The relative path to the file within the workspace.
    * @returns The content of the file as a string, or an empty string if the file does not exist.
    */
-  async currentContent(relativePath: string): Promise<string> {
-    return this.readContent(workspaceFile(this.workspaceRoot(), relativePath));
+  async currentContent(relativePath: string, root = this.workspaceRoot()): Promise<string> {
+    return (await this.currentSnapshot(relativePath, root)).content;
+  }
+
+  async currentSnapshot(
+    relativePath: string,
+    root = this.workspaceRoot(),
+  ): Promise<WorkspaceContentSnapshot> {
+    const snapshot = await this.contentSnapshot(workspaceFile(root, relativePath));
+    return { ...snapshot, root };
+  }
+
+  currentWorkspaceRoot(): string {
+    return this.workspaceRoot();
+  }
+
+  async firstMissingWorkspaceFile(
+    relativePaths: readonly string[],
+  ): Promise<string | undefined> {
+    const root = this.workspaceRoot();
+    for (const relativePath of relativePaths) {
+      const uri = workspaceFile(root, relativePath);
+      if (this.openDocument(uri)) continue;
+      try {
+        const stat = await vscode.workspace.fs.stat(uri);
+        if (stat.type & vscode.FileType.File) continue;
+      } catch (error) {
+        if (
+          error instanceof vscode.FileSystemError &&
+          error.code === "FileNotFound"
+        ) {
+          return relativePath;
+        }
+        throw error;
+      }
+      return relativePath;
+    }
+    return undefined;
   }
 
   async getGitChanges(): Promise<string | undefined> {
@@ -758,6 +966,24 @@ export class WorkspaceTools {
     return this.openDocument(uri)?.getText() ?? (await readTextIfExists(uri));
   }
 
+  private async contentSnapshot(
+    uri: vscode.Uri,
+    document = this.openDocument(uri),
+  ): Promise<{ content: string; exists: boolean }> {
+    if (document) return { content: document.getText(), exists: true };
+    try {
+      return {
+        content: Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8"),
+        exists: true,
+      };
+    } catch (error) {
+      if (error instanceof vscode.FileSystemError && error.code === "FileNotFound") {
+        return { content: "", exists: false };
+      }
+      throw error;
+    }
+  }
+
   private openDocument(uri: vscode.Uri): vscode.TextDocument | undefined {
     return vscode.workspace.textDocuments.find(
       (document) => document.uri.toString() === uri.toString(),
@@ -769,7 +995,10 @@ export class WorkspaceTools {
    * @returns The absolute path to the workspace root directory.
    */
   private workspaceRoot(): string {
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const activeUri = vscode.window.activeTextEditor?.document.uri;
+    const root =
+      (activeUri && vscode.workspace.getWorkspaceFolder(activeUri)?.uri.fsPath) ??
+      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root)
       throw new Error("Open a workspace folder before using project tools.");
     return root;
@@ -783,6 +1012,7 @@ export class WorkspaceTools {
   async runCommand(
     command: string,
     onOutput?: (chunk: string) => void,
+    root = this.workspaceRoot(),
   ): Promise<string> {
     return new Promise((resolve) => {
       let streamedLength = 0;
@@ -811,7 +1041,7 @@ export class WorkspaceTools {
       const child = exec(
         command,
         {
-          cwd: this.workspaceRoot(),
+          cwd: root,
           timeout: TOOL_TIMEOUT,
           maxBuffer: MAX_OUTPUT_LENGTH,
           windowsHide: true,
@@ -821,18 +1051,31 @@ export class WorkspaceTools {
             const details = error as Error & {
               stdout?: string;
               stderr?: string;
+              code?: number | string;
             };
             resolve(
-              truncate(
-                `Command failed: ${details.message}\n${details.stdout ?? stdout}${details.stderr ?? stderr}`,
-              ),
+              commandResult({
+                status: "failed",
+                command,
+                cwd: root,
+                exitCode: details.code,
+                error: details.message,
+                output: truncate(
+                  `${details.stdout ?? stdout}${details.stderr ?? stderr}`,
+                ),
+              }),
             );
             return;
           }
 
           resolve(
-            truncate(`${stdout}${stderr}`) ||
-              "Command completed with no output.",
+            commandResult({
+              status: "succeeded",
+              command,
+              cwd: root,
+              exitCode: 0,
+              output: truncate(`${stdout}${stderr}`),
+            }),
           );
         },
       );
@@ -840,6 +1083,14 @@ export class WorkspaceTools {
       child.stderr?.on("data", forwardOutput);
     });
   }
+}
+
+function sameTextContent(left: string, right: string): boolean {
+  return normalizeLineEndings(left) === normalizeLineEndings(right);
+}
+
+function normalizeLineEndings(value: string): string {
+  return value.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
 }
 
 function runGitCommand(root: string, args: string[]): Promise<string> {
@@ -877,4 +1128,83 @@ function truncateAtLineBoundary(value: string, maxChars: number): string {
   const lineEnd = excerpt.lastIndexOf("\n");
   const completeLines = lineEnd < 0 ? excerpt : excerpt.slice(0, lineEnd);
   return `${completeLines}${note}`;
+}
+
+function objectSchema(
+  properties: Record<string, Record<string, unknown>>,
+  required: string[] = [],
+): Record<string, unknown> {
+  return {
+    type: "object",
+    properties,
+    ...(required.length > 0 && { required }),
+    additionalProperties: false,
+  };
+}
+
+function emptyArgumentsSchema(): Record<string, unknown> {
+  return objectSchema({});
+}
+
+function installCommand(
+  packageManager: "npm" | "pnpm" | "yarn",
+  lockfile: string | undefined,
+): string {
+  if (packageManager === "pnpm") {
+    return lockfile ? "pnpm install --frozen-lockfile" : "pnpm install";
+  }
+  if (packageManager === "yarn") {
+    return lockfile ? "yarn install --immutable" : "yarn install";
+  }
+  return lockfile ? "npm ci" : "npm install";
+}
+
+function installProjectCommand(info: ProjectInfo): string | undefined {
+  if (info.ecosystem === "node" && info.packageManager) {
+    return installCommand(info.packageManager, info.lockfile);
+  }
+  if (info.ecosystem === "python") {
+    return info.manifest === "requirements.txt"
+      ? "python -m pip install -r requirements.txt"
+      : "python -m pip install -e .";
+  }
+  if (info.ecosystem === "rust") return "cargo fetch";
+  if (info.ecosystem === "go") return "go mod download";
+  if (info.ecosystem === "dotnet") return "dotnet restore";
+  return undefined;
+}
+
+function checkProjectCommand(info: ProjectInfo): string | undefined {
+  if (info.ecosystem === "node" && info.packageManager) {
+    const commands = ["test", "check", "lint", "build"]
+      .filter((name) => info.scripts.includes(name))
+      .map((name) => scriptCommand(info.packageManager!, name));
+    return commands.length ? commands.join(" && ") : undefined;
+  }
+  if (info.ecosystem === "rust") return "cargo test";
+  if (info.ecosystem === "go") return "go test ./...";
+  if (info.ecosystem === "dotnet") return "dotnet test";
+  return undefined;
+}
+
+function scriptCommand(
+  packageManager: "npm" | "pnpm" | "yarn",
+  script: string,
+): string {
+  return packageManager === "npm" ? `npm run ${script}` : `${packageManager} ${script}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function commandResult(value: {
+  status: "succeeded" | "failed";
+  command: string;
+  cwd: string;
+  exitCode?: number | string;
+  error?: string;
+  output: string;
+}): string {
+  return JSON.stringify(value);
 }

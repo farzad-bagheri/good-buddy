@@ -226,6 +226,76 @@ describe("WorkspaceTools writes", () => {
     }
   });
 
+  it("inspects Node project commands and routes install/check actions through approval", async () => {
+    vscodeState.files.set(
+      "D:\\workspace\\package.json",
+      JSON.stringify({
+        packageManager: "pnpm@11.0.0",
+        scripts: { test: "vitest run", check: "tsc --noEmit", build: "vite build" },
+      }),
+    );
+    vscodeState.files.set("D:\\workspace\\pnpm-lock.yaml", "lockfileVersion: 9");
+    const executeCommand = vi.fn().mockResolvedValue("Command completed.");
+    const tools = new WorkspaceTools().createTools(vi.fn(), executeCommand);
+    const inspect = tools.find((tool) => tool.id === "inspect_project");
+    const install = tools.find((tool) => tool.id === "install_dependencies");
+    const checks = tools.find((tool) => tool.id === "run_project_checks");
+    if (!inspect || !install || !checks) throw new Error("Project tools missing");
+
+    await expect(
+      inspect.execute({ tool: "inspect_project", autoApprove: false, arguments: {} }),
+    ).resolves.toContain('"packageManager":"pnpm"');
+    await install.execute({ tool: "install_dependencies", autoApprove: false, arguments: {} });
+    await checks.execute({ tool: "run_project_checks", autoApprove: false, arguments: {} });
+
+    expect(executeCommand).toHaveBeenNthCalledWith(1, {
+      tool: "install_dependencies",
+      autoApprove: false,
+      arguments: { command: "pnpm install --frozen-lockfile" },
+      workspaceRoot: "D:\\workspace",
+    });
+    expect(executeCommand).toHaveBeenNthCalledWith(2, {
+      tool: "run_project_checks",
+      autoApprove: false,
+      arguments: { command: "pnpm test && pnpm check && pnpm build" },
+      workspaceRoot: "D:\\workspace",
+    });
+  });
+
+  it("detects Python and Rust projects without assuming npm commands", async () => {
+    const executeCommand = vi.fn().mockResolvedValue("Command completed.");
+    const tools = new WorkspaceTools().createTools(vi.fn(), executeCommand);
+    const inspect = tools.find((tool) => tool.id === "inspect_project");
+    const install = tools.find((tool) => tool.id === "install_dependencies");
+    const checks = tools.find((tool) => tool.id === "run_project_checks");
+    if (!inspect || !install || !checks) throw new Error("Project tools missing");
+
+    vscodeState.files.set("D:\\workspace\\pyproject.toml", "[project]\nname = 'demo'");
+    await expect(
+      inspect.execute({ tool: "inspect_project", autoApprove: false, arguments: {} }),
+    ).resolves.toContain('"ecosystem":"python"');
+    await install.execute({ tool: "install_dependencies", autoApprove: false, arguments: {} });
+    expect(executeCommand).toHaveBeenLastCalledWith({
+      tool: "install_dependencies",
+      autoApprove: false,
+      arguments: { command: "python -m pip install -e ." },
+      workspaceRoot: "D:\\workspace",
+    });
+
+    vscodeState.files.clear();
+    vscodeState.files.set("D:\\workspace\\Cargo.toml", "[package]\nname = 'demo'");
+    await expect(
+      inspect.execute({ tool: "inspect_project", autoApprove: false, arguments: {} }),
+    ).resolves.toContain('"ecosystem":"rust"');
+    await checks.execute({ tool: "run_project_checks", autoApprove: false, arguments: {} });
+    expect(executeCommand).toHaveBeenLastCalledWith({
+      tool: "run_project_checks",
+      autoApprove: false,
+      arguments: { command: "cargo test" },
+      workspaceRoot: "D:\\workspace",
+    });
+  });
+
   it("omits Python virtual environments and caches from project context", async () => {
     vscodeState.directories.set("D:\\workspace", [
       ["pyproject.toml", 1],
@@ -326,6 +396,27 @@ describe("WorkspaceTools writes", () => {
     expect(vscodeState.fileWriteCalls).toBe(0);
   });
 
+  it("accepts a persisted editor write when the editor has stale text or normalizes line endings", async () => {
+    const filePath = "D:\\workspace\\notes.txt";
+    vscodeState.files.set(filePath, "before");
+    const document = {
+      uri: { fsPath: filePath, toString: () => filePath },
+      value: "before",
+      getText: () => "before",
+      positionAt: (offset: number) => ({ character: offset }),
+      async save() {
+        vscodeState.files.set(filePath, this.value.replaceAll("\n", "\r\n"));
+        return true;
+      },
+    };
+    vscodeState.documents.push(document);
+
+    await expect(
+      new WorkspaceTools().applyWrite("notes.txt", "before", "after\nnext"),
+    ).resolves.toBe("Wrote notes.txt.");
+    expect(vscodeState.files.get(filePath)).toBe("after\r\nnext");
+  });
+
   it("writes and verifies a closed file through the workspace filesystem", async () => {
     const filePath = "D:\\workspace\\notes.txt";
     vscodeState.files.set(filePath, "before");
@@ -337,6 +428,19 @@ describe("WorkspaceTools writes", () => {
     expect(vscodeState.files.get(filePath)).toBe("after");
     expect(vscodeState.fileWriteCalls).toBe(1);
     expect(vscodeState.editCalls).toBe(0);
+  });
+
+  it("does not overwrite an empty file created after a new-file proposal", async () => {
+    const filePath = "D:\\workspace\\notes.txt";
+    vscodeState.files.set(filePath, "");
+
+    await expect(
+      new WorkspaceTools().applyWrite("notes.txt", "", "after", false),
+    ).resolves.toBe(
+      "Write cancelled: notes.txt changed after the proposal was created.",
+    );
+    expect(vscodeState.files.get(filePath)).toBe("");
+    expect(vscodeState.fileWriteCalls).toBe(0);
   });
 
   it("searches workspace paths with a glob", async () => {

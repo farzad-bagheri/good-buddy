@@ -67,7 +67,14 @@ export interface SvgArtifact {
   content: string;
 }
 
-export type Artifact = CodeArtifact | SvgArtifact;
+export interface MermaidArtifact {
+  type: "mermaid";
+  title: string;
+  language: "mermaid";
+  content: string;
+}
+
+export type Artifact = CodeArtifact | SvgArtifact | MermaidArtifact;
 
 export function createEmptyResponseExtras(): ResponseExtras {
   return { suggestions: [], files: [], artifacts: [] };
@@ -102,13 +109,27 @@ export function responseExtrasSchema(): Record<string, unknown> {
         items: {
           type: "object",
           properties: {
-            type: { type: "string", enum: ["code", "svg"] },
+            type: { type: "string", enum: ["code", "svg", "mermaid"] },
             title: { type: "string", minLength: 1, maxLength: 100 },
             language: { type: "string", minLength: 1, maxLength: 40 },
             content: { type: "string", minLength: 1, maxLength: 100000 },
           },
           required: ["type", "title", "language", "content"],
           additionalProperties: false,
+          allOf: [
+            {
+              if: { properties: { type: { const: "svg" } }, required: ["type"] },
+              then: { properties: { language: { const: "svg" } } },
+            },
+            {
+              if: { properties: { type: { const: "code" } }, required: ["type"] },
+              then: { properties: { language: { not: { const: "svg" } } } },
+            },
+            {
+              if: { properties: { type: { const: "mermaid" } }, required: ["type"] },
+              then: { properties: { language: { const: "mermaid" } } },
+            },
+          ],
         },
         minItems: 0,
         maxItems: 3,
@@ -187,7 +208,10 @@ function isArtifact(value: unknown): value is Artifact {
     return false;
   }
   if (value.type === "code") return true;
-  return value.type === "svg" && value.language === "svg";
+  return (
+    (value.type === "svg" && value.language === "svg") ||
+    (value.type === "mermaid" && value.language === "mermaid")
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

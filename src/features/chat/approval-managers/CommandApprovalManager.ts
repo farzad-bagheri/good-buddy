@@ -4,6 +4,7 @@ import { formatError, toolArgument } from "../utils";
 
 interface PendingCommand {
   command: string;
+  root: string;
   resolve: (result: string) => void;
 }
 
@@ -39,17 +40,13 @@ export class CommandApprovalManager {
    */
   async executeOrPropose(toolCall: ToolCall): Promise<string> {
     const command = toolArgument(toolCall, "command");
+    const root = toolCall.workspaceRoot ?? this.workspaceTools.currentWorkspaceRoot();
     const id = String(this.nextId++);
-    if (toolCall.autoApprove) {
-      this.events.start(id, command);
-      return this.runCommand(id, command);
-    }
-
-    // Propose the command to the user for approval.
+    // Commands always require a user review; autoApprove is never trusted from a model.
     this.events.propose(id, command);
 
     // Return a promise that will be resolved once the user reviews the command.
-    return new Promise((resolve) => this.pending.set(id, { command, resolve })); // Store the pending command with its resolver (to be called upon user approval or rejection)
+    return new Promise((resolve) => this.pending.set(id, { command, root, resolve }));
   }
 
   /**
@@ -63,18 +60,28 @@ export class CommandApprovalManager {
 
     this.pending.delete(id);
 
-    pending.resolve(
-      approved
-        ? await this.runCommand(id, pending.command)
-        : "Command denied by the user.",
-    );
+    if (approved) {
+      pending.resolve(await this.runCommand(id, pending.command, pending.root));
+      return;
+    }
+
+    const result = "Command denied by the user.";
+    this.events.complete(id, result);
+    pending.resolve(result);
   }
 
-  private async runCommand(id: string, command: string): Promise<string> {
+  private async runCommand(
+    id: string,
+    command: string,
+    root: string,
+  ): Promise<string> {
     let result: string;
+    this.events.start(id, command);
     try {
-      result = await this.workspaceTools.runCommand(command, (chunk) =>
-        this.events.output(id, chunk),
+      result = await this.workspaceTools.runCommand(
+        command,
+        (chunk) => this.events.output(id, chunk),
+        root,
       );
     } catch (error) {
       result = `Command failed: ${formatError(error)}`;
@@ -84,7 +91,10 @@ export class CommandApprovalManager {
   }
 
   rejectAll(reason = "Command denied because the chat was reset."): void {
-    for (const pending of this.pending.values()) pending.resolve(reason);
+    for (const [id, pending] of this.pending) {
+      this.events.complete(id, reason);
+      pending.resolve(reason);
+    }
     this.pending.clear();
   }
 }

@@ -63,7 +63,7 @@
 
 .code {
   max-height: 12em;
-  overflow: hidden;
+  overflow: auto;
   margin: 0;
   padding: 12px;
   color: var(--vscode-textPreformat-foreground);

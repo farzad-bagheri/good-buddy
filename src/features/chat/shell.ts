@@ -6,7 +6,7 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src ${cspSource} blob:; style-src ${cspSource} 'nonce-${nonce}'; script-src ${cspSource} 'nonce-${nonce}';"
+      content="default-src 'none'; img-src ${cspSource} data: blob:; style-src ${cspSource} 'nonce-${nonce}'; script-src ${cspSource} 'nonce-${nonce}';"
     />
     <link rel="stylesheet" href="${styleUri}" />
     <style nonce="${nonce}">
@@ -120,9 +120,24 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
         mask-image: url("${iconUri("code")}");
         -webkit-mask-image: url("${iconUri("code")}");
       }
+
+    .zoom-in-icon {
+        mask-image: url("${iconUri("zoom-in")}");
+        -webkit-mask-image: url("${iconUri("zoom-in")}");
+      }
+
+    .zoom-out-icon {
+        mask-image: url("${iconUri("zoom-out")}");
+        -webkit-mask-image: url("${iconUri("zoom-out")}");
+      }
+
+    .zoom-reset-icon {
+        mask-image: url("${iconUri("zoom-reset")}");
+        -webkit-mask-image: url("${iconUri("zoom-reset")}");
+      }
     </style>
   </head>
-  <body>
+  <body data-style-nonce="${nonce}">
     <div id="root"></div>
     <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
   </body>

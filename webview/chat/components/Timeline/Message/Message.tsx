@@ -3,6 +3,7 @@ import { IconButton } from "../../../components/IconButton";
 import type { TimelineItem } from "../../../types";
 import { sanitizeHtml } from "../../../utils";
 import { CodeArtifact } from "./CodeArtifact";
+import { MermaidArtifact } from "./MermaidArtifact";
 import { SvgArtifact } from "./SvgArtifact";
 import styles from "./Message.module.css";
 
@@ -36,6 +37,11 @@ export function Message({ item, onRetry, retryDisabled }: MessageProps) {
         item.extras?.artifacts.map((artifact, index) =>
           artifact.type === "svg" ? (
             <SvgArtifact
+              key={`${artifact.title}-${index}`}
+              artifact={artifact}
+            />
+          ) : artifact.type === "mermaid" ? (
+            <MermaidArtifact
               key={`${artifact.title}-${index}`}
               artifact={artifact}
             />

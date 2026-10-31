@@ -69,12 +69,13 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     // Initialize the write approval manager.
     this.writeApprovals = new WriteApprovalManager(this.workspaceTools, {
       // Handle write proposals from the workspace tools.
-      propose: (id, path, diff, before, after) => {
+      propose: (id, path, diff, before, after, existed) => {
         this.view?.webview.postMessage({
           type: "vsc:writeProposal",
           id,
           path,
           diff,
+          existed,
         });
         void this.proposalDiffEditor
           .open(id, path, before, after)
@@ -278,7 +279,13 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         this.commandApprovals.executeOrReject(id, approved),
     });
     const messageSubscription = router.register();
-    webviewView.onDidDispose(() => messageSubscription.dispose());
+    webviewView.onDidDispose(() => {
+      messageSubscription.dispose();
+      if (this.view === webviewView) this.view = undefined;
+      this.activeController?.abort();
+      this.writeApprovals.rejectAll("Write cancelled because the chat view closed.");
+      this.commandApprovals.rejectAll("Command cancelled because the chat view closed.");
+    });
   }
 
   /** Sends chat history to the webview, rendering assistant messages as HTML. */

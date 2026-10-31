@@ -73,7 +73,7 @@ export class ChatAgent {
             ? `${content}\n\n${extras.artifacts
                 .map(
                   (artifact) =>
-                    `[${artifact.type === "svg" ? "SVG" : "Code"} artifact: ${artifact.title} (${artifact.language})]\n${artifact.content}`,
+                    `[${artifact.type === "svg" ? "SVG" : artifact.type === "mermaid" ? "Mermaid" : "Code"} artifact: ${artifact.title} (${artifact.language})]\n${artifact.content}`,
                 )
                 .join("\n\n")}`
             : content,
@@ -83,6 +83,8 @@ export class ChatAgent {
     let title: string | undefined;
     let responseRetries = 0;
     let titleRequired = requestTitle;
+    const completedWrites = new Set<string>();
+    let attemptedWorkspaceWrite = false;
 
     for (let step = 0; step < MAX_CHAT_STEPS; step++) {
       // Notify the webview that the model is processing a request.
@@ -172,11 +174,41 @@ export class ChatAgent {
         continue;
       }
 
-      responseRetries = 0;
       titleRequired = false;
       if (!envelope) throw new Error("The assistant response was not parsed.");
       title ??= envelope.title;
       if (envelope.type === "final") {
+        const unsupportedClaim =
+          attemptedWorkspaceWrite
+            ? findUnsupportedWriteClaim(envelope.response, completedWrites)
+            : undefined;
+        const missingFile = await this.workspaceTools.firstMissingWorkspaceFile?.(
+          envelope.extras.files.map(({ path }) => path),
+        );
+        const invalidFinalReason =
+          unsupportedClaim ??
+          (missingFile
+            ? `The response links to ${missingFile}, but that workspace file does not exist.`
+            : undefined);
+        if (invalidFinalReason) {
+          this.output.appendLine(`[invalid assistant response] ${invalidFinalReason}`);
+          if (responseRetries >= MAX_RESPONSE_RETRIES) {
+            return {
+              response: finalValidationFailureMessage(
+                missingFile,
+              ),
+              title,
+              extras: createEmptyResponseExtras(),
+            };
+          }
+          responseRetries++;
+          messages.push({ role: "assistant", content: response });
+          messages.push({
+            role: "system",
+            content: `${invalidFinalReason} Do not claim a workspace file was created, updated, saved, or written unless the corresponding tool result begins with 'Wrote '. Only include workspace file references that currently exist. State the actual result instead.`,
+          });
+          continue;
+        }
         if (streamedResponse !== envelope.response) {
           this.events.onAssistantResponse?.(envelope.response, signal);
         }
@@ -186,7 +218,9 @@ export class ChatAgent {
           extras: envelope.extras,
         };
       }
-      const toolCall = envelope.tool;
+      // Approval is a host policy, never a model-controlled capability.
+      const toolCall = { ...envelope.tool, autoApprove: false };
+      responseRetries = 0;
 
       // Notify the webview that a tool call is about to be executed.
       this.events.onToolStatus(toolCall);
@@ -196,6 +230,19 @@ export class ChatAgent {
         result = await this.tools.execute(toolCall);
       } catch (error) {
         result = `Tool error: ${formatError(error)}`;
+      }
+      if (
+        (toolCall.tool === "write_file" || toolCall.tool === "replace_in_file") &&
+        result.startsWith("Wrote ")
+      ) {
+        const writtenPath = result.slice("Wrote ".length).replace(/\.$/, "");
+        completedWrites.add(normalizePath(writtenPath));
+      }
+      if (
+        toolCall.tool === "write_file" ||
+        toolCall.tool === "replace_in_file"
+      ) {
+        attemptedWorkspaceWrite = true;
       }
       if (result.length > MAX_AGENT_TOOL_RESULT_LENGTH) {
         result = `${result.slice(0, MAX_AGENT_TOOL_RESULT_LENGTH)}\n[Tool result truncated to ${MAX_AGENT_TOOL_RESULT_LENGTH} characters.]`;
@@ -216,4 +263,46 @@ export class ChatAgent {
       extras: createEmptyResponseExtras(),
     };
   }
+}
+
+function findUnsupportedWriteClaim(
+  response: string,
+  completedWrites: ReadonlySet<string>,
+): string | undefined {
+  const claims = [
+    ...response.matchAll(
+      /\b(?:created|updated|wrote|saved)\s+(?:the\s+)?(?:file\s+)?[`"']?([^\s`"',;:()]+)[`"']?/gi,
+    ),
+  ];
+  if (claims.length === 0) return undefined;
+  if (reportsWriteFailure(response)) return undefined;
+  if (completedWrites.size === 0) {
+    return "The response claims a workspace write, but no write tool completed successfully.";
+  }
+  const unsupported = claims.find((claim) => {
+    const claimedPath = normalizePath(claim[1]).replace(/\.$/, "");
+    const looksLikePath =
+      /[./\\]/.test(claimedPath) || /\bfile\s+/i.test(claim[0]);
+    return looksLikePath && !completedWrites.has(claimedPath);
+  });
+  return unsupported
+    ? `The response claims ${unsupported[0].trim()}, but that path was not verified by a successful write tool result.`
+    : undefined;
+}
+
+function normalizePath(value: string): string {
+  return value.replaceAll("\\", "/").replace(/^\.\//, "").toLowerCase();
+}
+
+function reportsWriteFailure(response: string): boolean {
+  return /\b(?:could not|couldn't|did not|was not|not|denied|cancelled|failed to)\s+(?:create|make|add|write|generate|save|update)\b/i.test(
+    response,
+  );
+}
+
+function finalValidationFailureMessage(missingFile: string | undefined): string {
+  if (missingFile) {
+    return `I couldn't verify the linked workspace file '${missingFile}'.`;
+  }
+  return "I couldn't produce a trustworthy final response after checking the tool results.";
 }

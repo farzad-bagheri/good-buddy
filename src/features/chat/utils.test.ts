@@ -173,6 +173,41 @@ describe("assistant response envelope", () => {
     });
   });
 
+  it("rejects invalid built-in tool arguments before execution", () => {
+    const schemaTool: ToolDefinition = {
+      id: "read_file",
+      description: "Read a file",
+      inputSchema: {
+        type: "object",
+        properties: { path: { type: "string" } },
+        required: ["path"],
+        additionalProperties: false,
+      },
+      execute: async () => "contents",
+    };
+    const parse = (arguments_: Record<string, unknown>) =>
+      parseAssistantEnvelope(
+        JSON.stringify({
+          type: "tool_call",
+          response: "",
+          tool: "read_file",
+          autoApprove: false,
+          arguments: arguments_,
+          title: null,
+          extras: { suggestions: [], files: [], artifacts: [] },
+        }),
+        [schemaTool],
+      );
+
+    expect(() => parse({})).toThrow("Tool argument 'path' is required.");
+    expect(() => parse({ path: 2 })).toThrow(
+      "Tool argument 'path' must be a string.",
+    );
+    expect(() => parse({ path: "notes.txt", extra: true })).toThrow(
+      "Tool argument 'extra' is not supported.",
+    );
+  });
+
   it("accepts null titles after the initial response", () => {
     expect(
       parseAssistantEnvelope(
@@ -317,6 +352,127 @@ describe("assistant response envelope", () => {
     ).toThrow("Extras must contain valid");
   });
 
+  it("normalizes SVG code output into the dedicated SVG artifact", () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle r="4" /></svg>';
+    const result = parseAssistantEnvelope(
+      JSON.stringify({
+        type: "final",
+        response: `Here is the diagram.\n\n\`\`\`svg\n${svg}\n\`\`\``,
+        tool: null,
+        autoApprove: false,
+        arguments: {},
+        title: null,
+        extras: {
+          suggestions: [],
+          files: [],
+          artifacts: [
+            { type: "code", title: "Diagram", language: "svg", content: svg },
+          ],
+        },
+      }),
+      tools,
+    );
+
+    expect(result).toMatchObject({
+      response: "Here is the diagram.",
+      extras: {
+        artifacts: [
+          { type: "svg", title: "Diagram", language: "svg", content: svg },
+        ],
+      },
+    });
+  });
+
+  it("removes unsafe external SVG resources before previewing an artifact", () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>rect { fill: black; }</style><image href="blob:broken" /><circle onclick="alert(1)" r="4" /></svg>';
+    const result = parseAssistantEnvelope(
+      JSON.stringify({
+        type: "final",
+        response: "Here is the diagram.",
+        tool: null,
+        autoApprove: false,
+        arguments: {},
+        title: null,
+        extras: {
+          suggestions: [],
+          files: [],
+          artifacts: [{ type: "svg", title: "Diagram", language: "svg", content: svg }],
+        },
+      }),
+      tools,
+    );
+
+    if (result.type !== "final") throw new Error("Expected a final response.");
+    expect(result.extras.artifacts[0]).toMatchObject({
+      type: "svg",
+      content: expect.not.stringContaining("blob:"),
+    });
+    expect(result.extras.artifacts[0]?.content).not.toContain("onclick");
+    expect(result.extras.artifacts[0]?.content).not.toContain("<style");
+  });
+
+  it("repairs common SVG serialization mistakes before previewing", () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">\\n<text>Import & Setup</text>\\n</svg>';
+    const result = parseAssistantEnvelope(
+      JSON.stringify({
+        type: "final",
+        response: "Here is the diagram.",
+        tool: null,
+        autoApprove: false,
+        arguments: {},
+        title: null,
+        extras: {
+          suggestions: [],
+          files: [],
+          artifacts: [{ type: "svg", title: "Diagram", language: "svg", content: svg }],
+        },
+      }),
+      tools,
+    );
+
+    if (result.type !== "final") throw new Error("Expected a final response.");
+    expect(result.extras.artifacts[0]?.content).toContain("Import &amp; Setup");
+    expect(result.extras.artifacts[0]?.content).not.toContain("\\n");
+  });
+
+  it("normalizes Mermaid code into a dedicated Mermaid artifact", () => {
+    const result = parseAssistantEnvelope(
+      JSON.stringify({
+        type: "final", response: "Here is the flow.", tool: null, autoApprove: false, arguments: {}, title: null,
+        extras: { suggestions: [], files: [], artifacts: [{ type: "code", title: "Flow", language: "mermaid", content: "flowchart TD\n  A[Start] --> B[End]" }] },
+      }),
+      tools,
+    );
+    if (result.type !== "final") throw new Error("Expected a final response.");
+    expect(result.extras.artifacts[0]).toMatchObject({ type: "mermaid", language: "mermaid" });
+  });
+
+  it("keeps only complete user-side suggestion shortcuts", () => {
+    const result = parseAssistantEnvelope(
+      JSON.stringify({
+        type: "final",
+        response: "Done.",
+        tool: null,
+        autoApprove: false,
+        arguments: {},
+        title: null,
+        extras: {
+          suggestions: [
+            "Explain the execution flow.",
+            "Would you like a diagram?",
+          ],
+          files: [],
+          artifacts: [],
+        },
+      }),
+      tools,
+    );
+
+    expect(result.type).toBe("final");
+    if (result.type !== "final") throw new Error("Expected a final response.");
+    expect(result.extras.suggestions).toEqual(["Explain the execution flow."]);
+  });
+
   it("requires a non-empty title on the first response and null on later responses", () => {
     const response = {
       type: "final",
@@ -380,7 +536,7 @@ describe("assistant response envelope", () => {
               type: "array",
               items: {
                 properties: {
-                  type: { enum: ["code", "svg"] },
+                  type: { enum: ["code", "svg", "mermaid"] },
                 },
               },
             },
@@ -388,6 +544,15 @@ describe("assistant response envelope", () => {
         },
       },
       required: expect.arrayContaining(["extras", "title"]),
+    });
+    expect(assistantResponseFormat(tools)).toMatchObject({
+      allOf: expect.arrayContaining([
+        expect.objectContaining({
+          then: expect.objectContaining({
+            properties: expect.objectContaining({ autoApprove: { const: false } }),
+          }),
+        }),
+      ]),
     });
   });
 
@@ -443,7 +608,10 @@ describe("assistant response envelope", () => {
       "finish every sentence and list, and do not end with an unfinished introduction or colon",
     );
     expect(prompt).toContain(
-      'When the user asks you to write, generate, provide, or return code, put the complete requested code in an "extras.artifacts" item',
+      "WORKSPACE FILE OPERATIONS TAKE PRECEDENCE",
+    );
+    expect(prompt).toContain(
+      'When the user asks for standalone code that is not meant to be applied to a workspace file, put the complete requested code in an "extras.artifacts" item',
     );
     expect(prompt).toContain(
       "do not put the same complete code in a Markdown fence",

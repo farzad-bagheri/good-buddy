@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import type { SvgArtifact as SvgArtifactData } from "../../../types";
 import { CopyButton } from "../../CopyButton/CopyButton";
 import { IconButton } from "../../IconButton";
@@ -8,45 +8,18 @@ interface SvgArtifactProps {
   artifact: SvgArtifactData;
 }
 
-interface PreviewState {
-  content?: string;
-  url?: string;
-  error?: string;
-}
-
 export function SvgArtifact({ artifact }: SvgArtifactProps) {
   const previewId = useId();
   const previewTabId = useId();
   const sourceTabId = useId();
   const [tab, setTab] = useState<"preview" | "source">("preview");
 
-  const [preview, setPreview] = useState<PreviewState>({});
-  const previewReady = preview.content === artifact.content && !!preview.url;
-
-  useEffect(() => {
-    let url: string | undefined;
-    try {
-      const safeSvg = artifact.content;
-      url = URL.createObjectURL(new Blob([safeSvg], { type: "image/svg+xml" }));
-      setPreview({ content: artifact.content, url });
-    } catch (error) {
-      setPreview({
-        content: artifact.content,
-        error:
-          error instanceof Error
-            ? error.message
-            : "The SVG preview could not be created.",
-      });
-    }
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [artifact.content]);
+  const previewUrl = svgDataUrl(artifact.content);
 
   const downloadSvg = () => {
-    if (!previewReady || !preview.url) return;
+    if (!previewUrl) return;
     const anchor = document.createElement("a");
-    anchor.href = preview.url;
+    anchor.href = previewUrl;
     const safeTitle =
       artifact.title.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") ||
       "artifact";
@@ -95,7 +68,7 @@ export function SvgArtifact({ artifact }: SvgArtifactProps) {
             iconName="download-icon"
             title="Download SVG"
             onClick={downloadSvg}
-            disabled={!previewReady}
+            disabled={!previewUrl}
           />
         </div>
       </header>
@@ -106,12 +79,10 @@ export function SvgArtifact({ artifact }: SvgArtifactProps) {
           role="tabpanel"
           aria-labelledby={previewTabId}
         >
-          {preview.content === artifact.content && preview.url ? (
-            <img src={preview.url} alt={artifact.title} />
-          ) : preview.content === artifact.content && preview.error ? (
-            <p role="alert">{preview.error} Switch to Source to inspect it.</p>
+          {previewUrl ? (
+            <img src={previewUrl} alt={artifact.title} />
           ) : (
-            <p role="status">Preparing preview...</p>
+            <p role="alert">The SVG preview could not be created. Switch to Source to inspect it.</p>
           )}
         </div>
       ) : (
@@ -126,4 +97,15 @@ export function SvgArtifact({ artifact }: SvgArtifactProps) {
       )}
     </section>
   );
+}
+
+function svgDataUrl(svg: string): string | undefined {
+  try {
+    const bytes = new TextEncoder().encode(svg);
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return `data:image/svg+xml;base64,${btoa(binary)}`;
+  } catch {
+    return undefined;
+  }
 }

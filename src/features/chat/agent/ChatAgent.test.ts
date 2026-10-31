@@ -613,6 +613,108 @@ describe("ChatAgent", () => {
     );
   });
 
+  it("rejects an unverified claim that a cancelled write created a file", async () => {
+    const writeRequest = JSON.stringify({
+      type: "tool_call",
+      response: "",
+      tool: "write_file",
+      autoApprove: false,
+      arguments: { path: "notes.txt", content: "hello" },
+      title: "Create notes",
+      extras: { suggestions: [], files: [], artifacts: [] },
+    });
+    const unsupportedFinal = JSON.stringify({
+      type: "final",
+      response: "Created notes.txt.",
+      tool: null,
+      autoApprove: false,
+      arguments: {},
+      title: null,
+      extras: { suggestions: [], files: [], artifacts: [] },
+    });
+    const correctedFinal = JSON.stringify({
+      type: "final",
+      response: "The write was cancelled, so notes.txt was not created.",
+      tool: null,
+      autoApprove: false,
+      arguments: {},
+      title: null,
+      extras: { suggestions: [], files: [], artifacts: [] },
+    });
+    const chat = vi
+      .fn()
+      .mockResolvedValueOnce(writeRequest)
+      .mockResolvedValueOnce(unsupportedFinal)
+      .mockResolvedValueOnce(correctedFinal);
+    const agent = new ChatAgent(
+      createProvider(chat as GoodBuddyProvider["chat"]),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      {
+        list: () => [{ id: "write_file" } as ToolDefinition],
+        execute: vi.fn().mockResolvedValue("Write cancelled: notes.txt changed."),
+      } as never,
+      { onToolStatus: vi.fn(), onModelStatus: vi.fn() },
+    );
+
+    await expect(
+      agent.run(
+        [{ role: "user", content: "Create notes.txt" }],
+        { model: "qwen3:8b" } as ProviderModel,
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({
+      response: "The write was cancelled, so notes.txt was not created.",
+    });
+    expect(chat).toHaveBeenCalledTimes(3);
+    expect(chat.mock.calls[2][0].messages.at(-1)?.content).toContain(
+      "no write tool completed successfully",
+    );
+  });
+
+  it("does not discard a final response based only on a guessed file-write intent", async () => {
+    const codeArtifactFinal = JSON.stringify({
+      type: "final",
+      response: "Here is config.ts.",
+      tool: null,
+      autoApprove: false,
+      arguments: {},
+      title: "Create config",
+      extras: {
+        suggestions: [],
+        files: [],
+        artifacts: [
+          {
+            type: "code",
+            title: "config.ts",
+            language: "typescript",
+            content: "export const enabled = true;",
+          },
+        ],
+      },
+    });
+    const chat = vi.fn().mockResolvedValueOnce(codeArtifactFinal);
+    const agent = new ChatAgent(
+      createProvider(chat as GoodBuddyProvider["chat"]),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [], execute: vi.fn() } as never,
+      { onToolStatus: vi.fn(), onModelStatus: vi.fn() },
+    );
+
+    await expect(
+      agent.run(
+        [{ role: "user", content: "Create a config.ts file" }],
+        { model: "qwen3:8b" } as ProviderModel,
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({
+      response: "Here is config.ts.",
+      extras: { artifacts: [{ title: "config.ts" }] },
+    });
+    expect(chat).toHaveBeenCalledTimes(1);
+  });
+
   it("stops after the bounded number of invalid response retries", async () => {
     const chat = vi.fn().mockResolvedValue("not JSON");
     const agent = new ChatAgent(

@@ -38,6 +38,53 @@ export class ToolRegistry {
    * @throws An error if the tool ID is unknown.
    */
   async execute(call: ToolCall): Promise<string> {
-    return this.get(call.tool).execute(call);
+    const tool = this.get(call.tool);
+    // MCP tools own their confirmation and argument validation lifecycle.
+    // Validate built-ins before execution, but do not bypass MCP confirmation.
+    if (!call.tool.startsWith("mcp:")) {
+      validateArguments(tool.inputSchema, call.arguments);
+    }
+    return tool.execute(call);
   }
+}
+
+function validateArguments(
+  schema: ToolDefinition["inputSchema"],
+  arguments_: Record<string, unknown>,
+): void {
+  if (!schema || schema.type !== "object") return;
+  const properties = isRecord(schema.properties) ? schema.properties : {};
+  const required = Array.isArray(schema.required) ? schema.required : [];
+  for (const name of required) {
+    if (typeof name === "string" && !(name in arguments_)) {
+      throw new Error(`Tool argument '${name}' is required.`);
+    }
+  }
+  if (schema.additionalProperties === false) {
+    for (const name of Object.keys(arguments_)) {
+      if (!(name in properties)) {
+        throw new Error(`Tool argument '${name}' is not supported.`);
+      }
+    }
+  }
+  for (const [name, value] of Object.entries(arguments_)) {
+    const property = properties[name];
+    if (!isRecord(property)) continue;
+    if (property.type === "string" && typeof value !== "string") {
+      throw new Error(`Tool argument '${name}' must be a string.`);
+    }
+    if (property.type === "number" && typeof value !== "number") {
+      throw new Error(`Tool argument '${name}' must be a number.`);
+    }
+    if (property.type === "boolean" && typeof value !== "boolean") {
+      throw new Error(`Tool argument '${name}' must be a boolean.`);
+    }
+    if (Array.isArray(property.enum) && !property.enum.includes(value)) {
+      throw new Error(`Tool argument '${name}' must use a supported value.`);
+    }
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

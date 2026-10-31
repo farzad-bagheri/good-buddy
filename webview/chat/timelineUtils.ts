@@ -39,6 +39,22 @@ export function appendCommandProposal(
   command: string,
   autoApproved: boolean,
 ): TimelineItem[] {
+  const existing = items.find(
+    (item) => item.kind === "commandProposal" && item.commandId === commandId,
+  );
+  if (existing?.kind === "commandProposal") {
+    return items.map((item) =>
+      item === existing
+        ? {
+            ...item,
+            command,
+            autoApproved,
+            status: autoApproved ? "Running command..." : item.status,
+          }
+        : item,
+    );
+  }
+
   return appendTimelineItem(items, {
     kind: "commandProposal",
     commandId,
@@ -103,15 +119,47 @@ export function completeCommandProposal(
   commandId: string,
   result: string,
 ): TimelineItem[] {
+  const parsedResult = parseCommandResult(result);
   return items.map((item) =>
     item.kind === "commandProposal" && item.commandId === commandId
       ? {
           ...item,
-          output: item.output || result,
-          status: result.startsWith("Command failed:")
-            ? "Command failed"
-            : "Completed",
+          output: item.output || parsedResult?.output || result,
+          status: result === "Command denied by the user."
+            ? "Rejected"
+            : result.startsWith("Command failed:") ||
+                parsedResult?.status === "failed"
+              ? "Command failed"
+              : "Completed",
         }
       : item,
   );
+}
+
+function parseCommandResult(
+  result: string,
+): { status: "succeeded" | "failed"; output: string } | undefined {
+  try {
+    const value: unknown = JSON.parse(result);
+    if (
+      typeof value !== "object" ||
+      value === null ||
+      !["succeeded", "failed"].includes((value as { status?: unknown }).status as string)
+    ) {
+      return undefined;
+    }
+    const { status, output, error } = value as {
+      status: "succeeded" | "failed";
+      output?: unknown;
+      error?: unknown;
+    };
+    const text = typeof output === "string" && output.trim()
+      ? output
+      : typeof error === "string"
+        ? error
+        : "";
+    return { status, output: text };
+  } catch {
+    return undefined;
+  }
 }

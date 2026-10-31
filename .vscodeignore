@@ -5,6 +5,7 @@
 
 coverage/
 node_modules/
+.vite-cache/
 
 src/
 scripts/
