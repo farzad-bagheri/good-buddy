@@ -10,5 +10,9 @@ export interface ChatResponse {
 }
 
 export interface ListModelsResponse {
-  models?: ProviderModel[];
+  models?: (ProviderModel & { digest?: string })[];
+}
+
+export interface ShowModelResponse {
+  capabilities?: string[];
 }

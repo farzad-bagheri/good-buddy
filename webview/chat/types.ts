@@ -92,7 +92,8 @@ export interface ProviderModel {
     context_length: number;
     embedding_length: number;
   };
-  capabilities: ("completion" | "tools" | "thinking")[];
+  capabilities: ("completion" | "tools" | "thinking" | "vision")[];
+  capabilitiesUnknown?: boolean;
 }
 
 export interface CodeArtifact {

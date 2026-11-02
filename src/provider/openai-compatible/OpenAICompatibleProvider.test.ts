@@ -145,7 +145,71 @@ describe("OpenAICompatibleProvider", () => {
         model: "local-model",
         details: { format: "openai-compatible", family: "local-model" },
         capabilities: ["completion"],
+        capabilitiesUnknown: true,
       },
+    ]);
+  });
+
+  it("reads vision support from LM Studio's native model list", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: URL) =>
+        url.pathname === "/api/v1/models"
+          ? {
+              ok: true,
+              text: async () =>
+                JSON.stringify({
+                  models: [
+                    {
+                      key: "acme/seer",
+                      capabilities: { vision: true },
+                      loaded_instances: [{ id: "acme/seer" }],
+                    },
+                    {
+                      key: "google/gemma-4-26b-a4b",
+                      capabilities: { vision: false },
+                    },
+                  ],
+                }),
+            }
+          : {
+              ok: true,
+              text: async () =>
+                JSON.stringify({
+                  data: [{ id: "acme/seer" }, { id: "google/gemma-4-26b-a4b" }],
+                }),
+            },
+      ),
+    );
+
+    const models = await new OpenAICompatibleProvider().listModels();
+    expect(models.map((m) => [m.model, m.capabilities, m.capabilitiesUnknown])).toEqual([
+      ["acme/seer", ["completion", "vision"], undefined],
+      ["google/gemma-4-26b-a4b", ["completion"], undefined],
+    ]);
+  });
+
+  it("detects vision support from metadata or well-known names", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            data: [
+              { id: "gpt-4o" },
+              { id: "text-only", architecture: { input_modalities: ["text"] } },
+              { id: "custom", architecture: { input_modalities: ["text", "image"] } },
+            ],
+          }),
+      }),
+    );
+
+    const models = await new OpenAICompatibleProvider().listModels();
+    expect(models.map((m) => [m.model, m.capabilities, m.capabilitiesUnknown])).toEqual([
+      ["gpt-4o", ["completion", "vision"], undefined],
+      ["text-only", ["completion"], undefined],
+      ["custom", ["completion", "vision"], undefined],
     ]);
   });
 

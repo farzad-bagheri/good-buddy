@@ -7,6 +7,9 @@ describe("stripThinking", () => {
     expect(stripThinking("<think>Hidden reasoning</think>hello")).toBe("hello");
     expect(stripThinking("hello")).toBe("hello");
     expect(stripThinking("<think>Hidden reasoning")).toBe("");
+    expect(stripThinking("reasoning</think>hello")).toBe("hello");
+    expect(stripThinking("hello</think>\n</think>")).toBe("");
+    expect(stripThinking("a</think>b<think>c</think>d")).toBe("bd");
   });
 });
 

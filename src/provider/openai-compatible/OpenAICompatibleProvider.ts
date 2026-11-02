@@ -17,7 +17,36 @@ interface ChatCompletionResponse {
 }
 
 interface ModelsResponse {
-  data?: { id?: string }[];
+  data?: {
+    id?: string;
+    architecture?: { input_modalities?: string[] };
+  }[];
+}
+
+// LM Studio's native /api/v1/models, which reports capabilities.vision.
+interface NativeModelsResponse {
+  models?: {
+    key?: string;
+    loaded_instances?: { id?: string }[];
+    capabilities?: { vision?: boolean };
+  }[];
+}
+
+// Standard /models responses carry no capabilities, so fall back to
+// well-known vision model names when nothing explicit is reported.
+const VISION_MODEL_NAME =
+  /vision|llava|pixtral|(^|[-/:._])vl([-/:._]|$)|gpt-4o|gpt-4\.1|gpt-5|gemini|claude|gemma-?[34]|llama-?4/i;
+
+function detectVision(
+  model: NonNullable<ModelsResponse["data"]>[number],
+  nativeVision: Map<string, boolean>,
+) {
+  const id = model.id ?? "";
+  const native = nativeVision.get(id);
+  if (native !== undefined) return native;
+  const modalities = model.architecture?.input_modalities;
+  if (Array.isArray(modalities)) return modalities.includes("image");
+  return VISION_MODEL_NAME.test(id) ? true : undefined;
 }
 
 export class OpenAICompatibleProvider implements GoodBuddyProvider {
@@ -185,26 +214,50 @@ export class OpenAICompatibleProvider implements GoodBuddyProvider {
       );
     }
 
-    return json.data.flatMap(({ id }) =>
-      typeof id === "string"
-        ? [
-            {
-              caption: id,
-              name: id,
-              model: id,
-              details: {
-                format: "openai-compatible",
-                family: id,
-                parameter_size: "",
-                quantization_level: "",
-                context_length: 0,
-                embedding_length: 0,
-              },
-              capabilities: ["completion"],
-            } satisfies ProviderModel,
-          ]
-        : [],
-    );
+    const nativeVision = await this.nativeVisionSupport();
+    return json.data.flatMap((entry) => {
+      const { id } = entry;
+      if (typeof id !== "string") return [];
+      const vision = detectVision(entry, nativeVision);
+      return [
+        {
+          caption: id,
+          name: id,
+          model: id,
+          details: {
+            format: "openai-compatible",
+            family: id,
+            parameter_size: "",
+            quantization_level: "",
+            context_length: 0,
+            embedding_length: 0,
+          },
+          capabilities: vision ? ["completion", "vision"] : ["completion"],
+          ...(vision === undefined && { capabilitiesUnknown: true }),
+        } satisfies ProviderModel,
+      ];
+    });
+  }
+
+  /** Best effort: only LM Studio serves this endpoint; other servers are ignored. */
+  private async nativeVisionSupport(): Promise<Map<string, boolean>> {
+    const support = new Map<string, boolean>();
+    try {
+      const response = await this.request.get("/api/v1/models");
+      const json = this.parseJson<NativeModelsResponse>(
+        await response.text(),
+        "/api/v1/models",
+      );
+      for (const model of json.models ?? []) {
+        const vision = model.capabilities?.vision;
+        if (typeof vision !== "boolean") continue;
+        const ids = [model.key, ...(model.loaded_instances ?? []).map((i) => i.id)];
+        for (const id of ids) if (id) support.set(id, vision);
+      }
+    } catch {
+      // Not LM Studio, or the endpoint is unavailable.
+    }
+    return support;
   }
 
   private responseFormat(

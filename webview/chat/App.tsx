@@ -27,6 +27,7 @@ import type {
   TimelineItem,
 } from "./types";
 import { createItemId } from "./utils";
+import { getVisionSupport } from "./visionSupport";
 import { vscode } from "./vscode";
 
 export function App() {
@@ -352,6 +353,7 @@ export function App() {
           </section>
           <Composer
             attachments={attachments}
+            vision={getVisionSupport(models, selectedModel)}
             text={text}
             busy={thinking}
             onTextChange={setText}

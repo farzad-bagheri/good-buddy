@@ -1,4 +1,5 @@
 import { ProviderModel } from "../../../types";
+import { getVisionSupport, VISION_LABELS } from "../../../visionSupport";
 import { IconButton } from "../../IconButton/IconButton";
 import styles from "./ChatToolbar.module.css";
 
@@ -22,6 +23,7 @@ export function ChatToolbar({
   const handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     onModelChange(event.target.value);
   };
+  const vision = getVisionSupport(models, selectedModel);
 
   return (
     <div className={styles.container}>
@@ -48,6 +50,7 @@ export function ChatToolbar({
           {models.map((model) => (
             <option key={model.model} value={model.model} title={model.model}>
               {model.caption}
+              {model.capabilities?.includes("vision") ? " · Vision" : ""}
             </option>
           ))}
         </select>
@@ -62,7 +65,23 @@ export function ChatToolbar({
           onClick={onToggleHistory}
         />
       </div>
-      <span className={styles.note}>{selectedModel}</span>
+      <div className={styles.noteRow}>
+        <span className={styles.note}>{selectedModel}</span>
+        {vision !== "none" && (
+          <span
+            className={`${styles.badge} ${
+              {
+                supported: styles.badgeSupported,
+                unsupported: styles.badgeUnsupported,
+                unknown: styles.badgeUnknown,
+              }[vision]
+            }`}
+            title={VISION_LABELS[vision].title}
+          >
+            {VISION_LABELS[vision].label}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

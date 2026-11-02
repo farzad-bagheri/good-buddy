@@ -2,7 +2,18 @@ import { ProviderModel } from "../types";
 
 // Defensive: some models emit <think>...</think> reasoning even when not requested.
 export function stripThinking(text: string): string {
-  return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trimStart();
+  // A closing tag with no opening tag means the template injected <think>,
+  // so everything before it is reasoning.
+  const firstClose = text.search(/<\/think>/i);
+  const firstOpen = text.search(/<think>/i);
+  const body =
+    firstClose !== -1 && (firstOpen === -1 || firstClose < firstOpen)
+      ? text.slice(firstClose)
+      : text;
+  return body
+    .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "")
+    .replace(/<\/think>/gi, "")
+    .trimStart();
 }
 
 /**

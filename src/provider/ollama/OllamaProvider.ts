@@ -11,6 +11,7 @@ import type {
   ChatResponse,
   GenerateResponse,
   ListModelsResponse,
+  ShowModelResponse,
 } from "./types";
 import {
   makeModelCaption,
@@ -24,7 +25,10 @@ import {
  */
 export class OllamaProvider implements GoodBuddyProvider {
   private request: Request;
-
+  private capabilityCache = new Map<
+    string,
+    Pick<ProviderModel, "capabilities">
+  >();
   constructor() {
     this.request = new Request(getGoodBuddyConfig().endpoint);
   }
@@ -127,10 +131,50 @@ export class OllamaProvider implements GoodBuddyProvider {
       "/api/tags",
     );
 
-    return (json.models ?? []).map((m) => ({
-      ...m,
-      caption: makeModelCaption(m),
-    }));
+    return Promise.all(
+      (json.models ?? []).map(async ({ digest, ...m }) => ({
+        ...m,
+        ...(await this.modelCapabilities(m.model, digest)),
+        caption: makeModelCaption(m),
+      })),
+    );
+  }
+
+  /**
+   * /api/tags omits capabilities, so ask /api/show. Failures (for example older
+   * Ollama versions without a capabilities field) mark the model as unknown.
+   */
+  private async modelCapabilities(
+    model: string,
+    digest?: string,
+  ): Promise<Pick<ProviderModel, "capabilities" | "capabilitiesUnknown">> {
+    const cacheKey = digest ? `${model}@${digest}` : undefined;
+    const cached = cacheKey && this.capabilityCache.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const response = await this.request.post(
+        "/api/show",
+        JSON.stringify({ model }),
+      );
+      const json = parseJsonResponse<ShowModelResponse>(
+        await response.text(),
+        "/api/show",
+      );
+      if (!Array.isArray(json.capabilities)) {
+        return { capabilities: [], capabilitiesUnknown: true };
+      }
+      const result: Pick<ProviderModel, "capabilities"> = {
+        capabilities: json.capabilities.filter(
+          (capability): capability is ProviderModel["capabilities"][number] =>
+            ["completion", "tools", "thinking", "vision"].includes(capability),
+        ),
+      };
+      if (cacheKey) this.capabilityCache.set(cacheKey, result);
+      return result;
+    } catch {
+      return { capabilities: [], capabilitiesUnknown: true };
+    }
   }
 
   /**

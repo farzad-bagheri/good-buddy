@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { insertPromptTemplate, PROMPT_TEMPLATES } from "../../prompts";
+import {
+  insertPromptTemplate,
+  PROMPT_TEMPLATES,
+  type PromptTemplate,
+} from "../../prompts";
 import type { AttachmentState } from "../../types";
+import type { VisionSupport } from "../../visionSupport";
 import { vscode } from "../../vscode";
 import { IconButton } from "../IconButton";
 import { Attachment } from "./Attachment";
@@ -8,6 +13,7 @@ import styles from "./Composer.module.css";
 
 interface ComposerProps {
   attachments: AttachmentState;
+  vision: VisionSupport;
   text: string;
   busy: boolean;
   onTextChange: (text: string) => void;
@@ -17,6 +23,7 @@ interface ComposerProps {
 
 export function Composer({
   attachments,
+  vision,
   text,
   busy,
   onTextChange,
@@ -35,9 +42,12 @@ export function Composer({
     if (busy) setPromptsOpen(false);
   }, [busy]);
 
-  const insertTemplate = (prompt: string) => {
-    onTextChange(insertPromptTemplate(text, prompt));
+  const insertTemplate = (template: PromptTemplate) => {
+    onTextChange(insertPromptTemplate(text, template.prompt));
     setPromptsOpen(false);
+    if (template.requiresImage && attachments.images.length === 0) {
+      setAttachmentError("Paste or attach a screenshot to use this prompt.");
+    }
     textareaRef.current?.focus();
   };
 
@@ -168,6 +178,12 @@ export function Composer({
           {attachmentError}
         </div>
       )}
+      {attachments.images.length > 0 && vision === "unsupported" && (
+        <div className={styles.attachmentError} role="alert">
+          The selected model cannot read images. Choose a vision-capable model
+          or remove the image.
+        </div>
+      )}
 
       <div
         className={styles.composer}
@@ -197,17 +213,28 @@ export function Composer({
                 role="group"
                 aria-label="Prompt templates"
               >
-                {PROMPT_TEMPLATES.map((template) => (
-                  <IconButton
-                    type="button"
-                    key={template.id}
-                    caption={template.label}
-                    iconName={template.icon}
-                    className={styles.promptMenuItem}
-                    disabled={busy}
-                    onClick={() => insertTemplate(template.prompt)}
-                  />
-                ))}
+                {PROMPT_TEMPLATES.map((template) => {
+                  const visionBlocked =
+                    template.requiresImage && vision === "unsupported";
+                  return (
+                    <IconButton
+                      type="button"
+                      key={template.id}
+                      caption={template.label}
+                      iconName={template.icon}
+                      className={styles.promptMenuItem}
+                      title={
+                        visionBlocked
+                          ? "The selected model cannot read images. Choose a vision-capable model."
+                          : template.requiresImage && vision === "unknown"
+                            ? "Requires a model that can read images"
+                            : undefined
+                      }
+                      disabled={busy || visionBlocked}
+                      onClick={() => insertTemplate(template)}
+                    />
+                  );
+                })}
                 <IconButton
                   type="button"
                   iconName="git-icon"

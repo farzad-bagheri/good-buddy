@@ -3,9 +3,19 @@ export interface PromptTemplate {
   label: string;
   icon: string;
   prompt: string;
+  /** Needs an attached image and a vision-capable model. */
+  requiresImage?: boolean;
 }
 
 export const PROMPT_TEMPLATES: PromptTemplate[] = [
+  {
+    id: "screenshot-to-code",
+    label: "Screenshot to code",
+    icon: "code-icon",
+    requiresImage: true,
+    prompt:
+      "Recreate the attached screenshot or mockup as UI code. First inspect the workspace to find the framework, component structure, and styling conventions, and match them. Reproduce the layout, spacing, colors, typography, and visible text as closely as you can, using semantic and accessible markup. Then propose the new or changed files. Mention anything in the image you could not determine and the assumptions you made.",
+  },
   {
     id: "explain",
     label: "Explain this code",

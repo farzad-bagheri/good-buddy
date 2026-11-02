@@ -10,7 +10,9 @@ export interface ProviderModel {
     context_length: number;
     embedding_length: number;
   };
-  capabilities: ("completion" | "tools" | "thinking")[];
+  capabilities: ("completion" | "tools" | "thinking" | "vision")[];
+  /** True when the provider could not report this model's capabilities. */
+  capabilitiesUnknown?: boolean;
 }
 
 export interface GenerateOptions {

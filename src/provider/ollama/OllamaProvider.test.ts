@@ -117,6 +117,43 @@ describe("OllamaProvider", () => {
     expect(onChunk).toHaveBeenCalledWith("answer");
   });
 
+  it("reads model capabilities from /api/show", async () => {
+    const tag = (model: string) => ({
+      name: model,
+      model,
+      digest: model,
+      details: { family: "x", parameter_size: "1B" },
+    });
+    const fetchMock = vi.fn(async (url: URL, init: { body?: string }) => {
+      if (url.pathname === "/api/tags") {
+        return {
+          ok: true,
+          text: async () =>
+            JSON.stringify({ models: [tag("vl"), tag("text"), tag("old")] }),
+        };
+      }
+      const { model } = JSON.parse(init.body ?? "{}");
+      if (model === "old") return { ok: false, status: 404 };
+      return {
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            capabilities: model === "vl" ? ["completion", "vision"] : ["completion"],
+          }),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const models = await new OllamaProvider().listModels();
+    expect(
+      models.map((m) => [m.model, m.capabilities, m.capabilitiesUnknown]),
+    ).toEqual([
+      ["vl", ["completion", "vision"], undefined],
+      ["text", ["completion"], undefined],
+      ["old", [], true],
+    ]);
+  });
+
   it("sends image bytes in Ollama's native images field", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
