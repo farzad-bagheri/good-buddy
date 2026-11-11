@@ -133,7 +133,7 @@ describe("OllamaProvider", () => {
         };
       }
       const { model } = JSON.parse(init.body ?? "{}");
-      if (model === "old") return { ok: false, status: 404 };
+      if (model === "old") return { ok: false, status: 404, text: async () => "" };
       return {
         ok: true,
         text: async () =>

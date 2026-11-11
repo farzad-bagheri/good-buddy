@@ -45,9 +45,6 @@ export function Composer({
   const insertTemplate = (template: PromptTemplate) => {
     onTextChange(insertPromptTemplate(text, template.prompt));
     setPromptsOpen(false);
-    if (template.requiresImage && attachments.images.length === 0) {
-      setAttachmentError("Paste or attach a screenshot to use this prompt.");
-    }
     textareaRef.current?.focus();
   };
 
@@ -191,8 +188,27 @@ export function Composer({
           if (event.key === "Escape") setPromptsOpen(false);
         }}
       >
-        <div className={styles.controls}>
-          {" "}
+        <div className={styles.toolbar}>
+          <div className={styles.controls}>
+          <IconButton
+            iconName="selection-icon"
+            title="Attach the selected code from the active editor"
+            disabled={busy}
+            onClick={() => vscode.postMessage({ type: "wv:attachSelection" })}
+          />
+          <IconButton
+            iconName="terminal-icon"
+            title="Attach the active terminal's output (briefly selects and copies it)"
+            disabled={busy}
+            onClick={() => vscode.postMessage({ type: "wv:attachTerminal" })}
+          />
+          <IconButton
+            iconName="problems-icon"
+            title="Attach errors and warnings from the Problems panel"
+            disabled={busy}
+            onClick={() => vscode.postMessage({ type: "wv:attachProblems" })}
+          />
+          </div>
           <div className={styles.promptPicker}>
             <button
               type="button"
@@ -259,18 +275,12 @@ export function Composer({
           onPaste={handlePaste}
         />
 
-        <div className={styles.controls}>
+        <div className={styles.toolbar}>
           <IconButton
             iconName="add-icon"
             title="Attach text or image files; paste an image to attach it"
             disabled={busy}
             onClick={() => vscode.postMessage({ type: "wv:attachFiles" })}
-          />
-          <IconButton
-            iconName="selection-icon"
-            title="Attach the selected code from the active editor"
-            disabled={busy}
-            onClick={() => vscode.postMessage({ type: "wv:attachSelection" })}
           />
           {busy ? (
             <IconButton

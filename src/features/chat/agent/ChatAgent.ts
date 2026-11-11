@@ -99,6 +99,7 @@ export class ChatAgent {
             model: providerModel.model,
             messages,
             format: assistantResponseFormat(availableTools, titleRequired),
+            allowJsonMode: true,
           },
           (chunk) => {
             response += chunk;

@@ -121,6 +121,14 @@ endpoint, so model behavior can differ from Ollama's native fill-in-the-middle
 endpoint. Ensure your selected model server supports the API features Good
 Buddy uses, as compatibility can vary.
 
+For OpenAI's API, chat uses JSON mode because its agent schema is not supported
+by OpenAI's strict schema subset. Good Buddy validates responses and retries
+invalid ones; choose a model that supports JSON mode and chat completions.
+
+If a chat request fails, Good Buddy displays the server's error message when
+available. Error details come from the server and may contain information about
+your request; review them before sharing.
+
 ### Ollama model suggestions
 
 If using Ollama, pick models sized for your hardware; smaller models respond faster and are a better fit for inline completions where latency matters. Select downloaded model IDs in the Models dialog.

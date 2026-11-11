@@ -1,17 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/config", () => ({
-  getGoodBuddyConfig: () => ({
-    openAICompatibleEndpoint: "http://localhost:1234/v1",
-    openAICompatibleApiKey: "test-key",
-  }),
+const config = vi.hoisted(() => ({
+  openAICompatibleEndpoint: "http://localhost:1234/v1",
+  openAICompatibleApiKey: "test-key",
 }));
 
+vi.mock("@/config", () => ({
+  getGoodBuddyConfig: () => config,
+}));
+
+import { ChatAgent } from "@/features/chat/agent/ChatAgent";
+import type { ProviderModel } from "@/provider";
 import { OpenAICompatibleProvider } from "./OpenAICompatibleProvider";
 
 describe("OpenAICompatibleProvider", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    config.openAICompatibleEndpoint = "http://localhost:1234/v1";
   });
 
   it("sends OpenAI-compatible chat requests with optional auth and JSON schema", async () => {
@@ -37,6 +42,7 @@ describe("OpenAICompatibleProvider", () => {
         },
       ],
       format: schema,
+      allowJsonMode: true,
     });
 
     expect(response).toBe("hello");
@@ -63,6 +69,96 @@ describe("OpenAICompatibleProvider", () => {
         }),
       }),
     );
+  });
+
+  it("uses JSON mode for OpenAI agent chat and parses the streamed response", async () => {
+    config.openAICompatibleEndpoint = "https://api.openai.com/v1";
+    const envelope = JSON.stringify({
+      type: "final",
+      title: "Availability",
+      response: "Yes, I am available.",
+      tool: null,
+      autoApprove: false,
+      arguments: {},
+      extras: { suggestions: [], files: [], artifacts: [] },
+    });
+    const fetchMock = vi.fn(async (_url: URL, init: RequestInit) => {
+      const request = JSON.parse(String(init.body));
+      if (request.response_format?.type !== "json_object") {
+        return new Response(
+          JSON.stringify({ error: { message: "'allOf' is not permitted." } }),
+          { status: 400 },
+        );
+      }
+      const event = JSON.stringify({
+        choices: [{ delta: { content: envelope }, finish_reason: "stop" }],
+      });
+      return new Response(`data: ${event}\n\ndata: [DONE]\n\n`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const agent = new ChatAgent(
+      new OpenAICompatibleProvider(),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project") } as never,
+      { list: () => [], execute: vi.fn() } as never,
+      { onToolStatus: vi.fn(), onModelStatus: vi.fn() },
+    );
+    const model: ProviderModel = {
+      caption: "gpt-4o",
+      name: "gpt-4o",
+      model: "gpt-4o",
+      details: {
+        format: "openai-compatible",
+        family: "gpt-4o",
+        parameter_size: "",
+        quantization_level: "",
+        context_length: 0,
+        embedding_length: 0,
+      },
+      capabilities: ["completion"],
+    };
+
+    await expect(
+      agent.run(
+        [{ role: "user", content: "Are you available?" }],
+        model,
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({
+      title: "Availability",
+      response: "Yes, I am available.",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body))).toMatchObject({
+      model: "gpt-4o",
+      stream: true,
+      response_format: { type: "json_object" },
+    });
+  });
+
+  it("only switches OpenAI schemas to JSON mode when explicitly allowed", async () => {
+    config.openAICompatibleEndpoint = "https://api.openai.com/v1/";
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ choices: [{ message: { content: "{}" } }] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new OpenAICompatibleProvider();
+    const options = {
+      model: "gpt-4o",
+      messages: [{ role: "user" as const, content: "Respond in JSON" }],
+      format: { type: "object" },
+    };
+
+    await provider.chat(options);
+    await provider.chat({ ...options, allowJsonMode: true });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).response_format).toMatchObject({
+      type: "json_schema",
+    });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).response_format).toEqual({
+      type: "json_object",
+    });
   });
 
   it("returns the provider finish reason with the chat content", async () => {

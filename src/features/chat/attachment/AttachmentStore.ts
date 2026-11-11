@@ -14,13 +14,20 @@ export interface ChatAttachmentBase {
 
 export interface ChatAttachment extends ChatAttachmentBase {
   content: string;
-  kind?: "selection";
+  kind?: "selection" | "terminal" | "problems";
   sourcePath?: string;
 }
 
 export interface ChatImageAttachment extends ChatImage {
   id: string;
 }
+
+const ATTACHMENT_LABELS = {
+  file: "file",
+  selection: "selection",
+  terminal: "terminal output",
+  problems: "problems",
+} as const;
 
 const IMAGE_MIME_TYPES = new Set<ChatImage["mimeType"]>([
   "image/png",
@@ -126,6 +133,39 @@ export class AttachmentStore {
     this.items.push(attachment);
   }
 
+  /**
+   * Adds a captured snapshot (terminal output, problems). Capturing again
+   * replaces the earlier snapshot of the same source.
+   */
+  addSnapshot(
+    kind: "terminal" | "problems",
+    name: string,
+    path: string,
+    content: string,
+  ): boolean {
+    const attachment: ChatAttachment = { name, path, content, kind };
+    const existing = this.items.findIndex((item) => item.path === path);
+    const others =
+      existing >= 0 ? this.items.filter((_, i) => i !== existing) : this.items;
+    const valid =
+      content.trim().length > 0 &&
+      !content.includes("\0") &&
+      Buffer.byteLength(content, "utf8") <= MAX_ATTACHMENT_BYTES;
+    if (!valid) return false;
+    if (
+      existing < 0 &&
+      others.length + this.imageItems.length >= MAX_ATTACHMENTS
+    ) {
+      vscode.window.showWarningMessage(
+        `Good Buddy supports up to ${MAX_ATTACHMENTS} attachments per message.`,
+      );
+      return false;
+    }
+    if (existing >= 0) this.items[existing] = attachment;
+    else this.items.push(attachment);
+    return true;
+  }
+
   addImageBase64(name: string, mimeType: string, base64: string): void {
     if (base64.length > Math.ceil((MAX_IMAGE_ATTACHMENT_BYTES * 4) / 3)) {
       vscode.window.showWarningMessage(
@@ -229,7 +269,7 @@ export class AttachmentStore {
     return this.withDefault(defaultAttachment)
       .map(
         (attachment) =>
-          `\n\nAttached ${attachment.kind === "selection" ? "selection" : "file"}: ${attachment.path}\n\`\`\`\n${attachment.content}\n\`\`\``,
+          `\n\nAttached ${ATTACHMENT_LABELS[attachment.kind ?? "file"]}: ${attachment.path}\n\`\`\`\n${attachment.content}\n\`\`\``,
       )
       .join("");
   }

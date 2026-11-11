@@ -44,6 +44,12 @@
   opacity: 0.7;
 }
 
+.toolbar{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .controls {
   position: relative;
   display: flex;

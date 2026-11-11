@@ -135,6 +135,16 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
         mask-image: url("${iconUri("zoom-reset")}");
         -webkit-mask-image: url("${iconUri("zoom-reset")}");
       }
+
+    .terminal-icon {
+        mask-image: url("${iconUri("terminal")}");
+        -webkit-mask-image: url("${iconUri("terminal")}");
+      }
+
+    .problems-icon {
+        mask-image: url("${iconUri("problems")}");
+        -webkit-mask-image: url("${iconUri("problems")}");
+      }
     </style>
   </head>
   <body data-style-nonce="${nonce}">

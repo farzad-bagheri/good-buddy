@@ -4,6 +4,7 @@ import { ModelSelectionStore } from "@/provider/ModelSelectionStore";
 import { Resources } from "@/resources";
 import * as vscode from "vscode";
 import { AttachmentStore } from "./attachment";
+import { captureTerminalText, formatProblems } from "./attachment/capture";
 import { findMissingModels, getModelSetupStatus } from "./utils";
 
 /**
@@ -134,6 +135,54 @@ export class ChatViewState {
       contextPath,
       relativePath,
       document.getText(selection),
+    );
+    this.postAttachments();
+  }
+
+  async attachTerminal(): Promise<void> {
+    try {
+      const captured = await captureTerminalText();
+      if (!captured) {
+        void vscode.window.showInformationMessage(
+          "Good Buddy: open a terminal to attach its output.",
+        );
+        return;
+      }
+      const attached = this.attachments.addSnapshot(
+        "terminal",
+        `Terminal: ${captured.name}`,
+        `terminal:${captured.name}`,
+        captured.content,
+      );
+      if (!attached && !captured.content.trim()) {
+        void vscode.window.showInformationMessage(
+          "Good Buddy: the terminal has no output to attach.",
+        );
+      }
+    } catch (error) {
+      this.output.appendLine(`Good Buddy chat: terminal capture failed: ${error}`);
+      void vscode.window.showWarningMessage(
+        "Good Buddy: could not read the terminal output.",
+      );
+    }
+    this.postAttachments();
+  }
+
+  attachProblems(): void {
+    const { content, total } = formatProblems(
+      vscode.languages.getDiagnostics(),
+    );
+    if (total === 0) {
+      void vscode.window.showInformationMessage(
+        "Good Buddy: there are no errors or warnings in the Problems panel.",
+      );
+      return;
+    }
+    this.attachments.addSnapshot(
+      "problems",
+      `Problems (${total})`,
+      "problems",
+      content,
     );
     this.postAttachments();
   }

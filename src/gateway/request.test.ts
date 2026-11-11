@@ -49,6 +49,7 @@ describe("Request", () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 500,
+        text: async () => "",
       }),
     );
 
@@ -56,6 +57,72 @@ describe("Request", () => {
 
     await expect(request.get("/api/tags")).rejects.toThrow(
       "Request failed (500) for /api/tags",
+    );
+  });
+
+  it("includes the OpenAI API's diagnostic message in the error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              message: "Invalid schema: 'allOf' is not permitted.",
+              type: "invalid_request_error",
+            },
+          }),
+          { status: 400 },
+        ),
+      ),
+    );
+
+    await expect(
+      new Request("https://example.test/v1/").post("chat/completions", "{}"),
+    ).rejects.toThrow(
+      "Request failed (400) for chat/completions: Invalid schema: 'allOf' is not permitted.",
+    );
+  });
+
+  it.each([
+    ['{"error":"model not found"}', "model not found"],
+    ["  Server unavailable\nTry again  ", "Server unavailable Try again"],
+    ['{"detail":"invalid request"}', '{"detail":"invalid request"}'],
+  ])("includes other server error responses", async (body, detail) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(body, { status: 400 })),
+    );
+
+    await expect(new Request("https://example.test/").get("models")).rejects.toThrow(
+      `Request failed (400) for models: ${detail}`,
+    );
+  });
+
+  it("limits the length of an error response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("x".repeat(2100), { status: 400 })),
+    );
+
+    await expect(new Request("https://example.test/").get("models")).rejects.toThrow(
+      `Request failed (400) for models: ${"x".repeat(2000)}...`,
+    );
+  });
+
+  it("reports when an error response cannot be read", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () => {
+          throw new Error("connection interrupted");
+        },
+      }),
+    );
+
+    await expect(new Request("https://example.test/").get("models")).rejects.toThrow(
+      "Request failed (400) for models: Could not read error response: connection interrupted",
     );
   });
 });

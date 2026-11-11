@@ -255,6 +255,8 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       retry: (historyIndex) => this.handleRetry(historyIndex),
       attachFiles: () => this.viewState.pickAttachments(),
       attachSelection: () => this.viewState.attachSelection(),
+      attachTerminal: () => this.viewState.attachTerminal(),
+      attachProblems: () => this.viewState.attachProblems(),
       excludeActiveDocument: () => this.viewState.excludeActiveDocument(),
       addImage: (name, mimeType, data) =>
         this.viewState.addImageAttachment(name, mimeType, data),

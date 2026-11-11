@@ -53,9 +53,46 @@ export class Request {
     });
 
     if (!response.ok) {
-      throw new Error(`Request failed (${response.status}) for ${path}`);
+      const message = `Request failed (${response.status}) for ${path}`;
+      let body: string;
+      try {
+        body = await response.text();
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(`${message}: Could not read error response: ${reason}`, {
+          cause: error,
+        });
+      }
+      const detail = errorDetail(body);
+      throw new Error(detail ? `${message}: ${detail}` : message);
     }
 
     return response;
   }
+}
+
+function errorDetail(body: string): string {
+  let detail = body.trim();
+  if (!detail) return "";
+  try {
+    const json: unknown = JSON.parse(detail);
+    if (json && typeof json === "object" && "error" in json) {
+      const error = json.error;
+      if (typeof error === "string") {
+        detail = error;
+      } else if (
+        error &&
+        typeof error === "object" &&
+        "message" in error &&
+        typeof error.message === "string"
+      ) {
+        detail = error.message;
+      }
+    }
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+  }
+  detail = detail.replace(/\s+/g, " ").trim();
+  return detail.length > 2000 ? `${detail.slice(0, 2000)}...` : detail;
 }

@@ -417,6 +417,50 @@ describe("WorkspaceTools writes", () => {
     expect(vscodeState.files.get(filePath)).toBe("after\r\nnext");
   });
 
+  it("accepts an open document that format-on-save rewrote after the edit", async () => {
+    const filePath = "D:\\workspace\\notes.txt";
+    vscodeState.files.set(filePath, "before");
+    const document = {
+      uri: { fsPath: filePath, toString: () => filePath },
+      value: "before",
+      getText() {
+        return this.value;
+      },
+      positionAt: (offset: number) => ({ character: offset }),
+      async save() {
+        vscodeState.files.set(filePath, `${this.value};`);
+        return true;
+      },
+    };
+    vscodeState.documents.push(document);
+
+    await expect(
+      new WorkspaceTools().applyWrite("notes.txt", "before", "after"),
+    ).resolves.toMatch(/^Wrote notes\.txt\. VS Code modified/);
+    expect(vscodeState.files.get(filePath)).toBe("after;");
+  });
+
+  it("fails when a saved open document still holds the original content", async () => {
+    const filePath = "D:\\workspace\\notes.txt";
+    vscodeState.files.set(filePath, "before");
+    const document = {
+      uri: { fsPath: filePath, toString: () => filePath },
+      value: "before",
+      getText() {
+        return this.value;
+      },
+      positionAt: (offset: number) => ({ character: offset }),
+      async save() {
+        return true;
+      },
+    };
+    vscodeState.documents.push(document);
+
+    await expect(
+      new WorkspaceTools().applyWrite("notes.txt", "before", "after"),
+    ).rejects.toThrow("Write verification failed for notes.txt.");
+  });
+
   it("writes and verifies a closed file through the workspace filesystem", async () => {
     const filePath = "D:\\workspace\\notes.txt";
     vscodeState.files.set(filePath, "before");

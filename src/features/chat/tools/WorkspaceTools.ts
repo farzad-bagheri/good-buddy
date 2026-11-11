@@ -799,7 +799,16 @@ export class WorkspaceTools {
     // editor buffer asynchronously or apply its configured line endings after
     // save, even though the approved edit has been persisted successfully.
     if (!sameTextContent(persisted, content)) {
-      throw new Error(`Write verification failed for ${relativePath}.`);
+      // Format-on-save, fix-on-save and similar settings can legitimately
+      // rewrite the file after the approved edit was applied and saved.
+      const reformattedOnSave =
+        document !== undefined &&
+        (sameTextContent(content, current) ||
+          !sameTextContent(persisted, current));
+      if (!reformattedOnSave) {
+        throw new Error(`Write verification failed for ${relativePath}.`);
+      }
+      return `Wrote ${relativePath}. VS Code modified the content on save (for example formatting), so the file may differ slightly from the proposal.`;
     }
     return `Wrote ${relativePath}.`;
   }

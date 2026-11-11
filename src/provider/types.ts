@@ -233,6 +233,8 @@ export interface ChatOptions {
   stream?: boolean;
   think?: boolean;
   format?: "json" | Record<string, unknown>;
+  /** Allow providers to use JSON mode instead of enforcing the supplied schema. */
+  allowJsonMode?: boolean;
 }
 
 export interface ChatResponse {

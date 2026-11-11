@@ -15,6 +15,8 @@ export interface ChatWebviewMessageHandlers {
   retry(historyIndex: number): Promise<void>;
   attachFiles(): Promise<void>;
   attachSelection(): void;
+  attachTerminal(): Promise<void>;
+  attachProblems(): void;
   excludeActiveDocument(): void;
   addImage(name: string, mimeType: string, data: string): void;
   removeAttachment(index: number): void;
@@ -57,6 +59,10 @@ export class ChatWebviewMessageRouter {
           return this.handlers.attachFiles();
         case "wv:attachSelection":
           return this.handlers.attachSelection();
+        case "wv:attachTerminal":
+          return this.handlers.attachTerminal();
+        case "wv:attachProblems":
+          return this.handlers.attachProblems();
         case "wv:excludeActiveDocument":
           return this.handlers.excludeActiveDocument();
         case "wv:addImage":

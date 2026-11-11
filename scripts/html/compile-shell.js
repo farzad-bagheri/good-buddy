@@ -30,6 +30,8 @@ const iconNames = [
   "zoom-in",
   "zoom-out",
   "zoom-reset",
+  "terminal",
+  "problems",
 ];
 const iconClasses = iconNames
   .map(

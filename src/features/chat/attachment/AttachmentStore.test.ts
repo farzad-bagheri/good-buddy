@@ -53,6 +53,21 @@ describe("AttachmentStore", () => {
     vscodeState.showWarningMessage.mockClear();
   });
 
+  it("replaces an earlier snapshot of the same source", () => {
+    const store = new AttachmentStore();
+    expect(store.addSnapshot("terminal", "Terminal: zsh", "terminal:zsh", "one")).toBe(true);
+    expect(store.addSnapshot("terminal", "Terminal: zsh", "terminal:zsh", "two")).toBe(true);
+    expect(store.all).toHaveLength(1);
+    expect(store.all[0].content).toBe("two");
+    expect(store.formatForPrompt()).toContain("Attached terminal output: terminal:zsh");
+  });
+
+  it("rejects empty snapshots", () => {
+    const store = new AttachmentStore();
+    expect(store.addSnapshot("problems", "Problems", "problems", "  ")).toBe(false);
+    expect(store.all).toHaveLength(0);
+  });
+
   it("uses a basename for name and a workspace-relative path", () => {
     const store = new AttachmentStore();
     vscodeState.activeDocument = {

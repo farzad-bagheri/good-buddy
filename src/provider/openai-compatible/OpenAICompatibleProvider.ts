@@ -51,12 +51,14 @@ function detectVision(
 
 export class OpenAICompatibleProvider implements GoodBuddyProvider {
   private readonly request: Request;
+  private readonly isOpenAI: boolean;
 
   constructor() {
     const config = getGoodBuddyConfig();
     const baseUrl = config.openAICompatibleEndpoint.endsWith("/")
       ? config.openAICompatibleEndpoint
       : `${config.openAICompatibleEndpoint}/`;
+    this.isOpenAI = new URL(baseUrl).hostname === "api.openai.com";
     const apiKey = config.openAICompatibleApiKey.trim();
     this.request = new Request(
       baseUrl,
@@ -115,7 +117,7 @@ export class OpenAICompatibleProvider implements GoodBuddyProvider {
       })),
       stream: false,
       ...(options.format !== undefined && {
-        response_format: this.responseFormat(options.format),
+        response_format: this.responseFormat(options.format, options.allowJsonMode),
       }),
     };
     const response = await this.request.post(
@@ -155,7 +157,7 @@ export class OpenAICompatibleProvider implements GoodBuddyProvider {
       })),
       stream: true,
       ...(options.format !== undefined && {
-        response_format: this.responseFormat(options.format),
+        response_format: this.responseFormat(options.format, options.allowJsonMode),
       }),
     };
     const response = await this.request.post(
@@ -262,8 +264,12 @@ export class OpenAICompatibleProvider implements GoodBuddyProvider {
 
   private responseFormat(
     format: NonNullable<ChatOptions["format"]>,
+    allowJsonMode?: boolean,
   ): Record<string, unknown> {
-    if (format === "json") return { type: "json_object" };
+    // The agent schema uses constructs that OpenAI's strict schema subset rejects.
+    if (format === "json" || (this.isOpenAI && allowJsonMode)) {
+      return { type: "json_object" };
+    }
     return {
       type: "json_schema",
       json_schema: {
