@@ -40,6 +40,7 @@ export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
   displayContent?: string;
+  skillInstructions?: string;
   images?: ChatImage[];
   extras?: ResponseExtras;
 }

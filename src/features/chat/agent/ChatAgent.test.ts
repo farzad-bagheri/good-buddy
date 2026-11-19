@@ -38,6 +38,160 @@ function createProvider(chat: GoodBuddyProvider["chat"]) {
 }
 
 describe("ChatAgent", () => {
+  it("stops repeated failed replacements even when the model changes the text and rereads the file", async () => {
+    const request = (tool: string, args: Record<string, string>, title: string | null) =>
+      JSON.stringify({
+        type: "tool_call", response: "", tool, autoApprove: false,
+        arguments: args, title, extras: { suggestions: [], files: [], artifacts: [] },
+      });
+    const chat = vi.fn()
+      .mockResolvedValueOnce(request("replace_in_file", { path: "src/app.ts", oldText: "first", newText: "one" }, "Update app"))
+      .mockResolvedValueOnce(request("read_file", { path: "src/app.ts" }, null))
+      .mockResolvedValueOnce(request("replace_in_file", { path: "src/app.ts", oldText: "second", newText: "two" }, null))
+      .mockResolvedValueOnce(request("replace_in_file", { path: "src/app.ts", oldText: "third", newText: "three" }, null));
+    const execute = vi.fn().mockImplementation(async (call: { tool: string }) => {
+      if (call.tool === "read_file") return "Actual file content";
+      throw new Error("Expected exactly one matching section in src/app.ts, found 0. Read the file and use a more specific oldText.");
+    });
+    const agent = new ChatAgent(
+      createProvider(chat as GoodBuddyProvider["chat"]),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [{ id: "read_file" }, { id: "replace_in_file" }], execute } as never,
+      { onToolStatus: vi.fn(), onModelStatus: vi.fn() },
+    );
+    const result = await agent.run(
+      [{ role: "user", content: "Update the file" }],
+      { model: "model" } as ProviderModel,
+      new AbortController().signal,
+    );
+    expect(result.response).toContain("after three attempts");
+    expect(result.response).toContain("No approval was requested");
+    expect(chat).toHaveBeenCalledTimes(4);
+    expect(execute).toHaveBeenCalledTimes(4);
+  });
+
+  it.each([
+    ["write_file", { path: "notes.txt", content: "hello" }, "Write denied by the user.", "file change", "not applied"],
+    ["replace_in_file", { path: "notes.txt", oldText: "before", newText: "after" }, "Write denied by the user.", "file change", "not applied"],
+    ["run_command", { command: "npm test" }, "Command denied by the user.", "command", "not run"],
+  ])("stops after the user rejects %s", async (tool, args, denial, operation, outcome) => {
+    const chat = vi.fn().mockResolvedValue(JSON.stringify({
+      type: "tool_call", response: "", tool, autoApprove: false,
+      arguments: args, title: "Test approval", extras: { suggestions: [], files: [], artifacts: [] },
+    }));
+    const execute = vi.fn().mockResolvedValue(denial);
+    const agent = new ChatAgent(
+      createProvider(chat as GoodBuddyProvider["chat"]),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [{ id: tool }], execute } as never,
+      { onToolStatus: vi.fn(), onModelStatus: vi.fn() },
+    );
+    const result = await agent.run(
+      [{ role: "user", content: "Propose a change" }],
+      { model: "model" } as ProviderModel,
+      new AbortController().signal,
+    );
+    expect(result.response).toContain(operation);
+    expect(result.response).toContain(outcome);
+    expect(chat).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("continues after a failed replacement when the next proposal succeeds", async () => {
+    const request = (oldText: string, title: string | null) => JSON.stringify({
+      type: "tool_call", response: "", tool: "replace_in_file", autoApprove: false,
+      arguments: { path: "app.ts", oldText, newText: "new" }, title,
+      extras: { suggestions: [], files: [], artifacts: [] },
+    });
+    const chat = vi.fn()
+      .mockResolvedValueOnce(request("wrong", "Update app"))
+      .mockResolvedValueOnce(request("correct", null))
+      .mockResolvedValueOnce(JSON.stringify({
+        type: "final", response: "Updated app.ts.", tool: null, autoApprove: false,
+        arguments: {}, title: null, extras: { suggestions: [], files: [], artifacts: [] },
+      }));
+    const execute = vi.fn()
+      .mockRejectedValueOnce(new Error("Expected exactly one matching section in app.ts, found 0."))
+      .mockResolvedValueOnce("Wrote app.ts.");
+    const agent = new ChatAgent(
+      createProvider(chat as GoodBuddyProvider["chat"]),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [{ id: "replace_in_file" }], execute } as never,
+      { onToolStatus: vi.fn(), onModelStatus: vi.fn() },
+    );
+    const result = await agent.run(
+      [{ role: "user", content: "Update app.ts" }],
+      { model: "model" } as ProviderModel,
+      new AbortController().signal,
+    );
+    expect(result.response).toBe("Updated app.ts.");
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("resets the failed-replacement limit after a successful write to the same file", async () => {
+    const request = (tool: string, args: Record<string, string>, title: string | null) =>
+      JSON.stringify({
+        type: "tool_call", response: "", tool, autoApprove: false,
+        arguments: args, title, extras: { suggestions: [], files: [], artifacts: [] },
+      });
+    const replacement = (title: string | null) =>
+      request("replace_in_file", { path: "app.ts", oldText: "wrong", newText: "new" }, title);
+    const chat = vi.fn()
+      .mockResolvedValueOnce(replacement("Update app"))
+      .mockResolvedValueOnce(replacement(null))
+      .mockResolvedValueOnce(request("write_file", { path: "app.ts", content: "new" }, null))
+      .mockResolvedValueOnce(replacement(null))
+      .mockResolvedValueOnce(replacement(null))
+      .mockResolvedValueOnce(JSON.stringify({
+        type: "final", response: "Some edits could not be prepared.", tool: null, autoApprove: false,
+        arguments: {}, title: null, extras: { suggestions: [], files: [], artifacts: [] },
+      }));
+    const execute = vi.fn().mockImplementation(async (call: { tool: string }) => {
+      if (call.tool === "write_file") return "Wrote app.ts. VS Code modified the content on save (for example formatting), so the file may differ slightly from the proposal.";
+      throw new Error("Expected exactly one matching section in app.ts, found 0.");
+    });
+    const agent = new ChatAgent(
+      createProvider(chat as GoodBuddyProvider["chat"]),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [{ id: "replace_in_file" }, { id: "write_file" }], execute } as never,
+      { onToolStatus: vi.fn(), onModelStatus: vi.fn() },
+    );
+    const result = await agent.run(
+      [{ role: "user", content: "Update app.ts" }],
+      { model: "model" } as ProviderModel,
+      new AbortController().signal,
+    );
+    expect(result.response).toBe("Some edits could not be prepared.");
+    expect(execute).toHaveBeenCalledTimes(5);
+  });
+
+  it("uses only the current request's skill instructions", async () => {
+    const chat = vi.fn().mockResolvedValue(JSON.stringify({
+      type: "final", response: "Done.", tool: null, autoApprove: false,
+      arguments: {}, title: null, suggestions: [], files: [],
+    }));
+    const agent = new ChatAgent(
+      createProvider(chat as GoodBuddyProvider["chat"]),
+      { appendLine: vi.fn() },
+      { projectContext: vi.fn().mockResolvedValue("project context") } as never,
+      { list: () => [], execute: vi.fn() } as never,
+      { onToolStatus: vi.fn(), onModelStatus: vi.fn() },
+    );
+    await agent.run([
+      { role: "user", content: "Old request", skillInstructions: "Old skill instructions" },
+      { role: "assistant", content: "Old answer" },
+      { role: "user", content: "New request", skillInstructions: "New skill instructions" },
+    ], { model: "model" } as unknown as ProviderModel, new AbortController().signal);
+    const messages = chat.mock.calls[0][0].messages;
+    expect(messages[1].content).toBe("Old request");
+    expect(messages.at(-1).content).toContain("New skill instructions");
+    expect(messages.at(-1).content).toContain("New request");
+  });
+
   it("streams only the user-facing response field from the structured output", async () => {
     const response = JSON.stringify({
       type: "final",

@@ -36,6 +36,11 @@ export const shellHtml = (cspSource: string, nonce: string, scriptUri: string, s
         -webkit-mask-image: url("${iconUri("copy")}");
       }
 
+    .commands-icon {
+        mask-image: url("${iconUri("commands")}");
+        -webkit-mask-image: url("${iconUri("commands")}");
+      }
+
     .debug-icon {
         mask-image: url("${iconUri("debug")}");
         -webkit-mask-image: url("${iconUri("debug")}");

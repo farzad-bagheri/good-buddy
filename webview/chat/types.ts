@@ -2,6 +2,13 @@ export interface VsCodeApi {
   postMessage(message: Record<string, unknown>): void;
 }
 
+export interface WorkspaceSkill {
+  id: string;
+  name: string;
+  description: string;
+  location: string;
+}
+
 export interface ChatSummary {
   id: string;
   title: string;

@@ -25,6 +25,14 @@ export function ProviderSetupDialog({
   const checking = provider.status === "checking";
   const isOllama = provider.provider === "ollama";
   const providerName = isOllama ? "Ollama" : "OpenAI-compatible server";
+  const missingSelections = [
+    provider.missingModels.includes(provider.chatModel)
+      ? `Chat: ${provider.chatModel}`
+      : "",
+    provider.missingModels.includes(provider.completionModel)
+      ? `Inline completion: ${provider.completionModel}`
+      : "",
+  ].filter(Boolean);
 
   const message = (() => {
     switch (provider.status) {
@@ -90,7 +98,7 @@ export function ProviderSetupDialog({
       )}
       {provider.status === "models-missing" && (
         <p className={styles.help}>
-          Unavailable: {provider.missingModels.join(", ")}
+          Unavailable: {missingSelections.join(", ")}
           {isOllama && " — download replacements with ollama pull <model>."}
         </p>
       )}

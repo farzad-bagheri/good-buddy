@@ -18,6 +18,7 @@ import {
   updateAssistantMessage,
   updateWriteProposal,
 } from "./timelineUtils";
+import { createSlowResponseWarning } from "./slowResponseWarning";
 import type {
   AttachmentState,
   ChatSummary,
@@ -25,6 +26,7 @@ import type {
   ProviderModel,
   ProviderStatusInfo,
   TimelineItem,
+  WorkspaceSkill,
 } from "./types";
 import { createItemId } from "./utils";
 import { getVisionSupport } from "./visionSupport";
@@ -61,6 +63,11 @@ export function App() {
    */
   const [text, setText] = useState("");
   const [thinking, setThinking] = useState(false);
+  const [slowResponse, setSlowResponse] = useState(false);
+  const [skills, setSkills] = useState<WorkspaceSkill[]>([]);
+  const [skillsTrusted, setSkillsTrusted] = useState(true);
+  const [selectedSkill, setSelectedSkill] = useState<WorkspaceSkill | undefined>();
+  const slowWarningRef = useRef<ReturnType<typeof createSlowResponseWarning> | undefined>(undefined);
   /**
    * The ID of the current assistant message being composed.
    */
@@ -71,6 +78,8 @@ export function App() {
   const endOfMessages = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const slowWarning = createSlowResponseWarning(setSlowResponse);
+    slowWarningRef.current = slowWarning;
     // Listen for messages from the VS Code extension.
     function onMessage(event: MessageEvent) {
       const message = event.data;
@@ -91,10 +100,21 @@ export function App() {
           });
           break;
         case "vsc:history":
+          slowWarning.stop();
+          setSelectedSkill(undefined);
           setHistoryOpen(false);
           setThinking(message.thinking === true);
           assistantId.current = undefined;
           setItems(mapHistoryToTimelineItems(message.messages));
+          break;
+        case "vsc:skills":
+          setSkills(message.skills);
+          setSkillsTrusted(message.trusted === true);
+          break;
+        case "vsc:skillError":
+          setText(message.text);
+          setThinking(false);
+          appendItem({ kind: "message", role: "error", text: message.error });
           break;
         case "vsc:chatList":
           setHistory(message.chats);
@@ -102,6 +122,7 @@ export function App() {
           setProjectName(message.projectName);
           break;
         case "vsc:userMessage":
+          setSelectedSkill(undefined);
           appendItem({
             kind: "message",
             role: "user",
@@ -128,6 +149,7 @@ export function App() {
           break;
         }
         case "vsc:assistantChunk":
+          if (message.text) slowWarning.stop();
           if (assistantId.current) {
             const id = assistantId.current;
             setItems((current) =>
@@ -139,6 +161,7 @@ export function App() {
           }
           break;
         case "vsc:assistantDone":
+          slowWarning.stop();
           setThinking(false);
           if (assistantId.current) {
             const id = assistantId.current;
@@ -151,14 +174,21 @@ export function App() {
           assistantId.current = undefined;
           break;
         case "vsc:assistantError":
+          slowWarning.stop();
           setThinking(false);
           assistantId.current = undefined;
           appendItem({ kind: "message", role: "error", text: message.text });
           break;
         case "vsc:modelStatus":
-          if (message.waiting) setThinking(true);
+          if (message.waiting) {
+            setThinking(true);
+            slowWarning.start();
+          } else {
+            slowWarning.stop();
+          }
           break;
         case "vsc:requestDone":
+          slowWarning.stop();
           setThinking(false);
           break;
         case "vsc:toolStatus":
@@ -222,13 +252,17 @@ export function App() {
 
     window.addEventListener("message", onMessage);
     vscode.postMessage({ type: "wv:ready" });
-    return () => window.removeEventListener("message", onMessage);
+    return () => {
+      window.removeEventListener("message", onMessage);
+      slowWarning.stop();
+      slowWarningRef.current = undefined;
+    };
   }, []);
 
   // Scroll to the end of the messages when items or thinking state changes.
   useEffect(() => {
     endOfMessages.current?.scrollIntoView({ block: "end" });
-  }, [items, thinking]);
+  }, [items, thinking, slowResponse]);
 
   const toggleHistory = () => {
     const opening = !historyOpen;
@@ -300,6 +334,7 @@ export function App() {
         onToggleHistoryScope={toggleHistoryScope}
         onNewChat={() => {
           setHistoryOpen(false);
+          slowWarningRef.current?.stop();
           vscode.postMessage({ type: "wv:newChat" });
         }}
         onOpenSetup={() => {
@@ -336,7 +371,7 @@ export function App() {
               retryDisabled={thinking}
             />
 
-            {thinking && <ThinkingIndicator />}
+            {thinking && <ThinkingIndicator slowResponse={slowResponse} />}
 
             {files && files.length > 0 && (
               <Files files={files} onOpen={handleOpenFile} />
@@ -356,9 +391,16 @@ export function App() {
             vision={getVisionSupport(models, selectedModel)}
             text={text}
             busy={thinking}
+            skills={skills}
+            skillsTrusted={skillsTrusted}
+            selectedSkill={selectedSkill}
+            onSelectSkill={setSelectedSkill}
             onTextChange={setText}
             onSend={() => setThinking(true)}
-            onCancel={() => vscode.postMessage({ type: "wv:cancel" })}
+            onCancel={() => {
+              slowWarningRef.current?.stop();
+              vscode.postMessage({ type: "wv:cancel" });
+            }}
           />
         </>
       )}

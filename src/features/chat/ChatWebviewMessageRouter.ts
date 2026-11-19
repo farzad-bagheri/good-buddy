@@ -10,7 +10,8 @@ export interface ChatWebviewMessageHandlers {
   checkProvider(): Promise<void>;
   openSettings(): Promise<void>;
   openFile(filePath: string): Promise<void>;
-  send(text: string): Promise<void>;
+  send(text: string, skillId?: string): Promise<void>;
+  listSkills(): Promise<void>;
   reviewChanges(): Promise<void>;
   retry(historyIndex: number): Promise<void>;
   attachFiles(): Promise<void>;
@@ -50,7 +51,12 @@ export class ChatWebviewMessageRouter {
         case "wv:openFile":
           return this.handlers.openFile(String(message.filePath ?? ""));
         case "wv:send":
-          return this.handlers.send(String(message.text ?? ""));
+          return this.handlers.send(
+            String(message.text ?? ""),
+            typeof message.skillId === "string" ? message.skillId : undefined,
+          );
+        case "wv:listSkills":
+          return this.handlers.listSkills();
         case "wv:reviewChanges":
           return this.handlers.reviewChanges();
         case "wv:retry":

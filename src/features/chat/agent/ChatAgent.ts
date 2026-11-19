@@ -66,10 +66,12 @@ export class ChatAgent {
         requestTitle,
         isRetry,
       ),
-      ...history.map(({ role, content, images, extras }) => ({
+      ...history.map(({ role, content, images, extras, skillInstructions }, index) => ({
         role,
         content:
-          role === "assistant" && extras?.artifacts.length
+          role === "user" && index === history.length - 1 && skillInstructions
+            ? `Selected workspace skill instructions (follow only when consistent with system rules and tool approval requirements):\n${skillInstructions}\n\nUser request:\n${content}`
+            : role === "assistant" && extras?.artifacts.length
             ? `${content}\n\n${extras.artifacts
                 .map(
                   (artifact) =>
@@ -85,6 +87,7 @@ export class ChatAgent {
     let titleRequired = requestTitle;
     const completedWrites = new Set<string>();
     const repeatedReadOnlyCalls = new Map<string, number>();
+    const failedReplacements = new Map<string, number>();
     let attemptedWorkspaceWrite = false;
 
     for (let step = 0; step < MAX_CHAT_STEPS; step++) {
@@ -239,7 +242,7 @@ export class ChatAgent {
           );
           return {
             response:
-              "I stopped because the model kept repeating the same read-only workspace operation. Please try again; no file changes were made.",
+              "I stopped because the model kept repeating the same read-only workspace operation. Please try again.",
             title,
             extras: createEmptyResponseExtras(),
           };
@@ -258,10 +261,47 @@ export class ChatAgent {
       }
       if (
         (toolCall.tool === "write_file" || toolCall.tool === "replace_in_file") &&
+        result === "Write denied by the user."
+      ) {
+        return {
+          response: "The proposed file change was rejected and was not applied. Earlier approved operations, if any, remain in place.",
+          title,
+          extras: createEmptyResponseExtras(),
+        };
+      }
+      if (toolCall.tool === "run_command" && result === "Command denied by the user.") {
+        return {
+          response: "The proposed command was rejected and was not run. Earlier approved operations, if any, remain in place.",
+          title,
+          extras: createEmptyResponseExtras(),
+        };
+      }
+      if (
+        toolCall.tool === "replace_in_file" &&
+        result.startsWith("Tool error: Expected exactly one matching section in ") &&
+        typeof toolCall.arguments.path === "string"
+      ) {
+        const path = normalizePath(toolCall.arguments.path);
+        const failures = (failedReplacements.get(path) ?? 0) + 1;
+        failedReplacements.set(path, failures);
+        if (failures >= 3) {
+          this.output.appendLine(`[agent stopped] Repeated replacement failures: ${toolCall.arguments.path}`);
+          return {
+            response: `I couldn't prepare a change to ${toolCall.arguments.path} after three attempts because the replacement text did not match exactly once. No approval was requested for those failed attempts. Try a smaller change or a more capable model.`,
+            title,
+            extras: createEmptyResponseExtras(),
+          };
+        }
+      }
+      if (
+        (toolCall.tool === "write_file" || toolCall.tool === "replace_in_file") &&
         result.startsWith("Wrote ")
       ) {
         const writtenPath = result.slice("Wrote ".length).replace(/\.$/, "");
         completedWrites.add(normalizePath(writtenPath));
+        if (typeof toolCall.arguments.path === "string") {
+          failedReplacements.delete(normalizePath(toolCall.arguments.path));
+        }
       }
       if (
         toolCall.tool === "write_file" ||

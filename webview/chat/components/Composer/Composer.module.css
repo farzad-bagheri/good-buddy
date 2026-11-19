@@ -22,6 +22,7 @@
 }
 
 .composer {
+  position: relative;
   padding: 8px 12px;
   border: 1px solid var(--vscode-input-border, transparent);
   border-radius: 8px;
@@ -99,11 +100,14 @@
 
 .promptMenu {
   position: absolute;
+  left: 0;
   right: 0;
   bottom: calc(100% + 6px);
   z-index: 2;
   display: flex;
   min-width: 180px;
+  max-height: 260px;
+  overflow-y: auto;
   flex-direction: column;
   gap: 2px;
   padding: 4px;
@@ -115,7 +119,7 @@
 
 .promptMenuItem {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   padding: 6px;
   border: 0;
@@ -128,7 +132,7 @@
   display: block;
   width: 16px;
   height: 16px;
-  flex: 0 0 auto;
+  flex: 0 0 16px;
   background-color: currentColor;
   mask-position: center;
   mask-repeat: no-repeat;
@@ -136,4 +140,26 @@
   -webkit-mask-position: center;
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-size: contain;
+}
+
+.promptMenuText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.promptMenuItem[aria-selected="true"] {
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.promptMenuItem small,
+.menuNote {
+  font-size: 0.85em;
+}
+
+.menuNote {
+  padding: 6px;
+  color: var(--vscode-descriptionForeground);
 }

@@ -10,6 +10,7 @@ const iconNames = [
   "back",
   "check",
   "copy",
+  "commands",
   "debug",
   "delete",
   "explain",

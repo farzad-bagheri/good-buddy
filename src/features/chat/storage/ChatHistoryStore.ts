@@ -204,6 +204,8 @@ function isStoredChatRecord(value: unknown): value is StoredChatRecord {
         typeof message.content === "string" &&
         (message.displayContent === undefined ||
           typeof message.displayContent === "string") &&
+        (message.skillInstructions === undefined ||
+          typeof message.skillInstructions === "string") &&
         (message.extras === undefined || isResponseExtras(message.extras)) &&
         isValidLegacyExtras(message) &&
         (message.images === undefined ||

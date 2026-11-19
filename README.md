@@ -25,15 +25,17 @@ server you configure and does not require a Good Buddy cloud service.
   model supports vision; text-only models may reject image requests.
 - **Choose code context.** The open file is included when it fits the attachment
   limit; remove its context chip to exclude it from the next message. Select
-  code and use **Selection** in the chat composer to attach just that region;
-  remove it from the attachment chips when you no longer need it.
-- **Review Git changes.** Choose **Review changes** in the chat composer to
+  code and use the selection button or **/attach-selection** in the chat
+  composer to attach just that region; remove it from the attachment chips
+  when you no longer need it.
+- **Review Git changes.** Choose **/review-changes** in the chat composer to
   review staged and unstaged diffs plus small text untracked files. This is
   read-only; Good Buddy does not stage files or change your repository.
-- **Reuse prompt templates.** Choose **Prompts** in the chat composer to insert
+- **Reuse prompt templates.** Type **/** in the chat composer to insert
   a starter prompt for explaining code, writing tests, finding a bug, or
   improving code. You can also start a Git review from this menu. Inserted
-  prompts are editable and are not sent until you choose Send.
+  prompts are editable and are not sent until you choose Send. The same menu
+  provides attachment actions and workspace skills.
 - **Make changes with the assistant.** Ask it to add a feature, update existing
   behavior, or fix a bug. Good Buddy can inspect files, propose edits, and run
   project commands. For project setup, it can inspect the detected ecosystem,
@@ -73,6 +75,27 @@ Saved chats are grouped by the opened workspace. Open chat history to see chats
 for the current workspace, or switch to **All chats** to browse conversations
 from other workspaces and chats created without a workspace.
 
+### Workspace skills
+
+In a trusted workspace, add `.github/skills/<folder>/SKILL.md` or
+`.agents/skills/<folder>/SKILL.md` to make a skill available in the `/` menu.
+For example:
+
+```markdown
+---
+name: write-tests
+description: Write focused tests following project conventions
+---
+Inspect the existing tests, add focused cases, and run the relevant test command.
+```
+
+Use a lowercase kebab-case name and a single-line description. Select a skill
+explicitly from the menu, then write and send your request; the selected skill
+applies to that request and is included in its saved chat history for retries.
+Skills are instructions, not executable plugins: they cannot bypass file,
+command, or MCP tool approval. Only use skills from workspace authors you trust.
+Files are limited to 64 KB; symlinked skills are not supported.
+
 ## Contributing
 
 Contributions are welcome! Please open issues or submit pull requests on the [GitHub repository](https://github.com/farzad-bagheri/good-buddy).
@@ -111,7 +134,9 @@ from the Good Buddy settings if that is your preferred server.
 
    When changing provider or endpoint, Good Buddy loads that connection's
    saved model selections. If either choice is missing or unavailable, choose
-   a model from the server's current list in the Models dialog.
+   a model from the server's current list in the Models dialog. The chat
+   notice only flags problems that prevent chat; the Models dialog also shows
+   issues with the inline-completion selection.
 
 For an OpenAI-compatible server, choose model IDs returned by its `/models`
 endpoint in the Models dialog. The server must support `/chat/completions`;
@@ -128,6 +153,16 @@ invalid ones; choose a model that supports JSON mode and chat completions.
 If a chat request fails, Good Buddy displays the server's error message when
 available. Error details come from the server and may contain information about
 your request; review them before sharing.
+
+If a model takes more than 30 seconds to produce a visible response, chat shows
+a reminder to check the local machine's RAM and the model server configuration.
+The first run can take longer while the model loads. This warning does not stop
+the request.
+
+If a model repeatedly fails to match the text for a file edit, Good Buddy stops
+and reports that no approval was requested for those failed attempts. Try a
+smaller change or a more capable model. Rejecting a file or command proposal
+also stops the current request; earlier approved operations are not undone.
 
 ### Ollama model suggestions
 

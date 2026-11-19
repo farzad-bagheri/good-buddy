@@ -18,6 +18,7 @@ import { ChatHistoryStore } from "./storage/ChatHistoryStore";
 import { McpToolManager, ToolRegistry } from "./tools";
 import { WorkspaceTools } from "./tools/WorkspaceTools";
 import { findRetryUserIndex, formatError } from "./utils";
+import { WorkspaceSkills } from "./WorkspaceSkills";
 
 export class ChatFeature implements vscode.WebviewViewProvider {
   public static readonly viewType = "goodBuddy.chatView";
@@ -37,6 +38,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
   private readonly commandApprovals: CommandApprovalManager;
   private readonly tools: ToolRegistry;
   private readonly agent: ChatAgent;
+  private readonly skills: WorkspaceSkills;
 
   /** Initializes chat tools, approval managers, and the chat agent. */
   constructor(
@@ -46,6 +48,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     readonly modelSelections: ModelSelectionStore,
   ) {
     this.resources = new Resources(context);
+    this.skills = new WorkspaceSkills(output);
 
     this.viewState = new ChatViewState(
       context,
@@ -250,7 +253,18 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         );
       },
       openFile: (filePath) => this.openFileInVsCode(filePath),
-      send: (text) => this.handleSend(text),
+      send: (text, skillId) => this.handleSend(text, undefined, { skillId }),
+      listSkills: async () => {
+        try {
+          const skills = await this.skills.list();
+          this.view?.webview.postMessage({ type: "vsc:skills", skills, trusted: vscode.workspace.isTrusted });
+        } catch (error) {
+          const message = formatError(error);
+          this.output.appendLine(`[skill discovery error] ${message}`);
+          void vscode.window.showErrorMessage(`Good Buddy could not discover workspace skills: ${message}`);
+          this.view?.webview.postMessage({ type: "vsc:skills", skills: [], trusted: vscode.workspace.isTrusted });
+        }
+      },
       reviewChanges: () => this.handleGitReview(),
       retry: (historyIndex) => this.handleRetry(historyIndex),
       attachFiles: () => this.viewState.pickAttachments(),
@@ -278,6 +292,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
         this.viewState.postAttachments();
         await this.postHistory();
         await this.postChatList();
+        await this.viewState.sendModelList();
       },
       listChats: (allChats) => this.postChatList(allChats),
       resumeChat: (id) => this.resumeChat(id),
@@ -517,6 +532,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       includeAttachments?: boolean;
       clearAttachments?: boolean;
       displayContent?: string;
+      skillId?: string;
     } = {},
   ): Promise<void> {
     // Return early if a new message is empty and has no attachments, or the webview is unavailable.
@@ -541,6 +557,35 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     const controller = new AbortController();
     this.activeController = controller;
     this.assistantStreamSignal = undefined;
+    let skill: { name: string; instructions: string } | undefined;
+    if (options.skillId) {
+      try {
+        skill = await this.skills.load(options.skillId);
+      } catch (error) {
+        if (this.activeController === controller) {
+          this.activeController = undefined;
+          if (!controller.signal.aborted) {
+            const message = formatError(error);
+            this.output.appendLine(`[skill error] ${message}`);
+            this.view?.webview.postMessage({
+              type: "vsc:skillError",
+              text: userMessage,
+              skillId: options.skillId,
+              error: `Could not use the selected skill: ${message}`,
+            });
+          }
+          this.view?.webview.postMessage({ type: "vsc:requestDone" });
+        }
+        return;
+      }
+    }
+    if (controller.signal.aborted || this.activeController !== controller) {
+      if (this.activeController === controller) {
+        this.activeController = undefined;
+        this.view?.webview.postMessage({ type: "vsc:requestDone" });
+      }
+      return;
+    }
     const modelName = this.viewState.getSelectedModel();
     const selectedModel = await this.viewState.modelDetails(modelName);
     if (controller.signal.aborted || this.activeController !== controller) {
@@ -569,7 +614,8 @@ export class ChatFeature implements vscode.WebviewViewProvider {
           )
         : undefined;
     const userContent =
-      replayMessage?.content ?? `${userMessage}${attachmentBlock}`.trim();
+      replayMessage?.content ??
+      `${userMessage}${attachmentBlock}`.trim();
     const attachedNames = replayMessage
       ? []
       : [
@@ -590,7 +636,7 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     const displayContent =
       replayMessage?.displayContent ??
       options.displayContent ??
-      `${userMessage}${attachmentLabel}`.trim();
+      `${skill ? `[Skill: ${skill.name}]\n\n` : ""}${userMessage}${attachmentLabel}`.trim();
     if (!replayMessage && options.clearAttachments !== false) {
       this.viewState.attachments.clear();
       this.viewState.postAttachments();
@@ -602,6 +648,9 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       role: "user",
       content: userContent,
       displayContent,
+      ...((replayMessage?.skillInstructions ?? skill?.instructions) && {
+        skillInstructions: replayMessage?.skillInstructions ?? skill?.instructions,
+      }),
       ...(images?.length && { images }),
     });
     this.view.webview.postMessage({

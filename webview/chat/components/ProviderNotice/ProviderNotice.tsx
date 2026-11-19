@@ -26,13 +26,18 @@ export function ProviderNotice({
           ? "The server is connected but has no downloaded models."
           : "The server is connected but has no available models.";
       case "models-unselected":
-        return "Choose chat and inline-completion models to finish setup.";
+        return provider.chatModel ? "" : "Choose a chat model to get started.";
       case "models-missing":
-        return "A selected model is no longer available from this server.";
+        if (!provider.chatModel) return "Choose a chat model to get started.";
+        return provider.missingModels.includes(provider.chatModel)
+          ? "The selected chat model is no longer available from this server."
+          : "";
       case "ready":
         return "";
     }
   })();
+
+  if (!message) return null;
 
   return (
     <section

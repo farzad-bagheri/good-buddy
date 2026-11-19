@@ -8,6 +8,12 @@
   font-size: 0.9em;
 }
 
+.warning {
+  margin: 4px 8px 0;
+  color: var(--vscode-editorWarning-foreground, var(--vscode-foreground));
+  font-size: 0.9em;
+}
+
 .dots {
   display: inline-flex;
   align-items: center;

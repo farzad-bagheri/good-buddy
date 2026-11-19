@@ -71,6 +71,17 @@ describe("ChatHistoryStore", () => {
     expect(chats[0]).not.toHaveProperty("messages");
   });
 
+  it("preserves selected skill instructions for retries", async () => {
+    const store = new ChatHistoryStore({ path: "/extension" } as never);
+    const chat = createChat(
+      "7c89a311-9d47-4d44-90a4-dde41d47f5b0",
+      "2026-09-26T10:00:00.000Z",
+    );
+    chat.messages[0].skillInstructions = "Inspect existing tests first.";
+    await store.save(chat);
+    await expect(store.get(chat.id)).resolves.toEqual(chat);
+  });
+
   it("filters history by project and includes legacy chats in all-project history", async () => {
     const store = new ChatHistoryStore({ path: "/extension" } as never);
     const projectChat = createChat(
