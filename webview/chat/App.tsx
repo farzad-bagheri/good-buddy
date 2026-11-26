@@ -345,11 +345,13 @@ export function App() {
 
       {historyOpen ? (
         <ChatHistory
+          key={historyAllChats ? "all" : "workspace"}
           history={history}
           allChats={historyAllChats}
           projectName={projectName}
           onResume={(id) => vscode.postMessage({ type: "wv:resumeChat", id })}
-          onDelete={(id) => vscode.postMessage({ type: "wv:deleteChat", id })}
+          onDelete={(ids) => vscode.postMessage({ type: "wv:deleteChats", ids })}
+          onExport={(ids) => vscode.postMessage({ type: "wv:exportChats", ids })}
         />
       ) : (
         <>

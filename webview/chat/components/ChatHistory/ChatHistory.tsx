@@ -1,5 +1,5 @@
+import { useState } from "react";
 import type { ChatSummary } from "../../types";
-import { IconButton } from "../IconButton/IconButton";
 import styles from "./ChatHistory.module.css";
 
 export function ChatHistory({
@@ -7,24 +7,28 @@ export function ChatHistory({
   allChats,
   projectName,
   onResume,
-  onDelete,
+  onDelete, onExport,
 }: {
   history: ChatSummary[];
   allChats: boolean;
   projectName?: string;
   onResume: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (ids: string[]) => void;
+  onExport: (ids: string[]) => void;
 }) {
+  const [selected, setSelected] = useState<string[]>([]);
+  const ids = history.filter((chat) => selected.includes(chat.id)).map((chat) => chat.id);
   const handleResume = (id: string) => () => {
     onResume(id);
   };
 
-  const handleDelete = (id: string) => () => {
-    onDelete(id);
-  };
-  
   return (
     <section className={styles.history} aria-label="Saved chats">
+      {history.length > 0 && <div className={styles.actions}>
+        <label><input type="checkbox" checked={ids.length === history.length} onChange={(event) => setSelected(event.target.checked ? history.map((chat) => chat.id) : [])} /> Select all</label>
+        <button type="button" disabled={!ids.length} onClick={() => onExport(ids)}>Export ({ids.length})</button>
+        <button type="button" disabled={!ids.length} onClick={() => onDelete(ids)}>Delete ({ids.length})</button>
+      </div>}
       {history.length === 0 ? (
         <p className={styles.empty}>
           {allChats
@@ -36,6 +40,7 @@ export function ChatHistory({
       ) : (
         history.map((chat) => (
           <div className={styles.item} key={chat.id}>
+            <input type="checkbox" aria-label={`Select ${chat.title}`} checked={ids.includes(chat.id)} onChange={(event) => setSelected((previous) => event.target.checked ? [...previous, chat.id] : previous.filter((id) => id !== chat.id))} />
             <button
               className={styles.resume}
               type="button"
@@ -52,12 +57,6 @@ export function ChatHistory({
                 {new Date(chat.updatedAt).toLocaleString()}
               </span>
             </button>
-            <IconButton
-              iconName="delete-icon"
-              type="button"
-              title="Delete chat"
-              onClick={handleDelete(chat.id)}
-            />
           </div>
         ))
       )}

@@ -27,7 +27,8 @@ export interface ChatWebviewMessageHandlers {
   newChat(): Promise<void>;
   listChats(allChats: boolean): Promise<void>;
   resumeChat(id: string): Promise<void>;
-  deleteChat(id: string): Promise<void>;
+  deleteChats(ids: string[]): Promise<void>;
+  exportChats(ids: string[]): Promise<void>;
   cancel(): void;
   reviewWrite(id: string, approved: boolean): Promise<void>;
   reviewCommand(id: string, approved: boolean): Promise<void>;
@@ -91,8 +92,10 @@ export class ChatWebviewMessageRouter {
           return this.handlers.listChats(message.allChats === true);
         case "wv:resumeChat":
           return this.handlers.resumeChat(String(message.id ?? ""));
-        case "wv:deleteChat":
-          return this.handlers.deleteChat(String(message.id ?? ""));
+        case "wv:deleteChats":
+          return this.handlers.deleteChats(Array.isArray(message.ids) ? message.ids.filter((id): id is string => typeof id === "string") : []);
+        case "wv:exportChats":
+          return this.handlers.exportChats(Array.isArray(message.ids) ? message.ids.filter((id): id is string => typeof id === "string") : []);
         case "wv:cancel":
           return this.handlers.cancel();
         case "wv:reviewWrite":

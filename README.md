@@ -74,6 +74,9 @@ explanation. Inline completions appear as you type when enabled.
 Saved chats are grouped by the opened workspace. Open chat history to see chats
 for the current workspace, or switch to **All chats** to browse conversations
 from other workspaces and chats created without a workspace.
+Select one or more chats in history to export them together as JSON or delete
+them after confirmation. Exports include message content and attachments, so
+review the file before sharing it. Importing exported chats is not supported.
 
 ### Workspace skills
 
@@ -197,7 +200,7 @@ Browse the full catalog at [ollama.com/library](https://ollama.com/library) for 
 
 1. Install dependencies with `pnpm install`.
 2. Start your configured model server and ensure the configured models are available.
-3. Run `pnpm run watch`, then launch **Run Good Buddy Extension** from VS Code.
+3. In two terminals, run `pnpm run watch:extension` and `pnpm run watch:webview`, then launch **Run Good Buddy Extension** from VS Code.
 
 Run `pnpm run check` and `pnpm run lint` before committing. Use `pnpm run build` to create a production bundle.
 

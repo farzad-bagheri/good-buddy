@@ -296,7 +296,8 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       },
       listChats: (allChats) => this.postChatList(allChats),
       resumeChat: (id) => this.resumeChat(id),
-      deleteChat: (id) => this.confirmDeleteChat(id),
+      deleteChats: (ids) => this.confirmDeleteChats(ids),
+      exportChats: (ids) => this.exportChats(ids),
       cancel: () => this.cancelActiveRequest(),
       reviewWrite: (id, approved) => this.writeApprovals.review(id, approved),
       reviewCommand: (id, approved) =>
@@ -391,21 +392,37 @@ export class ChatFeature implements vscode.WebviewViewProvider {
     await this.postChatList();
   }
 
-  private async confirmDeleteChat(id: string): Promise<void> {
-    const chat = await this.session.get(id);
-    if (!chat) {
-      await this.postChatList();
-      return;
-    }
+  private async confirmDeleteChats(ids: string[]): Promise<void> {
+    const selected = [...new Set(ids)];
+    if (!selected.length) return;
 
     const choice = await vscode.window.showWarningMessage(
-      `Delete "${chat.title}"? This cannot be undone.`,
+      `Delete ${selected.length} selected chat${selected.length === 1 ? "" : "s"}? This cannot be undone.`,
       { modal: true },
       "Delete",
     );
     if (choice !== "Delete") return;
 
-    await this.deleteChat(id);
+    for (const id of selected) await this.deleteChat(id);
+  }
+
+  private async exportChats(ids: string[]): Promise<void> {
+    const selected = [...new Set(ids)];
+    if (!selected.length) return;
+    try {
+      const chats = await Promise.all(selected.map((id) => this.session.get(id)));
+      if (chats.some((chat) => !chat)) throw new Error("One or more selected chats could not be found.");
+      const destination = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file("good-buddy-chats.json"),
+        filters: { JSON: ["json"] },
+        saveLabel: "Export chats",
+      });
+      if (!destination) return;
+      await vscode.workspace.fs.writeFile(destination, Buffer.from(JSON.stringify({ version: 1, chats }, null, 2), "utf8"));
+      void vscode.window.showInformationMessage(`Exported ${chats.length} chat${chats.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      void vscode.window.showErrorMessage(`Good Buddy could not export chats: ${formatError(error)}`);
+    }
   }
 
   private async deleteChat(id: string): Promise<void> {
