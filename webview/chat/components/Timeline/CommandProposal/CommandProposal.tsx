@@ -1,6 +1,6 @@
 import type { TimelineItem } from "../../../types";
 import { vscode } from "../../../vscode";
-import styles from "../Proposal.module.css";
+import styles from "./CommandProposal.module.css";
 
 type CommandProposalItem = Extract<TimelineItem, { kind: "commandProposal" }>;
 
@@ -14,16 +14,20 @@ export function CommandProposal({ item }: { item: CommandProposalItem }) {
   };
 
   return (
-    <section className={styles.proposal}>
-      <strong>Run command</strong>
-      <pre>{item.command}</pre>
-      <pre className={styles.commandOutput} hidden={!item.output}>
-        {item.output}
-      </pre>
+    <section className={styles.terminal} aria-label="Command execution">
+      <div className={styles.header}>
+        <span className={styles.indicator} aria-hidden="true" />
+        <strong>Terminal</strong>
+        <span className={styles.headerLabel}>Run command</span>
+      </div>
+      <div className={styles.screen}>
+        <div className={styles.command}><span className={styles.prompt} aria-hidden="true">❯</span><pre>{item.command}</pre></div>
+        {item.output && <pre className={styles.output}>{item.output}</pre>}
+      </div>
       {item.status ? (
-        <div>{item.status}</div>
+        <div className={styles.status} role="status">{item.status}</div>
       ) : item.autoApproved ? (
-        <div>Running command...</div>
+        <div className={styles.status} role="status">Running command...</div>
       ) : (
         <div className={styles.actions}>
           {[true, false].map((approved) => (

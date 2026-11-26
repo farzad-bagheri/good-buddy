@@ -192,6 +192,11 @@ export function App() {
           setThinking(false);
           break;
         case "vsc:toolStatus":
+          if (assistantId.current) {
+            const id = assistantId.current;
+            setItems((current) => current.filter((item) => item.id !== id));
+            assistantId.current = undefined;
+          }
           appendItem({
             kind: "toolStatus",
             text: formatToolActivity(

@@ -186,11 +186,13 @@ export class ChatFeature implements vscode.WebviewViewProvider {
       this.workspaceTools,
       this.tools,
       {
-        onToolStatus: (tool) =>
+        onToolStatus: (tool) => {
+          this.assistantStreamSignal = undefined;
           this.view?.webview.postMessage({
             type: "vsc:toolStatus",
             tool,
-          }),
+          });
+        },
         onModelStatus: (waiting, signal) => {
           if (this.activeController?.signal !== signal) return;
           this.view?.webview.postMessage({ type: "vsc:modelStatus", waiting });
